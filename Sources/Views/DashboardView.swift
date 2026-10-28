@@ -228,7 +228,7 @@ struct DashboardView: View {
             repsParticipant: goalManager.repsParticipant,
             halfTest: viewModel.repsStatus(participant: goalManager.repsParticipant, year: currentYear).moreThanHalfStatus,
             noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: currentYear),
-            propertyName: nil, daysOfData: daysOfData, hasPendingToConfirm: inbox.badgeCount > 0))
+            propertyName: nil, daysOfData: daysOfData, hasPendingToConfirm: confirmCount > 0))
     }
 
     private var pace: TodayPaceSentence {
@@ -243,7 +243,7 @@ struct DashboardView: View {
         return TodayPaceSentence.make(.init(
             hours: shownHours, goal: focus.goal, year: currentYear, now: InboxClock.now(), isRecord: isRecord,
             paceReady: TodayHeroCopy.paceIsReady(hours: focus.hours, daysOfData: daysOfData),
-            hasPendingToConfirm: inbox.badgeCount > 0, reachedCaveat: caveat))
+            hasPendingToConfirm: confirmCount > 0, reachedCaveat: caveat))
     }
 
     /// What is still open once the hours reach the goal, in Today's words: the 100-hour question
@@ -267,8 +267,15 @@ struct DashboardView: View {
         return { showParticipationSheet = true }
     }
 
+    /// The rental the To confirm block is scoped to: the page shown when a chip picks one rental of
+    /// several; nil on "All rentals" and with a single rental (nothing to pick between).
+    private var confirmRentalID: UUID? { viewModel.properties.count > 1 ? focus?.rentalID : nil }
+
+    /// "To confirm · N": the Inbox's visible items for the page shown (`TodayConfirm.count`).
+    private var confirmCount: Int { TodayConfirm.count(visible: inbox.visible, rentalID: confirmRentalID) }
+
     private var confirmState: TodayConfirm.State {
-        TodayConfirm.state(hasProperties: !viewModel.properties.isEmpty, pendingCount: inbox.badgeCount,
+        TodayConfirm.state(hasProperties: !viewModel.properties.isEmpty, pendingCount: confirmCount,
                            backfillScanning: backfill.isScanning, captureOn: calendarSuggestionsOn)
     }
 
@@ -475,7 +482,7 @@ struct DashboardView: View {
         TodayTimerSlot()
             .padding(.horizontal, LHMetrics.gutter)
             .padding(.top, 12)
-        TodayConfirmBlock(inbox: inbox, state: confirmState, isScanning: backfill.isScanning, limit: rowLimit,
+        TodayConfirmBlock(inbox: inbox, rentalID: confirmRentalID, state: confirmState, isScanning: backfill.isScanning, limit: rowLimit,
                           onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
                           onTurnOn: { showCaptureSetup = true },
                           onLogged: rowLogged, onNotWork: { _ in

@@ -349,3 +349,38 @@ final class LogPlusRouteTests: XCTestCase {
         XCTAssertEqual(LogSheetRoute.forPlusRoute(isTimerRunning: false, stoppedDraft: nil), .log)
     }
 }
+
+// MARK: - Header day follows the selected day (shot-bug 4, 2026-10-27)
+
+final class LogTimeHeaderDayTests: XCTestCase {
+    private var cal: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }
+    private func date(_ m: Int, _ d: Int, _ h: Int = 12) -> Date { cal.date(from: DateComponents(year: 2026, month: m, day: d, hour: h))! }
+    private let nbsp = "\u{00A0}"
+
+    func testHeaderNamesYesterdayWhenTheSelectedDayIsYesterday() {
+        let now = date(10, 27, 9)
+        XCTAssertEqual(LogTimeFormat.eyebrow(date(10, 26, 18), now: now, calendar: cal), "Yesterday \u{00B7}\(nbsp)Mon, Oct 26")
+    }
+
+    func testHeaderDayAgreesWithTheDateRowAndDetailsLineForEveryDay() {
+        let now = date(10, 27, 9)
+        for offset in [0, -1, -2, -9, 3] {
+            let day = cal.date(byAdding: .day, value: offset, to: now)!
+            let header = LogTimeFormat.eyebrow(day, now: now, calendar: cal)
+            let row = LogTimeFormat.dateRow(day, now: now, calendar: cal)
+            let word = LogTimeFormat.dayWord(day, now: now, calendar: cal)
+            let short = LogTimeFormat.longDay(day, calendar: cal)
+            // The header carries the same day-word as the row and the details line, and the date once.
+            if offset == 0 || offset == -1 { XCTAssertTrue(header.hasPrefix(word), "\(offset): \(header) vs \(word)") }
+            XCTAssertEqual(header.components(separatedBy: short).count - 1, 1, "date appears exactly once: \(header)")
+            XCTAssertTrue(row.contains(word) || row.contains(short), row)
+        }
+    }
+
+    func testTimerHeadersNameTheDayTheSameWay() {
+        let now = date(10, 27, 9)
+        XCTAssertEqual(LogTimeFormat.timerEyebrow(date(10, 26, 22), now: now, calendar: cal), "Timer \u{00B7}\(nbsp)Yesterday \u{00B7}\(nbsp)Mon, Oct 26")
+        XCTAssertEqual(LogTimeFormat.timerEyebrow(date(10, 27, 8), now: now, calendar: cal), "Timer \u{00B7}\(nbsp)Today \u{00B7}\(nbsp)Tue, Oct 27")
+        XCTAssertEqual(LogTimeFormat.timerEyebrow(date(10, 20), now: now, calendar: cal), "Timer \u{00B7}\(nbsp)Tue, Oct 20")
+    }
+}

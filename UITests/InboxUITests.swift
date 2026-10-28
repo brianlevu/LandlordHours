@@ -440,4 +440,30 @@ final class InboxUITests: XCTestCase {
         app.buttons["onb-link"].tap()                          // Not now
         XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 5), "On to Who does the work")
     }
+
+    // MARK: Shot-bug 2 (2026-10-27): rows scroll under the pinned bar, none is cut at a hard edge
+
+    /// "Confirm N likely" is pinned over the list. The list must run beneath it (so the system or app
+    /// fade, not a hard frame edge, ends the rows), and at the end of the list the last row clears it.
+    func testListRunsBeneathTheBatchBarInsteadOfEndingAtAHardEdge() {
+        launch("inbox")
+        XCTAssertTrue(settle(row("plumber")))
+        let list = app.descendants(matching: .any)["inbox.list"]
+        let bar = app.buttons["inbox.confirm.batchBar"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 5), "the pinned bar shows with likely items above the fold")
+        XCTAssertGreaterThan(list.frame.maxY, bar.frame.midY,
+                             "list frame ends at \(list.frame.maxY), above the bar (\(bar.frame.minY)...\(bar.frame.maxY)): rows are cut with no fade")
+    }
+
+    func testTheLastRowClearsThePinnedBarAtTheEnd() {
+        launch("inbox")
+        XCTAssertTrue(settle(row("plumber")))
+        let foot = app.buttons["inbox.confirm.batch"]
+        var tries = 0
+        while !foot.exists || !foot.isHittable, tries < 10 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(foot.exists, "scrolled to the card's foot")
+        XCTAssertLessThanOrEqual(foot.frame.maxY, app.frame.maxY - 8, "the foot is fully on screen, not cut")
+        let bar = app.buttons["inbox.confirm.batchBar"]
+        if bar.exists { XCTAssertLessThanOrEqual(foot.frame.maxY, bar.frame.minY + 1, "the foot clears the bar") }
+    }
 }

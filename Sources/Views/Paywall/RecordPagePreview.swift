@@ -25,14 +25,19 @@ struct RecordPageModel: Equatable {
         let kindFor: (UUID) -> String = { id in
             (properties.first { $0.id == id }?.propertyType == .str) ? String(localized: "A few nights", table: "ConversionPath") : String(localized: "Long stays", table: "ConversionPath")
         }
-        let rows = report.propertyTotals.map { Row(name: $0.name, kind: kindFor($0.propertyId), hours: $0.repsCountableHours) }
-        let total = report.summary.repsCountableHours
-        let countable = report.categoryTotals.filter(\.countsForREPS).sorted { $0.hours > $1.hours }
-        let maxHours = max(countable.first?.hours ?? 0, 0.0001)
-        let kinds = countable.prefix(4).map { Kind(label: $0.category.inboxLabel, fraction: $0.hours / maxHours) }
+        let rows = report.propertyTotals.map { Row(name: $0.name, kind: kindFor($0.propertyId), hours: report.repsParticipant == .spouse ? $0.spouseRepsHours : $0.selfRepsHours) }
+        // One person's own 750 hours (the real estate professional's), never self plus spouse.
+        let total = report.repsHours(for: report.repsParticipant)
+        // The kinds bars and the recent lines are the same person's countable work as the rows and the Total.
+        let who = report.repsParticipant
+        let personHours: (AuditReport.CategoryTotal) -> Double = { who == .spouse ? $0.spouseHours : $0.selfHours }
+        let countable = report.categoryTotals.filter { $0.countsForREPS && personHours($0) > 0 }.sorted { personHours($0) > personHours($1) }
+        let maxHours = max(countable.first.map(personHours) ?? 0, 0.0001)
+        let kinds = countable.prefix(4).map { Kind(label: $0.category.inboxLabel, fraction: personHours($0) / maxHours) }
         let df = DateFormatter()
         df.dateFormat = "MMM d"
-        let lines = report.entries.sorted { $0.date > $1.date }.prefix(6).map { row -> Line in
+        let lines = report.entries.filter { $0.participant == who && $0.category.countsForREPS }
+            .sorted { $0.date > $1.date }.prefix(6).map { row -> Line in
             let text = row.description.trimmingCharacters(in: .whitespacesAndNewlines)
             return Line(date: df.string(from: row.date), title: text.isEmpty ? row.category.inboxLabel : text, hours: row.hours)
         }
@@ -42,6 +47,13 @@ struct RecordPageModel: Equatable {
         let name = owner.trimmingCharacters(in: .whitespacesAndNewlines)
         return RecordPageModel(year: report.taxYear, owner: name.isEmpty || name == "User" ? String(localized: "Your name", table: "ConversionPath") : name,
                                range: range, rows: rows, total: total, kinds: Array(kinds), lines: Array(lines), isSample: false)
+    }
+
+    /// The rentals past the first `limit` rows: how many and their hours, or nil when every row shows.
+    func overflow(limit: Int) -> (count: Int, hours: Double)? {
+        let hidden = rows.dropFirst(max(0, limit))
+        guard !hidden.isEmpty else { return nil }
+        return (hidden.count, hidden.reduce(0) { $0 + $1.hours })
     }
 
     static func sample(year: Int) -> RecordPageModel {
@@ -62,7 +74,8 @@ struct RecordPageModel: Equatable {
         let input = AuditReportBuilder.inputFromTaxProfile(
             entries: entries, properties: properties, taxYear: year,
             spouseTracking: tax.spouseTracking, nonREWorkHours: tax.nonREWorkHours,
-            groupingElection: tax.groupingElection, noOneParticipatedMore: tax.noOneParticipatedMore(forYear: year))
+            groupingElection: tax.groupingElection, noOneParticipatedMore: tax.noOneParticipatedMore(forYear: year),
+            repsParticipant: GoalManager.shared.repsParticipant)
         return await Task.detached(priority: .userInitiated) {
             let report = AuditReportBuilder.build(input)
             return report.isEmpty ? .sample(year: year) : .from(report: report, owner: owner, properties: properties)
@@ -143,12 +156,23 @@ struct RecordPagePreview: View {
             ForEach(Array(model.rows.prefix(rentalLimit).enumerated()), id: \.offset) { _, row in
                 rentalRow(row.name, row.kind, value: hoursText(row.hours), isNew: false)
             }
+            if let more = model.overflow(limit: rentalLimit) {
+                Text(Self.overflowText(count: more.count, hours: more.hours, shownRows: min(rentalLimit, model.rows.count)))
+                    .font(.footnote)
+                    .foregroundStyle(paper.textSecondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .accessibilityIdentifier("paywall.page.moreRentals")
+            }
             if case .newRow(let name) = highlight {
                 rentalRow(name, String(localized: "New rental", table: "ConversionPath"), value: "—", isNew: true)
             }
             LHDivider()
             HStack {
-                Text(String(localized: "Total", table: "ConversionPath")).font(.subheadline.weight(.semibold))
+                Text(model.rows.count > 1 ? String(localized: "Total, all rentals", table: "ConversionPath")
+                                          : String(localized: "Total", table: "ConversionPath"))
+                    .font(.subheadline.weight(.semibold))
                 Spacer()
                 Text(verbatim: "\(hoursText(model.total))h")
                     .font(.subheadline.weight(.semibold))
@@ -185,6 +209,17 @@ struct RecordPagePreview: View {
         .frame(maxWidth: .infinity, maxHeight: fillsHeight ? .infinity : nil, alignment: .top)
         .background(paper.backgroundSecondary)
         .environment(\.colorScheme, .light)
+    }
+
+    /// The line for rentals the page has no room to list, so the rows and the Total always agree:
+    /// "+2 more rentals · 34.0h", or "4 rentals · 40.0h" when none are listed.
+    static func overflowText(count: Int, hours: Double, shownRows: Int) -> String {
+        let h = String(format: "%.1f", max(0, hours))
+        if shownRows == 0 {
+            return String(localized: "\(count) rentals \u{00B7}\u{00A0}\(h)h", table: "ConversionPath")
+        }
+        if count == 1 { return String(localized: "+1 more rental \u{00B7}\u{00A0}\(h)h", table: "ConversionPath") }
+        return String(localized: "+\(count) more rentals \u{00B7}\u{00A0}\(h)h", table: "ConversionPath")
     }
 
     private func rentalRow(_ name: String, _ kind: String, value: String, isNew: Bool) -> some View {

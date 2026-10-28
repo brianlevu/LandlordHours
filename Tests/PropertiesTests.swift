@@ -508,3 +508,71 @@ final class RentalTilePaceTests: XCTestCase {
         XCTAssertEqual(RentalTileModel(row: row, goal: 0, pace: pace(88, goal: 0, record: true)).hoursLine, "88h")
     }
 }
+
+// MARK: - A rental with no hours draws the first stage the house system defines (shot-bug 6, 2026-10-27)
+
+final class RentalTileZeroHourStageTests: XCTestCase {
+    /// §H.3: five stages, `started` is the first and the only one below 20% of the goal. There is no
+    /// separate empty-lot render, so 0h (and any bad input) must draw `started`, never a later stage.
+    func testZeroHoursDrawsTheFirstStageForEveryGoal() {
+        for goal in [100.0, 500, 750] {
+            let row = RentalRowModel(id: UUID(), name: "Lakeside A-Frame", hours: 0, goal: goal, lit: false, kind: .ltr)
+            XCTAssertEqual(row.stage, CraftStage.allCases.first)
+            XCTAssertEqual(row.stage, .started, "goal \(Int(goal))")
+            XCTAssertEqual(row.value, "0h")
+        }
+        for bad in [-5.0, .nan, .infinity] {
+            XCTAssertEqual(RentalRowModel(id: UUID(), name: "x", hours: bad, goal: 100, lit: false, kind: .ltr).stage, .started)
+        }
+    }
+
+    /// The first stage's art exists for light and dark, lit and unlit, and is the lowest stage: the
+    /// tile can never show anything earlier than this, so "0h looks half-built" is a missing-art
+    /// question (no empty-lot render), not a mapping one.
+    func testEveryStageThatAZeroHourTileCouldDrawHasItsArt() {
+        let bundle = Bundle(for: AppViewModel.self)
+        for lit in [true, false] {
+            XCTAssertNotNil(UIImage(named: CraftStage.started.assetName(lit: lit), in: bundle, compatibleWith: nil))
+        }
+        XCTAssertEqual(CraftStage.stage(hours: 19.9, goal: 100), .started)
+        XCTAssertEqual(CraftStage.stage(hours: 20, goal: 100), .frame70)
+    }
+}
+
+// MARK: - The rental's headline and its breakdown follow the same person (REPS)
+
+@MainActor
+final class PropertyRepsParticipantTests: CaptureTestCase {
+    private let goals = GoalManager.shared
+    private var savedPro: RealEstatePro?
+
+    override func setUp() async throws {
+        try await super.setUp()
+        savedPro = goals.realEstatePro
+    }
+
+    override func tearDown() async throws {
+        goals.setGoalSetup(rental: goals.rentalMix, pro: savedPro)
+        try await super.tearDown()
+    }
+
+    private var year: Int { Calendar.current.component(.year, from: Date()) }
+
+    func testHeadlineAndBreakdownBothUseTheRealEstateProfessional() {
+        let (vm, oak) = makeViewModel()
+        vm.addTimeEntry(propertyId: oak, participant: .selfParticipant, category: .repairs, hours: 80, date: Date(), notes: "")
+        vm.addTimeEntry(propertyId: oak, participant: .spouse, category: .leasing, hours: 30, date: Date(), notes: "")
+        vm.addTimeEntry(propertyId: oak, participant: .spouse, category: .investing, hours: 9, date: Date(), notes: "")
+        for (pro, who, hours, kinds) in [(RealEstatePro.me, Participant.selfParticipant, 80.0, [ActivityCategory.repairs]),
+                                         (.spouse, .spouse, 30.0, [.leasing])] {
+            goals.setGoalSetup(rental: goals.rentalMix, pro: pro)
+            XCTAssertEqual(goals.repsParticipant, who)
+            XCTAssertEqual(vm.propertyCountableHours(oak, goal: .reps750, year: year), hours, accuracy: 0.001, "headline, \(pro)")
+            let entries = vm.propertyCountableEntries(oak, goal: .reps750, year: year)
+            XCTAssertTrue(entries.allSatisfy { $0.participant == who }, "breakdown entries are \(who)'s only, \(pro)")
+            XCTAssertEqual(entries.reduce(0) { $0 + $1.hours }, hours, accuracy: 0.001, "entries sum to the headline, \(pro)")
+            let figures = vm.propertyFigures(for: vm.properties[0], goal: .reps750, year: year)
+            XCTAssertEqual(figures.kinds.map(\.category), kinds, "kinds, \(pro)")
+        }
+    }
+}

@@ -86,7 +86,7 @@ struct SuggestionRowView: View {
             return LHTag(String(localized: "inbox.tag.mightBeLogged", defaultValue: "Might be logged", table: "Inbox"), tone: .informational)
         }
         guard let category = suggestion.proposedCategory else { return nil }
-        return LHTag(category.inboxLabel, tone: .custom(ink: colors.categoryInk(category), wash: colors.categoryWash(category)))
+        return LHTag(category.inboxLabel, tone: .category(category, colors: colors))
     }
 
     /// VoiceOver sentence for the whole row: "Plumber at Pine Cabin, Calendar, 12 to 2, Repairs, 2 hours".

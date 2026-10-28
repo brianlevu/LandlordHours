@@ -80,7 +80,9 @@ final class AuditReportBuilderTests: XCTestCase {
         let report = build(entries)
 
         XCTAssertEqual(report.summary.totalHours, 10.75, accuracy: 0.0001)
-        XCTAssertEqual(report.summary.repsCountableHours, 9.25, accuracy: 0.0001)
+        XCTAssertEqual(report.summary.nonInvestorHours, 9.25, accuracy: 0.0001)
+        XCTAssertEqual(report.summary.selfRepsHours, 3, accuracy: 0.0001, "your own 750 hours")
+        XCTAssertEqual(report.summary.spouseRepsHours, 6.25, accuracy: 0.0001, "your spouse's own 750 hours, never added to yours")
         XCTAssertEqual(report.summary.nonCountableHours, 1.5, accuracy: 0.0001)
         XCTAssertEqual(report.summary.entryCount, 4)
 
@@ -91,7 +93,8 @@ final class AuditReportBuilderTests: XCTestCase {
         let pine = report.propertyTotals.first { $0.propertyId == F.pine.id }!
         XCTAssertEqual(pine.selfHours, 1.5)
         XCTAssertEqual(pine.spouseHours, 4.25)
-        XCTAssertEqual(pine.repsCountableHours, 4.25)
+        XCTAssertEqual(pine.spouseRepsHours, 4.25)
+        XCTAssertEqual(pine.selfRepsHours, 0, "the self investing hours are investor-level")
 
         let repairs = report.categoryTotals.first { $0.category == .repairs }!
         XCTAssertEqual(repairs.hours, 7.25, accuracy: 0.0001)
@@ -743,5 +746,285 @@ final class AuditExportGatingTests: XCTestCase {
         viewModel.exportShared(format: .pdf)
         viewModel.exportShared(format: .csv)
         XCTAssertEqual(shared, [.pdf, .csv])
+    }
+}
+
+// MARK: - Totals equal the sum of their lines (shot-bug 3, 2026-10-27)
+
+final class AuditReportTotalsAgreeTests: XCTestCase {
+    private typealias F = AuditFixture
+
+    private func manyRentalReport() -> (AuditReport, [RentalProperty]) {
+        let rentals = (1...5).map { RentalProperty(name: "Rental \($0)", address: "\($0) Main St", propertyType: $0 % 2 == 0 ? .str : .ltr) }
+        let cats: [ActivityCategory] = [.repairs, .management, .leasing, .investing, .financing, .bookkeeping]
+        var entries: [TimeEntry] = []
+        for (i, r) in rentals.enumerated() {
+            for (j, cat) in cats.enumerated() {
+                let who: Participant = (i + j) % 3 == 0 ? .spouse : .selfParticipant
+                entries.append(F.entry(property: r, participant: who, category: cat, hours: Double(i + 1) * 1.25 + Double(j) * 0.5,
+                                       date: F.date(2026, 1 + j, 3 + i)))
+            }
+        }
+        // An entry whose rental was deleted still counts, under "Unknown property".
+        let ghost = RentalProperty(name: "Deleted", address: "", propertyType: .ltr)
+        entries.append(F.entry(property: ghost, hours: 2.75, date: F.date(2026, 7, 7)))
+        let report = AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: entries, properties: rentals, taxYear: 2026, participants: [.selfParticipant, .spouse],
+            nonRealEstateHours: [.selfParticipant: 100], generatedAt: F.date(2026, 10, 17, 12)))
+        return (report, rentals)
+    }
+
+    func testEveryTotalEqualsTheSumOfItsLines() {
+        let (report, _) = manyRentalReport()
+        let s = report.summary
+        func sum<T>(_ xs: [T], _ f: (T) -> Double) -> Double { xs.reduce(0) { $0 + f($1) } }
+        XCTAssertEqual(report.propertyTotals.count, 6, "five rentals plus the deleted one")
+        XCTAssertEqual(sum(report.propertyTotals, \.totalHours), s.totalHours, accuracy: 0.0001, "rentals")
+        XCTAssertEqual(sum(report.propertyTotals, \.selfRepsHours), s.selfRepsHours, accuracy: 0.0001, "rentals toward your 750")
+        XCTAssertEqual(sum(report.propertyTotals, \.spouseRepsHours), s.spouseRepsHours, accuracy: 0.0001, "rentals toward your spouse's 750")
+        XCTAssertEqual(sum(report.propertyTotals, \.selfHours) + sum(report.propertyTotals, \.spouseHours), s.totalHours, accuracy: 0.0001, "self + spouse by rental")
+        for p in report.propertyTotals {
+            XCTAssertEqual(p.selfHours + p.spouseHours, p.totalHours, accuracy: 0.0001, p.name)
+        }
+        XCTAssertEqual(sum(report.participantTotals, \.totalHours), s.totalHours, accuracy: 0.0001, "people")
+        XCTAssertEqual(report.participantTotals.first { $0.participant == .selfParticipant }?.repsCountableHours ?? -1, s.selfRepsHours, accuracy: 0.0001, "you toward 750")
+        XCTAssertEqual(report.participantTotals.first { $0.participant == .spouse }?.repsCountableHours ?? -1, s.spouseRepsHours, accuracy: 0.0001, "spouse toward 750")
+        XCTAssertEqual(sum(report.participantTotals) { Double($0.entryCount) }, Double(s.entryCount))
+        XCTAssertEqual(sum(report.categoryTotals, \.hours), s.totalHours, accuracy: 0.0001, "categories")
+        XCTAssertEqual(sum(report.entries, \.hours), s.totalHours, accuracy: 0.0001, "entry lines")
+        XCTAssertEqual(s.nonInvestorHours + s.nonCountableHours, s.totalHours, accuracy: 0.0001)
+        XCTAssertEqual(s.selfRepsHours + s.spouseRepsHours, s.nonInvestorHours, accuracy: 0.0001)
+        XCTAssertEqual(s.propertyCount, report.propertyTotals.count)
+    }
+
+    func testTheExportedPDFTotalsMatchItsLines() throws {
+        let (report, _) = manyRentalReport()
+        let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { _ in nil }).render(report)))
+        let text = document.string ?? ""
+        let lineSum = report.entries.reduce(0) { $0 + $1.hours }
+        XCTAssertTrue(text.contains("Total: \(report.entries.count) records, \(AuditReportFormat.hours(lineSum)) hours."),
+                      "the entry table's total is the sum of its lines")
+        // Every rental's own total is printed, and the by-rental table totals them (all rentals).
+        for p in report.propertyTotals { XCTAssertTrue(text.contains(AuditReportFormat.hours(p.totalHours)), p.name) }
+        let rentalSum = report.propertyTotals.reduce(0) { $0 + $1.totalHours }
+        XCTAssertTrue(text.contains("Total, all rentals"), "the by-rental table says what its total covers")
+        XCTAssertTrue(text.contains(AuditReportFormat.hours(rentalSum)))
+        // Spouse and self columns: the totals row carries both.
+        let selfSum = report.propertyTotals.reduce(0) { $0 + $1.selfHours }
+        let spouseSum = report.propertyTotals.reduce(0) { $0 + $1.spouseHours }
+        XCTAssertTrue(text.contains(AuditReportFormat.hours(selfSum)))
+        XCTAssertTrue(text.contains(AuditReportFormat.hours(spouseSum)))
+    }
+
+    // MARK: The preview page (paywall and Today's lock)
+
+    private func previewModel() throws -> RecordPageModel {
+        let (report, rentals) = manyRentalReport()
+        return RecordPageModel.from(report: report, owner: "Sam", properties: rentals)
+    }
+
+    func testPreviewVisibleRowsPlusOverflowEqualTheTotal() throws {
+        let model = try previewModel()
+        XCTAssertEqual(model.rows.count, 6)
+        XCTAssertEqual(model.rows.reduce(0) { $0 + $1.hours }, model.total, accuracy: 0.0001, "all rows sum to the total")
+        for limit in [3, 1, 0, 6, 9] {
+            let shown = model.rows.prefix(limit).reduce(0) { $0 + $1.hours }
+            let more = model.overflow(limit: limit)
+            XCTAssertEqual(shown + (more?.hours ?? 0), model.total, accuracy: 0.0001, "limit \(limit): visible rows + overflow line = total")
+            XCTAssertEqual(min(limit, model.rows.count) + (more?.count ?? 0), model.rows.count, "limit \(limit)")
+        }
+    }
+
+    func testPreviewOverflowIsNilWhenEveryRentalIsShown() throws {
+        let model = try previewModel()
+        XCTAssertNil(model.overflow(limit: 6))
+        XCTAssertNil(model.overflow(limit: 7))
+        XCTAssertEqual(model.overflow(limit: 3)?.count, 3)
+        XCTAssertEqual(model.overflow(limit: 0)?.count, 6)
+    }
+
+    func testPreviewOverflowLineSaysHowManyAndHowLong() throws {
+        let model = try previewModel()
+        let more = try XCTUnwrap(model.overflow(limit: 3))
+        let line = RecordPagePreview.overflowText(count: more.count, hours: more.hours, shownRows: 3)
+        XCTAssertTrue(line.hasPrefix("+3 more rentals"), line)
+        XCTAssertTrue(line.hasSuffix("\u{00B7}\u{00A0}" + String(format: "%.1f", more.hours) + "h") || line.contains(String(format: "%.1f", more.hours) + "h"), line)
+        XCTAssertEqual(RecordPagePreview.overflowText(count: 1, hours: 4, shownRows: 2).prefix(14), "+1 more rental")
+        XCTAssertTrue(RecordPagePreview.overflowText(count: 4, hours: 40, shownRows: 0).contains("4 rentals"), "no rows shown: it names all of them")
+    }
+}
+
+// MARK: - The 750 is each person's own (REPS, IRC 469(c)(7)(B)): self 500h + spouse 400h never reads 900
+
+@MainActor
+final class REPSPerPersonTests: CaptureTestCase {
+    private typealias F = AuditFixture
+
+    private func entries() -> (all: [TimeEntry], rentals: [RentalProperty]) {
+        // Self 500h and spouse 400h of countable work over two rentals, plus 20h of investor-level time
+        // for each (never countable), so "900" can only come from adding the two people together.
+        let oak = F.oak, pine = F.pine
+        var e: [TimeEntry] = []
+        e.append(F.entry(property: oak, participant: .selfParticipant, category: .repairs, hours: 300, date: F.date(2026, 2, 3)))
+        e.append(F.entry(property: pine, participant: .selfParticipant, category: .management, hours: 200, date: F.date(2026, 3, 3)))
+        e.append(F.entry(property: oak, participant: .spouse, category: .leasing, hours: 150, date: F.date(2026, 4, 3)))
+        e.append(F.entry(property: pine, participant: .spouse, category: .bookkeeping, hours: 250, date: F.date(2026, 5, 3)))
+        e.append(F.entry(property: oak, participant: .selfParticipant, category: .investing, hours: 20, date: F.date(2026, 6, 3)))
+        e.append(F.entry(property: pine, participant: .spouse, category: .financing, hours: 20, date: F.date(2026, 6, 4)))
+        return (e, [oak, pine])
+    }
+
+    private func report(repsParticipant: Participant = .selfParticipant) -> AuditReport {
+        let (e, rentals) = entries()
+        return AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: e, properties: rentals, taxYear: 2026, participants: [.selfParticipant, .spouse],
+            nonRealEstateHours: [.selfParticipant: 100], repsParticipant: repsParticipant,
+            generatedAt: F.date(2026, 10, 17, 12)))
+    }
+
+    private func pdfText(_ r: AuditReport) throws -> String {
+        try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { _ in nil }).render(r))?.string)
+    }
+
+    func testTheReportKeepsEachPersonsHoursApart() {
+        let r = report()
+        XCTAssertEqual(r.summary.selfRepsHours, 500, accuracy: 0.0001)
+        XCTAssertEqual(r.summary.spouseRepsHours, 400, accuracy: 0.0001)
+        XCTAssertEqual(r.summary.totalHours, 940, accuracy: 0.0001, "all logged hours stay combined")
+        XCTAssertEqual(r.summary.nonInvestorHours, 900, accuracy: 0.0001, "the plain non-investor total is not a 750 figure")
+        XCTAssertEqual(r.qualifications.first { $0.participant == .selfParticipant }?.realEstateHours ?? -1, 500, accuracy: 0.0001)
+        XCTAssertEqual(r.qualifications.first { $0.participant == .spouse }?.realEstateHours ?? -1, 400, accuracy: 0.0001)
+        for p in r.propertyTotals {
+            XCTAssertLessThan(max(p.selfRepsHours, p.spouseRepsHours), 900)
+        }
+        XCTAssertEqual(r.propertyTotals.reduce(0) { $0 + $1.selfRepsHours }, 500, accuracy: 0.0001)
+        XCTAssertEqual(r.propertyTotals.reduce(0) { $0 + $1.spouseRepsHours }, 400, accuracy: 0.0001)
+    }
+
+    func testThePDFNeverPrintsACombined750Figure() throws {
+        let text = try pdfText(report())
+        XCTAssertFalse(text.contains("Hours that count toward 750"), "the combined row is gone")
+        XCTAssertTrue(text.contains("Your hours toward 750"))
+        XCTAssertTrue(text.contains("Spouse hours toward 750"))
+        XCTAssertNil(text.range(of: #"toward 750[^\n]{0,40}900\.00"#, options: .regularExpression), "750 line must never read 900")
+        XCTAssertTrue(text.contains("500.00") && text.contains("400.00"))
+        // The by-rental table splits the 750 columns by person, and its totals row says 500 and 400.
+        let flat = text.replacingOccurrences(of: "\n", with: " ")   // a header may wrap inside its column
+        XCTAssertTrue(flat.contains("Your 750 hours") && flat.contains("Spouse 750 hours"))
+    }
+
+    func testThePDFShowsOnlyYourColumnWhenThereIsNoSpouse() throws {
+        let (e, rentals) = entries()
+        let solo = AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: e.filter { $0.participant == .selfParticipant }, properties: rentals, taxYear: 2026,
+            generatedAt: F.date(2026, 10, 17, 12)))
+        let text = try pdfText(solo)
+        XCTAssertTrue(text.contains("Your hours toward 750"))
+        XCTAssertFalse(text.contains("Spouse hours toward 750"))
+    }
+
+    func testThePreviewShowsTheQualifyingPersonsHoursNotBoth() throws {
+        let (_, rentals) = entries()
+        let you = RecordPageModel.from(report: report(repsParticipant: .selfParticipant), owner: "Sam", properties: rentals)
+        XCTAssertEqual(you.total, 500, accuracy: 0.0001)
+        XCTAssertEqual(you.rows.reduce(0) { $0 + $1.hours }, you.total, accuracy: 0.0001)
+        let spouse = RecordPageModel.from(report: report(repsParticipant: .spouse), owner: "Sam", properties: rentals)
+        XCTAssertEqual(spouse.total, 400, accuracy: 0.0001)
+        XCTAssertEqual(spouse.rows.reduce(0) { $0 + $1.hours }, spouse.total, accuracy: 0.0001)
+        XCTAssertNotEqual(you.total, 900)
+        XCTAssertNotEqual(spouse.total, 900)
+    }
+
+    func testTheExportScreenSummaryIsThePersonsOwnHours() {
+        let (e, _) = entries()
+        XCTAssertEqual(ExportPDFSummary.repsHours(entries: e, year: 2026, participant: .selfParticipant), 500, accuracy: 0.0001)
+        XCTAssertEqual(ExportPDFSummary.repsHours(entries: e, year: 2026, participant: .spouse), 400, accuracy: 0.0001)
+    }
+
+    /// Today's hero, Reports' standing cards and the PDF all read the same engine value per person.
+    func testTodayReportsAndThePDFAgreeOnEachPersonsNumber() throws {
+        let (app, _) = makeViewModel()
+        let (e, rentals) = entries()
+        app.properties = rentals
+        app.timeEntries = e
+        let goals = GoalManager.shared
+        let saved = (goals.realEstatePro, goals.goalChoice)
+        defer { goals.setGoalSetup(rental: goals.rentalMix, pro: saved.0); goals.setGoalChoice(saved.1) }
+        goals.setGoalChoice(.reps750)
+        let r = report()
+        for (pro, who, expected) in [(RealEstatePro.me, Participant.selfParticipant, 500.0), (.spouse, .spouse, 400.0)] {
+            goals.setGoalSetup(rental: goals.rentalMix, pro: pro)
+            XCTAssertEqual(goals.repsParticipant, who)
+            XCTAssertEqual(app.houseCountableHours(goal: .reps750, year: 2026), expected, accuracy: 0.0001, "Today, \(pro)")
+            XCTAssertEqual(app.repsStatus(participant: who, year: 2026).realEstateHours, expected, accuracy: 0.0001, "Reports, \(pro)")
+            XCTAssertEqual(r.repsHours(for: who), expected, accuracy: 0.0001, "PDF, \(pro)")
+        }
+        let cards = app.reportStandings(goal: .reps750, year: 2026)
+        XCTAssertEqual(cards.map(\.hours).sorted(), [400, 500], "one card per person; none reads 900")
+    }
+
+    /// Writes the 500h / 400h PDF for the capture frames when `LH_CAPTURE_DIR` is set.
+    func testWriteTheFiveHundredFourHundredSample() throws {
+        guard let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty else { return }
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        // Same 500h / 400h, with Repairs worked by both people (the spouse's 150h of leasing becomes repairs).
+        var (e, rentals) = entries()
+        e = e.map { entry in
+            var copy = entry
+            if entry.participant == .spouse && entry.category == .leasing { copy.category = .repairs }
+            return copy
+        }
+        let shared = AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: e, properties: rentals, taxYear: 2026, participants: [.selfParticipant, .spouse],
+            nonRealEstateHours: [.selfParticipant: 100], generatedAt: F.date(2026, 10, 17, 12)))
+        let pdf = AuditReportPDFRenderer(attachmentData: { _ in nil }).render(shared)
+        try pdf.write(to: URL(fileURLWithPath: dir).appendingPathComponent("reps-500-400-shared-category.pdf"))
+    }
+
+    // MARK: Category table and preview detail follow the same per-person rule
+
+    private func sharedCategoryReport(spouse: Bool = true) -> AuditReport {
+        let oak = F.oak
+        var e = [F.entry(property: oak, participant: .selfParticipant, category: .repairs, hours: 100, date: F.date(2026, 2, 3)),
+                 F.entry(property: oak, participant: .selfParticipant, category: .management, hours: 10, date: F.date(2026, 3, 3))]
+        if spouse { e.append(F.entry(property: oak, participant: .spouse, category: .repairs, hours: 50, date: F.date(2026, 4, 3))) }
+        return AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: e, properties: [oak], taxYear: 2026, participants: spouse ? [.selfParticipant, .spouse] : [.selfParticipant],
+            generatedAt: F.date(2026, 10, 17, 12)))
+    }
+
+    func testCategoryTotalsKeepEachPersonsHoursApart() throws {
+        let repairs = try XCTUnwrap(sharedCategoryReport().categoryTotals.first { $0.category == .repairs })
+        XCTAssertEqual(repairs.selfHours, 100, accuracy: 0.0001)
+        XCTAssertEqual(repairs.spouseHours, 50, accuracy: 0.0001)
+        XCTAssertEqual(repairs.hours, 150, accuracy: 0.0001, "the plain all-hours total stays")
+    }
+
+    func testThePDFCategoryTableNeverShowsACombinedNumberBesideThe750Flag() throws {
+        let text = try pdfText(sharedCategoryReport())
+        let flat = text.replacingOccurrences(of: "\n", with: " ")
+        XCTAssertTrue(flat.contains("Counts for the 750 test"))
+        XCTAssertFalse(flat.contains("Counts toward 750"), "the old heading is gone")
+        XCTAssertNil(text.range(of: #"Repairs & Maintenance[^\n]*150\.00"#, options: .regularExpression), "100 + 50 must not read 150 on a 750 line")
+        XCTAssertNotNil(text.range(of: #"Repairs & Maintenance[^\n]*100\.00[^\n]*50\.00"#, options: .regularExpression), "you, then your spouse")
+    }
+
+    func testThePDFCategoryTableWithoutASpouseKeepsOneHoursColumn() throws {
+        let text = try pdfText(sharedCategoryReport(spouse: false))
+        XCTAssertNotNil(text.range(of: #"Repairs & Maintenance[^\n]*100\.00"#, options: .regularExpression))
+        XCTAssertTrue(text.replacingOccurrences(of: "\n", with: " ").contains("Counts for the 750 test"))
+    }
+
+    func testThePreviewKindsAndLinesAreTheQualifyingPersonsToo() {
+        let (_, rentals) = entries()
+        // Self works repairs and management; the spouse works leasing and bookkeeping.
+        let you = RecordPageModel.from(report: report(repsParticipant: .selfParticipant), owner: "Sam", properties: rentals)
+        XCTAssertEqual(Set(you.kinds.map(\.label)), ["Repairs", "Management"])
+        XCTAssertTrue(you.lines.allSatisfy { ["Repairs", "Management"].contains($0.title) }, "\(you.lines.map(\.title))")
+        XCTAssertEqual(you.lines.reduce(0) { $0 + $1.hours }, 500, accuracy: 0.0001, "the lines are your countable hours, like the Total")
+        let spouse = RecordPageModel.from(report: report(repsParticipant: .spouse), owner: "Sam", properties: rentals)
+        XCTAssertEqual(Set(spouse.kinds.map(\.label)), ["Leasing", "Bookkeeping"])
+        XCTAssertTrue(spouse.lines.allSatisfy { ["Leasing", "Bookkeeping"].contains($0.title) })
+        XCTAssertEqual(spouse.lines.reduce(0) { $0 + $1.hours }, 400, accuracy: 0.0001)
     }
 }

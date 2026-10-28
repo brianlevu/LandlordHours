@@ -123,6 +123,8 @@ struct TodayNumberBlock: View {
 /// and a "See all N" foot. Reads the Inbox model; every action is the Inbox's own.
 struct TodayConfirmBlock: View {
     @ObservedObject var inbox: InboxViewModel
+    /// Count and rows are this rental's only; nil = every rental.
+    var rentalID: UUID? = nil
     let state: TodayConfirm.State
     let isScanning: Bool
     let limit: Int
@@ -138,8 +140,8 @@ struct TodayConfirmBlock: View {
     @State private var confirming: Set<String> = []
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    private var count: Int { inbox.badgeCount }
-    private var rows: [Suggestion] { TodayConfirm.rows(visible: inbox.visible, limit: limit) }
+    private var count: Int { TodayConfirm.count(visible: inbox.visible, rentalID: rentalID) }
+    private var rows: [Suggestion] { TodayConfirm.rows(visible: inbox.visible, rentalID: rentalID, limit: limit) }
 
     var body: some View {
         if state != .hidden {
@@ -255,7 +257,7 @@ struct TodayConfirmBlock: View {
             return LHTag(String(localized: "today.tag.notSure", defaultValue: "Not sure", table: "Today"), tone: .neutral)
         }
         guard let category = suggestion.proposedCategory else { return nil }
-        return LHTag(category.inboxLabel, tone: .custom(ink: colors.categoryInk(category), wash: colors.categoryWash(category)))
+        return LHTag(category.inboxLabel, tone: .category(category, colors: colors))
     }
 
     // MARK: Actions

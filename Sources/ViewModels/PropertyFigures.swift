@@ -4,7 +4,7 @@ import Foundation
 //
 // Every rental shows its OWN countable hours, counted the way Today's house counts them
 // (TodayHouse.swift), so a row never shows an hour the hero would not:
-//   - REPS: your own hours only (the IRS tests REPS for one spouse at a time).
+//   - REPS: the real estate professional's own hours only (the IRS tests REPS for one spouse at a time).
 //   - Material participation: owner + spouse, spouse only when tracked jointly (Tax Profile).
 //   - Investor-only tasks (investing, financing, contract negotiation) never count.
 // It reuses the tax engine; it never re-derives the rules. A grouping election changes what the
@@ -42,12 +42,17 @@ extension AppViewModel {
     ) -> [TimeEntry] {
         let calendar = Calendar.current
         let resolved = goal ?? houseGoal
-        let spouse = resolved == .reps750 ? false : (includeSpouse ?? tracksSpouseJointly)
+        // REPS: the real estate professional's own entries, the same person `propertyCountableHours` counts.
+        // Material participation: yours, plus your spouse's when tracked jointly.
+        let spouse = includeSpouse ?? tracksSpouseJointly
+        let repsPerson = GoalManager.shared.repsParticipant
         return timeEntries.filter {
             $0.propertyId == propertyId
                 && calendar.component(.year, from: $0.date) == year
                 && $0.countsForREPS
-                && ($0.participant == .selfParticipant || (spouse && $0.participant == .spouse))
+                && (resolved == .reps750
+                    ? $0.participant == repsPerson
+                    : ($0.participant == .selfParticipant || (spouse && $0.participant == .spouse)))
         }
     }
 

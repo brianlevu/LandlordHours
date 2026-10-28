@@ -530,10 +530,21 @@ enum LogTimeFormat {
         lt("\(propertyName) added · Logged \(Self.hours(hours))")
     }
 
-    /// "Today · Sun, Oct 19" or "Tue, Oct 14".
+    /// The header's day, worded exactly like the Date row and the details line: "Today · Sun, Oct 19",
+    /// "Yesterday · Sat, Oct 18", else "Tue, Oct 14". One line, the date once, the word always agreeing
+    /// with the selected day (it used to print yesterday's bare date above a "Yesterday" row).
     static func eyebrow(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
         let day = LogTimeFormat.longDay(date, calendar: calendar)
-        return calendar.isDate(date, inSameDayAs: now) ? lt("Today \u{00B7}\u{00A0}\(day)") : day
+        if calendar.isDate(date, inSameDayAs: now) { return lt("Today \u{00B7}\u{00A0}\(day)") }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
+            return lt("Yesterday \u{00B7}\u{00A0}\(day)")
+        }
+        return day
+    }
+
+    /// "Timer · Tue, Oct 14": the header of a stopped or recovered timer.
+    static func timerEyebrow(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        lt("Timer \u{00B7}\u{00A0}\(eyebrow(date, now: now, calendar: calendar))")
     }
 
     /// "Today", "Yesterday", or the weekday ("Tue").
