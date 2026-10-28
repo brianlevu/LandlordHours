@@ -34,9 +34,27 @@
     "%@ of %@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset.": {
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ of %2$@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$@ of %2$@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$@ of %2$@ on this iPad are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$@ of %2$@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
+                }
+              }
+            }
           }
         }
       }
@@ -87,24 +105,215 @@
     "Choose": {},
     "Combined. %@ added.": {},
     "Continue": {},
+    "Couldn’t open your records. They’re still safe on this iPhone.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couldn’t open your records. They’re still safe on this iPhone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couldn’t open your records. They’re still safe on this iPad."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couldn’t open your records. They’re still safe on this iPhone."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online.": {},
+    "Couldn’t save your last change. Your iPhone may be out of space.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couldn’t save your last change. Your iPhone may be out of space."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couldn’t save your last change. Your iPad may be out of space."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couldn’t save your last change. Your iPhone may be out of space."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Couldn’t search iCloud": {},
     "Couldn’t sync": {},
     "Decide later": {},
     "Delete": {},
     "Delete all data": {},
-    "Delete from this iPhone?": {},
+    "Delete from this iPhone?": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete from this iPhone?"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete from this iPad?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete from this iPhone?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Delete here too": {},
     "Delete on your other devices too, or they will offer to put the records back.": {},
     "Delete these records?": {},
-    "Deleted on this iPhone.": {},
-    "Deleted on this iPhone. Kept until %@.": {},
+    "Deleted on this iPhone.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted on this iPhone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted on this iPad."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted on this iPhone."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Deleted on this iPhone. Kept until %@.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted on this iPhone. Kept until %@."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted on this iPad. Kept until %@."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted on this iPhone. Kept until %@."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Earlier records": {},
     "Earlier records in iCloud may be missing here.": {},
     "Edit your name": {},
     "Every record in iCloud could be read": {},
-    "Every record on this iPhone goes. This can’t be undone.": {},
-    "Everything on this iPhone": {},
+    "Every record on this iPhone goes. This can’t be undone.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Every record on this iPhone goes. This can’t be undone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Every record on this iPad goes. This can’t be undone."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Every record on this iPhone goes. This can’t be undone."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Everything on this iPhone": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Everything on this iPhone"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Everything on this iPad"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Everything on this iPhone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Everything you tracked is in one place.": {},
     "Export the update backup": {},
     "From %@. Your earlier settings were kept.": {},
@@ -114,9 +323,63 @@
     "Keep and put back in iCloud": {},
     "Keep aside": {},
     "Keep them aside": {},
-    "Keep them on this iPhone and in iCloud": {},
+    "Keep them on this iPhone and in iCloud": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Keep them on this iPhone and in iCloud"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Keep them on this iPad and in iCloud"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Keep them on this iPhone and in iCloud"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Keep them with this iCloud": {},
-    "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?": {},
+    "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Keep this iPad’s copy and put it back in iCloud, or delete it here too?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Kept aside under Earlier records.": {},
     "Last synced: %@.": {},
     "Most of your records aren’t in iCloud anymore.": {},
@@ -133,21 +396,183 @@
     "Nothing waiting": {},
     "Off": {},
     "On": {},
-    "On this iPhone": {},
-    "On this iPhone and in iCloud": {},
+    "On this iPhone": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "On this iPhone"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "On this iPad"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "On this iPhone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "On this iPhone and in iCloud": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "On this iPhone and in iCloud"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "On this iPad and in iCloud"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "On this iPhone and in iCloud"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "On your reports": {},
-    "Only on this iPhone": {},
-    "Opens iPhone Settings": {},
+    "Only on this iPhone": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Only on this iPhone"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Only on this iPad"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Only on this iPhone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Opens iPhone Settings": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Opens iPhone Settings"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Opens iPad Settings"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Opens iPhone Settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Optional": {},
     "Put back": {},
     "Put back all": {},
     "Recently removed": {},
     "Records deleted in iCloud": {},
     "Records from an earlier version, another device or another sign-in. Add them to yours, or delete them. Nothing changes until you choose.": {},
-    "Remove them from this iPhone": {},
+    "Remove them from this iPhone": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Remove them from this iPhone"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Remove them from this iPad"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Remove them from this iPhone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Removed on another device.": {},
     "Removed on another device. Kept until %@.": {},
-    "Safe on this iPhone": {},
+    "Safe on this iPhone": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Safe on this iPhone"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Safe on this iPad"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Safe on this iPhone"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Save": {},
     "See them": {},
     "See what changed": {},
@@ -161,14 +586,203 @@
     "Synced %@": {},
     "Synced just now": {},
     "Syncing…": {},
-    "They go from iCloud and this iPhone. This can’t be undone.": {},
+    "They go from iCloud and this iPhone. This can’t be undone.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "They go from iCloud and this iPhone. This can’t be undone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "They go from iCloud and this iPad. This can’t be undone."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "They go from iCloud and this iPhone. This can’t be undone."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "They’re kept and will be tried again.": {},
-    "This iPhone and your iCloud": {},
-    "This iPhone is now signed in to a different iCloud account.": {},
-    "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted.": {},
-    "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?": {},
-    "This iPhone isn’t signed in to iCloud.": {},
-    "This iPhone uses a different iCloud now. Sync is paused until you choose.": {},
+    "This iPhone and your iCloud": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone and your iCloud"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPad and your iCloud"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone and your iCloud"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This iPhone is now signed in to a different iCloud account.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone is now signed in to a different iCloud account."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPad is now signed in to a different iCloud account."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone is now signed in to a different iCloud account."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPad is signed in to a different iCloud account. Nothing in that iCloud was deleted."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPad is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPad only?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This iPhone isn’t signed in to iCloud.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone isn’t signed in to iCloud."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPad isn’t signed in to iCloud."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone isn’t signed in to iCloud."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This iPhone uses a different iCloud now. Sync is paused until you choose.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone uses a different iCloud now. Sync is paused until you choose."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPad uses a different iCloud now. Sync is paused until you choose."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This iPhone uses a different iCloud now. Sync is paused until you choose."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Try again": {},
     "Turn on": {},
     "Turn on iCloud for Dormer": {},
@@ -188,23 +802,149 @@
     },
     "We found two sets of records.": {},
     "We kept the settings from your earlier records. Your setup answers from today are in Settings.": {},
-    "What this iPhone held before": {},
-    "Yes, combine them": {},
-    "Your %@ at %@ are still on this iPhone. What should happen to them?": {
+    "What this iPhone held before": {
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Your %1$@ at %2$@ are still on this iPhone. What should happen to them?"
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "What this iPhone held before"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "What this iPad held before"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "What this iPhone held before"
+                }
+              }
+            }
           }
         }
       }
     },
-    "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy.": {},
+    "Yes, combine them": {},
+    "Your %@ at %@ are still on this iPhone. What should happen to them?": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your %1$@ at %2$@ are still on this iPhone. What should happen to them?"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your %1$@ at %2$@ are still on this iPad. What should happen to them?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your %1$@ at %2$@ are still on this iPhone. What should happen to them?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your hours are only on this iPad. Turn on iCloud for Dormer to keep a copy."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Your name": {},
-    "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone.": {},
+    "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your records live on this iPad and in your own iCloud. We never see them. Photos stay on this iPad."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Your records now": {},
-    "Your records stay on your iPhone and in your iCloud.": {},
+    "Your records stay on your iPhone and in your iCloud.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your records stay on your iPhone and in your iCloud."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your records stay on your iPad and in your iCloud."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your records stay on your iPhone and in your iCloud."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Your records were deleted from iCloud on another device.": {},
     "iCloud": {},
     "iCloud & records": {},
@@ -214,8 +954,62 @@
     "iCloud didn’t answer.": {},
     "iCloud is busy. We’ll try again.": {},
     "iCloud is full.": {},
-    "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing.": {},
-    "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?": {},
+    "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "iCloud is full. Your records are safe on this iPad; free up iCloud space to keep syncing."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this iPad anyway, or turn on iCloud and retry?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "iCloud is off. Turn on iCloud for Dormer in Settings to sync.": {},
     "iCloud sync is unavailable in this build.": {},
     "never": {}

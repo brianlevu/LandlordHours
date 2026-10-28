@@ -116,9 +116,27 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ goes from this iPhone and iCloud. This can’t be undone."
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ goes from this iPhone and iCloud. This can’t be undone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ goes from this iPad and iCloud. This can’t be undone."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ goes from this iPhone and iCloud. This can’t be undone."
+                }
+              }
+            }
           }
         }
       }
@@ -127,9 +145,27 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@, its %2$@ of logged time and any photos go from this iPhone and iCloud. This can’t be undone."
+          "variations": {
+            "device": {
+              "iphone": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$@, its %2$@ of logged time and any photos go from this iPhone and iCloud. This can’t be undone."
+                }
+              },
+              "ipad": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$@, its %2$@ of logged time and any photos go from this iPad and iCloud. This can’t be undone."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$@, its %2$@ of logged time and any photos go from this iPhone and iCloud. This can’t be undone."
+                }
+              }
+            }
           }
         }
       }
