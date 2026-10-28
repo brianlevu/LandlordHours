@@ -199,7 +199,7 @@ enum InboxDebugSeed {
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
         }
         return [
-            item("plumber", title: "Plumber", start: day(0, 7), hours: 2, property: pine, category: .repairs, confidence: 0.95),
+            item("plumber", title: "Plumber", start: day(1, 14), hours: 2, property: pine, category: .repairs, confidence: 0.95),
             item("showing", title: "Showing", start: day(2, 17, 30), hours: 1, property: oak, category: .leasing, confidence: 0.92),
             item("gutters", title: "Gutter cleaning", start: day(5, 9), hours: 2, property: oak, category: .repairs, confidence: 0.9),
             item("inspection", title: "Smoke alarm check", start: day(6, 10), hours: 1, property: pine, category: .repairs, confidence: 0.88),
