@@ -39,6 +39,7 @@ struct LHSectionHeader: View {
     var leadsList = false
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     /// The system's extra top padding on an inset-grouped list's first section header (pt, iOS 27.0; the
@@ -86,7 +87,8 @@ struct LHSectionHeader: View {
             }
         }
         .frame(minHeight: style == .day ? 28 : 24)
-        .padding(.top, leadsList ? -Self.firstListHeaderInset : 0)
+        // Below AX only: at AX the title wraps and this pull-up would crowd it.
+        .padding(.top, leadsList && !typeSize.isAccessibilitySize ? -Self.firstListHeaderInset : 0)
     }
 }
 

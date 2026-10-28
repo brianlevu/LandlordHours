@@ -1317,7 +1317,8 @@ def cmd_breaks(args) -> int:
 SAFE_TOP_PT = {874: 62, 956: 62, 852: 59, 932: 59, 844: 47, 926: 47}  # status bar / Dynamic Island inset per height
 TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 96.0   # a large-title glyph band (Fraunces 34: ~25-33pt with descenders at default; ~60-80pt at AX3)
 SHEET_TITLE_MIN_PT = 14.0                  # SF title2 / title1 in sheets (~16-24pt)
-SUBTITLE_LINE_GAP_PT = 8.0                 # a wrapped subtitle's next line starts this close under the last
+WRAPPED_TITLE_PT = 50.0                    # a title band taller than this below AX is two lines that touch
+SUBTITLE_LINE_GAP_PT = 12.0                # a wrapped subtitle's next line starts this close under the last
 SUBTITLE_GAP_PT = 16.0                     # a short text band starting this close under the title (line-box descent + 2pt) is the subtitle
 INK_MAX_MEAN = 110                         # light theme ink: mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
 INK_MIN_MEAN_DARK = 150                    # dark theme ink: mean RGB above this (textPrimary #F2F4FA, textSecondary #A9B0C8)
@@ -1390,10 +1391,18 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
         return out
     s, e = title
     col = np.append(dark[s - y0:e - y0].sum(axis=1).astype(np.int32), 0)  # the band's own end is a drop too
-    start = int((len(col) - 1) * 0.4)
+    # The baseline is a steep fall in the per-row ink count (flat-bottomed glyphs end on it; descenders are
+    # thin). A wrapped title can arrive as one band with two such falls: take the FIRST fall that is at least
+    # 60% of the steepest, past the first 25% of the band (the cap/x-height rise is above it).
+    two_lines = (e - s) > WRAPPED_TITLE_PT * sc
+    start = int((len(col) - 1) * (0.25 if two_lines else 0.4))
     drops = col[start:-1] - col[start + 1:]
-    # first row of the steepest fall (a flat-bottomed glyph run ends on the baseline; descenders are thin)
-    base = s + start + int(np.argmax(drops)) if drops.size else e - 1
+    if not drops.size:
+        base = e - 1
+    elif two_lines:
+        base = s + start + int(np.flatnonzero(drops >= 0.6 * drops.max())[0])
+    else:
+        base = s + start + int(np.argmax(drops))
     def baseline_of(bs, be):
         c = np.append(dark[bs - y0:be - y0].sum(axis=1).astype(np.int32), 0)
         st = int((len(c) - 1) * 0.4)
@@ -1402,6 +1411,8 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
 
     header_end = e
     last_base = base + 1
+    if two_lines and drops.size:   # the header ends on the wrapped line's baseline
+        last_base = s + start + int(np.flatnonzero(drops >= 0.6 * drops.max())[-1]) + 1
     merged = 0
     # A wrapped title: its next line is as tall as the first (within 30%) and starts within 12pt.
     for bs, be in bands:
