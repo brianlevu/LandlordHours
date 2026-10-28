@@ -57,7 +57,13 @@ final class CaptureNotificationRefresher {
 
     /// The coordinator a real refresh uses.
     static func defaultCoordinator(store: SuggestionStore) -> CalendarCaptureCoordinator {
-        CalendarCaptureCoordinator(detector: CalendarDetector(source: EventKitCalendarSource()), store: store)
+        CalendarCaptureCoordinator(
+            detector: CalendarDetector(source: EventKitCalendarSource()),
+            // The same rules and on-device model as the 90-day backfill, with the profile's mute
+            // rules. The calendar category stays 1.x's, so the 1.1 duplicate check still holds.
+            classifier: ClassifierChain.forStore(store),
+            store: store
+        )
     }
 
     private var rerunRequested = false

@@ -157,7 +157,7 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
     }
 
     func testALocationMatchAloneNeverReachesLikely() async {
-        for title in ["Alex", "Pick up keys", "Lunch with Sam", "Catch up"] {
+        for title in ["Alex", "Quick stop", "Lunch with Sam", "Catch up"] {
             let outcome = await rulesChain().evaluate(candidate(title, location: oakAddress), properties: properties)
             switch outcome {
             case .suggest(let c): XCTAssertLessThan(c.confidence, ClassifierThresholds.likely, title)

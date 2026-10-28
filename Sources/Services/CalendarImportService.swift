@@ -32,9 +32,12 @@ class CalendarImportService {
     private init() {}
 
     /// True when the text names landlord work by one of `propertyKeywords`.
+    ///
+    /// Matches at the start of a word, never inside one: "rent" finds "rent" and "rental", not
+    /// "parent" or "current".
     func matchesPropertyKeyword(_ text: String) -> Bool {
-        let lower = text.lowercased()
-        return propertyKeywords.contains { lower.contains($0) }
+        let padded = " \(RulesEngine.normalize(text)) "
+        return propertyKeywords.contains { padded.contains(" " + RulesEngine.normalize($0)) }
     }
 
     /// Request calendar access. Returns true if granted.
@@ -78,7 +81,7 @@ class CalendarImportService {
             let eventNotes = event.notes?.lowercased() ?? ""
             let combined = title + " " + location + " " + eventNotes
 
-            let isPropertyRelated = propertyKeywords.contains { combined.contains($0) }
+            let isPropertyRelated = matchesPropertyKeyword(combined)
             guard isPropertyRelated,
                   let start = event.startDate,
                   let end = event.endDate else { continue }
@@ -122,22 +125,10 @@ class CalendarImportService {
 
     // MARK: - Private
 
+    /// The property a text is about: its name, or its street (house number plus street words, or
+    /// every street word). The city, state and zip never match, and neither does part of a word.
+    /// Shares the v2 matcher: two properties tied at the same level match nothing.
     func matchProperty(from text: String, properties: [RentalProperty]) -> RentalProperty? {
-        // Try name match first
-        for property in properties {
-            if text.contains(property.name.lowercased()) {
-                return property
-            }
-        }
-        // Try address parts (words > 3 chars)
-        for property in properties {
-            let addressWords = property.address.lowercased()
-                .components(separatedBy: CharacterSet.alphanumerics.inverted)
-                .filter { $0.count > 3 }
-            for word in addressWords {
-                if text.contains(word) { return property }
-            }
-        }
-        return nil
+        RulesEngine.matchProperty(normalized: RulesEngine.normalize(text), properties: properties)?.property
     }
 }

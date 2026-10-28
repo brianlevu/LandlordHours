@@ -14,7 +14,7 @@ struct PlaceholderCalendarClassifier: CaptureClassifier {
     func classify(_ candidate: CaptureCandidate, properties: [RentalProperty]) async -> CaptureClassification {
         let service = CalendarImportService.shared
         let text = (candidate.title + " " + (candidate.location ?? "")).lowercased()
-        let related = service.propertyKeywords.contains { text.contains($0) }
+        let related = service.matchesPropertyKeyword(text)
         let property = service.matchProperty(from: text, properties: properties)
         return CaptureClassification(
             isLandlordWork: related || property != nil,
@@ -93,9 +93,15 @@ final class CalendarCaptureCoordinator {
         await scan(detector.backfillInterval(now: clock(), calendar: calendar), properties: properties, entries: entries)
     }
 
-    /// Scan of the next 7 days.
+    /// Scan of the next 7 days. With a `ClassifierChain` it runs the same path as the backfill
+    /// (rules, then the on-device model, "Not sure" kept), so the two always agree. Any other
+    /// classifier is asked one event at a time.
     func scanUpcoming(properties: [RentalProperty], entries: [TimeEntry]) async -> CalendarScanResult {
-        await scan(detector.upcomingInterval(now: clock(), calendar: calendar), properties: properties, entries: entries)
+        let interval = detector.upcomingInterval(now: clock(), calendar: calendar)
+        if let chain = classifier as? ClassifierChain {
+            return await scanBatched(interval: interval, chain: chain, properties: properties, entries: entries, skipSettled: true)
+        }
+        return await scan(interval, properties: properties, entries: entries)
     }
 
     /// Day-1 backfill through the WP2 chain's batch API, with progress. WP-L: it streams. Each
@@ -111,14 +117,34 @@ final class CalendarCaptureCoordinator {
         progress: @escaping @MainActor (ClassifierBatchProgress) -> Void = { _ in },
         onIngest: @escaping @MainActor ([Suggestion]) -> Void = { _ in }
     ) async -> CalendarScanResult {
-        let interval = detector.backfillInterval(now: clock(), calendar: calendar)
-        let candidates: [CaptureCandidate]
+        await scanBatched(
+            interval: detector.backfillInterval(now: clock(), calendar: calendar),
+            chain: chain, properties: properties, entries: entries, progress: progress, onIngest: onIngest
+        )
+    }
+
+    /// The chain's batch API over `interval`. `skipSettled`: leave out events the store would
+    /// ignore anyway (dismissed or confirmed), so a scan on every launch doesn't ask the model
+    /// again about them.
+    private func scanBatched(
+        interval: DateInterval,
+        chain: ClassifierChain,
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        skipSettled: Bool = false,
+        progress: @escaping @MainActor (ClassifierBatchProgress) -> Void = { _ in },
+        onIngest: @escaping @MainActor ([Suggestion]) -> Void = { _ in }
+    ) async -> CalendarScanResult {
+        var candidates: [CaptureCandidate]
         do {
             candidates = try await detector.detect(in: interval)
         } catch CalendarCaptureError.noAccess(let access) {
             return .blocked(access)
         } catch {
             return .blocked(detector.access)
+        }
+        if skipSettled {
+            candidates = candidates.filter { store.wouldIngest(sourceKey: $0.sourceKey) }
         }
 
         enum Event: Sendable {
@@ -193,7 +219,8 @@ final class CalendarCaptureCoordinator {
         var suggestions: [Suggestion] = []
         for candidate in candidates {
             let classification = await classifier.classify(candidate, properties: properties)
-            guard classification.isLandlordWork else { continue }
+            // "Not sure" items are kept too (landlord evidence below the likely line).
+            guard classification.isLandlordWork || classification.hasLandlordEvidence else { continue }
             var suggestion = Suggestion(candidate: candidate, classification: classification)
             // Keep 1.x's values (see type comment).
             suggestion.proposedHours = candidate.scheduledHours

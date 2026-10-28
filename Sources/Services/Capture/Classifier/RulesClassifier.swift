@@ -23,8 +23,15 @@ struct RulesClassifier: CaptureClassifier {
     }
 
     func classifySync(_ candidate: CaptureCandidate, properties: [RentalProperty]) -> CaptureClassification {
-        let text = [candidate.title, candidate.location ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
-        let verdict = RulesEngine.evaluate(text: text, properties: properties, isEmail: candidate.kind == .gmail)
+        let verdict: RulesVerdict
+        if candidate.kind == .calendar {
+            // Title and location scored apart, with what the invite says (attendees, link, ...).
+            verdict = RulesEngine.evaluateCalendar(title: candidate.title, location: candidate.location,
+                                                   context: candidate.context, properties: properties)
+        } else {
+            let text = [candidate.title, candidate.location ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
+            verdict = RulesEngine.evaluate(text: text, properties: properties, isEmail: candidate.kind == .gmail)
+        }
         let isLandlordWork = verdict.confidence >= ClassifierThresholds.likely
 
         var evidence = verdict.evidence

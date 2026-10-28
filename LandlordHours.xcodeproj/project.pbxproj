@@ -54,6 +54,7 @@
 		24B4A91548115D49515C797B /* PropertiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D91BDD921FD02E42B58FE334 /* PropertiesView.swift */; };
 		257B76032BAC30320A0024FB /* SurfaceDebugHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EB46B67644CB107E30956A /* SurfaceDebugHooks.swift */; };
 		2660620E149B57D7595C08BB /* D5-201-local.plist in Resources */ = {isa = PBXBuildFile; fileRef = 05D6E55446ACD86EE664D6EB /* D5-201-local.plist */; };
+		2690B88328F81D6D9DC5B25E /* CalendarEventSignals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4329E2754EBB61EDD4D60B08 /* CalendarEventSignals.swift */; };
 		2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */; };
 		2B843690B8A92B72AA874888 /* EngagementLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */; };
 		2B95A78E4F82B5AE3269D3C2 /* D7-201-apple-plus-empty-local.md in Resources */ = {isa = PBXBuildFile; fileRef = D093576FC0843AF14E50EB40 /* D7-201-apple-plus-empty-local.md */; };
@@ -471,6 +472,7 @@
 		401D542F4CD2262A89C17B07 /* RecordsLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLogic.swift; sourceTree = "<group>"; };
 		40795DEE577B245A805AD8B8 /* LearnAndWhatsNewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnAndWhatsNewTests.swift; sourceTree = "<group>"; };
 		42CDC606352C919BAD1B48C9 /* CaptureNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationCenter.swift; sourceTree = "<group>"; };
+		4329E2754EBB61EDD4D60B08 /* CalendarEventSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventSignals.swift; sourceTree = "<group>"; };
 		435624AEE2D53F77DFB56482 /* TodayConfirmUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayConfirmUITests.swift; sourceTree = "<group>"; };
 		44BA80B28A53E62FB5831079 /* Settings.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Settings.xcstrings; sourceTree = "<group>"; };
 		45315D80200D5FEE893898D7 /* HouseTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseTokens.swift; sourceTree = "<group>"; };
@@ -956,6 +958,7 @@
 		815F2D2B6F5048580C2D860D /* Classifier */ = {
 			isa = PBXGroup;
 			children = (
+				4329E2754EBB61EDD4D60B08 /* CalendarEventSignals.swift */,
 				9E3335EA8A409DEA55AE7EAE /* ClassifierChain.swift */,
 				3CEC2D9DCAA8A77D8C960FA4 /* ClassifierKeywords.swift */,
 				A7C7395BF58AAA18F76C388B /* ClassifierThresholds.swift */,
@@ -1651,6 +1654,7 @@
 				C851F22E7D19AA2B45E2A6F9 /* BulkAbsenceSheet.swift in Sources */,
 				41D5547191C590C8DB391022 /* CalendarCaptureCoordinator.swift in Sources */,
 				D6F01A1BCC4C63937DFC7BB8 /* CalendarDetector.swift in Sources */,
+				2690B88328F81D6D9DC5B25E /* CalendarEventSignals.swift in Sources */,
 				3401F93DEDF4ACC4A7DB7346 /* CalendarEventSource.swift in Sources */,
 				B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */,
 				B9687060260268B573989B02 /* CaptureActionSupport.swift in Sources */,

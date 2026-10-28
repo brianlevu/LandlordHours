@@ -99,13 +99,20 @@ enum CaptureReconciler {
             let overlaps = entry.date < windowEnd && entryEnd > windowStart
             let onTouchedDay = entry.date >= firstDay && entry.date < daysEnd
             guard overlaps || onTouchedDay else { return false }
+            // The logged hours must be this event's length, give or take 15 minutes. A rental with
+            // any other entry that day (a long day of repairs) is not this event, and flagging it
+            // took the row's single tag away from "Not sure".
+            guard let hours = suggestion.proposedHours ?? suggestion.end.map({ $0.timeIntervalSince(windowStart) / 3600 }),
+                  hours > 0, abs(entry.hours - hours) <= hoursMatchTolerance else { return false }
             if let propertyId = suggestion.proposedPropertyId {
                 return entry.propertyId == propertyId
             }
-            guard let hours = suggestion.proposedHours else { return false }
-            return abs(entry.hours - hours) <= 0.25
+            return true
         }
     }
+
+    /// Fifteen minutes: logged hours this close to the event's length look like the same work.
+    static let hoursMatchTolerance = 0.25
 
     static func normalizedTitle(_ title: String) -> String {
         title
@@ -203,6 +210,14 @@ final class SuggestionStore {
     }
 
     func isDismissed(_ key: String) -> Bool { contents.dismissedKeys[key] != nil }
+
+    /// False when `ingest` would ignore this key anyway: dismissed, or already confirmed. A scan
+    /// skips classifying these (no model call for an event that is settled).
+    func wouldIngest(sourceKey: String) -> Bool {
+        if isDismissed(sourceKey) { return false }
+        if let existing = contents.suggestions.first(where: { $0.sourceKey == sourceKey }) { return existing.isPending }
+        return true
+    }
 
     func isMuted(_ suggestion: Suggestion) -> Bool {
         contents.muteRules.contains { $0.mutes(suggestion) }

@@ -66,6 +66,14 @@ enum ConfidenceBand: String, Equatable {
 }
 
 extension ClassifierThresholds {
+    /// Evidence marker the rules add to a calendar item that points away from rental work (a
+    /// location match beside a video call, a team invite, a salon). Nothing brings it back:
+    /// the on-device model is not asked and its "yes" cannot make the item visible.
+    static let notRentalEvidence = "signal: not rental"
+    /// Evidence marker on an item whose only landlord evidence is its location. The chain keeps
+    /// its confidence under `likely` even when the model agrees.
+    static let locationOnlyEvidence = "capped: location only"
+
     /// Evidence marker the rules add when a landlord keyword or property matched and noise
     /// words don't outweigh it.
     static let landlordSignalEvidence = "signal: landlord"
@@ -83,6 +91,7 @@ extension CaptureClassification {
     }
 
     var hasLandlordEvidence: Bool {
-        isLandlordWork || evidence.contains { $0 == ClassifierThresholds.landlordSignalEvidence || $0.hasPrefix("model: yes") }
+        if evidence.contains(ClassifierThresholds.notRentalEvidence) { return false }
+        return isLandlordWork || evidence.contains { $0 == ClassifierThresholds.landlordSignalEvidence || $0.hasPrefix("model: yes") }
     }
 }
