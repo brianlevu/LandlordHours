@@ -135,14 +135,10 @@ struct PropertiesView: View {
 
     @ViewBuilder private var rootContent: some View {
         if let id = singleRentalID {
+            // The page is the tab: Edit is its one header action and Add rental ends the page.
             PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) },
-                               onUnlockAtLimit: atLimit ? { openPaywall() } : nil)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(RentalsText.addRental, action: openAddProperty)
-                            .accessibilityIdentifier("properties.add")
-                    }
-                }
+                               onUnlockAtLimit: atLimit ? { openPaywall() } : nil,
+                               onAddRental: openAddProperty)
 #if DEBUG
                 .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: nil) }
 #endif

@@ -530,6 +530,17 @@
         }
       }
     },
+    "rentals.page.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    },
     "rentals.search": {
       "extractionState": "manual",
       "localizations": {

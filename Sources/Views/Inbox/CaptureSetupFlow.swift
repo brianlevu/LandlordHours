@@ -48,7 +48,7 @@ struct CaptureSetupEnvironment {
 /// tap here: calendar suggestions and end-of-event prompts default to off.
 /// Ends by starting the day-1 backfill in the background when calendar access was granted.
 ///
-/// Standard components only (plan package D): `LHScreenTitle` (sheet), `LHRowGroup` +
+/// Standard components only (plan package D): the sheet scaffold (`.lhSheetScreen`), `LHRowGroup` +
 /// `LHRow.Toggle`, a sample `LHRow.Action`, `LHButton`. No eyebrow, no blueprint switch style.
 struct CaptureSetupFlow: View {
     enum Mode { case onboarding, whatsNew }
@@ -111,19 +111,10 @@ struct CaptureSetupFlow: View {
     private var priming: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                VStack(alignment: .leading, spacing: 4) {
-                    LHScreenTitle(
-                        mode == .whatsNew
-                            ? String(localized: "capture.title.whatsNew", defaultValue: "We can notice your rental work", table: "Inbox")
-                            : String(localized: "capture.title.onboarding", defaultValue: "Let us notice your rental work", table: "Inbox"),
-                        style: .sheet
-                    )
-                    .accessibilityIdentifier("capture.priming.title")
-                    Text(String(localized: "capture.body", defaultValue: "We look for things like a plumber visit or a showing in your calendar, then ask you. Nothing counts until you confirm it.", table: "Inbox"))
-                        .font(.body)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(String(localized: "capture.body", defaultValue: "We look for things like a plumber visit or a showing in your calendar, then ask you. Nothing counts until you confirm it.", table: "Inbox"))
+                    .font(.body)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 switches
 
@@ -132,10 +123,17 @@ struct CaptureSetupFlow: View {
                 CapturePrivacyFooter()
             }
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, mode == .whatsNew ? 24 : 12)
             .padding(.bottom, 16)
         }
         .scrollBounceBehavior(.basedOnSize)
+        // Screen anatomy: a task sheet's step, so the sheet scaffold owns the title and the gaps.
+        .lhSheetScreen(
+            mode == .whatsNew
+                ? String(localized: "capture.title.whatsNew", defaultValue: "We can notice your rental work", table: "Inbox")
+                : String(localized: "capture.title.onboarding", defaultValue: "Let us notice your rental work", table: "Inbox"),
+            style: .sheet,
+            background: colors.background
+        )
         .safeAreaInset(edge: .bottom, spacing: 0) { primingFooter }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(mode == .whatsNew ? "capture.whatsNew" : "capture.onboarding")
@@ -335,7 +333,6 @@ struct CaptureSetupFlow: View {
         let ax = dynamicTypeSize.isAccessibilitySize
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                LHScreenTitle(String(localized: "capture.denied.title", defaultValue: "Calendar access is off", table: "Inbox"), style: .sheet)
                 Text(String(localized: "capture.denied.body", defaultValue: "To find rental work, we need Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way.", table: "Inbox"))
                     .font(.body)
                     .foregroundStyle(colors.textSecondary)
@@ -347,11 +344,12 @@ struct CaptureSetupFlow: View {
                 }
             }
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 24)
             .padding(.bottom, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .lhSheetScreen(String(localized: "capture.denied.title", defaultValue: "Calendar access is off", table: "Inbox"),
+                       style: .sheet, background: colors.background)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 4) {
                 if !ax { continueWithoutButton }
