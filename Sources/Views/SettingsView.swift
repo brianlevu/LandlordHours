@@ -136,6 +136,9 @@ struct SettingsView: View {
                     } else if args.contains("-LHOpenSupportFromSettings") {
                         Self.didApplyDebugRoute = true
                         route = .contactSupport
+                    } else if args.contains("-LHOpenICloudFromSettings") {
+                        Self.didApplyDebugRoute = true
+                        route = .icloud
                     } else if args.contains("-LHOpenMutedFromSettings") {
                         Self.didApplyDebugRoute = true
                         route = .muted

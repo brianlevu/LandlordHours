@@ -132,6 +132,11 @@ final class IdentityCoordinator: ObservableObject {
 
     func updateStatus(_ sync: CloudKitSyncService) {
         let state = sync.accountState
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHStoreICloudOn") {
+            status = .on(lastSync: Date().addingTimeInterval(-120)); return
+        }
+        #endif
         if sync.isSyncing || sync.isRunningInitialSync {
             status = .syncing
         } else if state == .restricted {

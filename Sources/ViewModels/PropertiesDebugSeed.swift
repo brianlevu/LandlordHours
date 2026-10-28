@@ -76,6 +76,12 @@ extension AppViewModel {
                          Seed(name: "The Arroyo Seco Schoolhouse Lofts, Unit 4B", address: "1 Arroyo Blvd", type: .ltr, hours: 21),
                          Seed(name: "Birch Lane House", address: "5 Birch Ln", type: .ltr, hours: 0)]
             }
+        case "store":
+            // App Store captures (2.2): made-up rentals only, at the layouts3 stages.
+            seeds = [Seed(name: "Pine Cabin", address: "88 Ridge Rd, Big Bear", type: .str, hours: 88, aliases: ["Cabin", "Big Bear"]),
+                     Seed(name: "Oak Street Duplex", address: "214 Oak St, Pasadena", type: .ltr, hours: 46, aliases: ["Oak St"]),
+                     Seed(name: "Harbor View 2", address: "40 Harbor Dr, Long Beach", type: .str, hours: 64),
+                     Seed(name: "Lakeside A-Frame", address: "3 Shore Rd, Lake Arrowhead", type: .str, hours: 0)]
         case "limit": seeds = [pine]
         case "limit2": seeds = [pine, oak]
         case "empty": seeds = []
@@ -84,7 +90,7 @@ extension AppViewModel {
 
         // Captures show the screen itself, not the first-run guided overlay.
         GuidedOnboardingStore.skip()
-        let pro = set == "four" || set == "twelve" || set == "brian" || set == "stages" || set.hasPrefix("layouts")
+        let pro = set == "four" || set == "twelve" || set == "brian" || set == "stages" || set == "store" || set.hasPrefix("layouts")
         let litToday: Set<Int> = arguments.firstIndex(of: "-LHPropertiesLitToday")
             .flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
             .map { Set($0.split(separator: ",").compactMap { Int($0) }) } ?? []
@@ -145,11 +151,12 @@ extension AppViewModel {
             for (k, _) in mix {
                 var remaining = max(0, targets[k] ?? 0)
                 while remaining > 0.0001 {
-                    let h = min(8, remaining)
+                    // App Store set: spread across the year (3h visits about every 9 days), not a burst.
+                    let h = min(set == "store" ? 3 : 8, remaining)
                     newEntries.append(TimeEntry(propertyId: property.id, participant: .selfParticipant, category: k, hours: h,
                                                 date: day(back), notes: ""))
                     remaining -= h
-                    back += 1
+                    back += set == "store" ? 9 : 1
                 }
             }
         }

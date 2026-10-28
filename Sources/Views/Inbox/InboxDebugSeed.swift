@@ -71,6 +71,10 @@ enum InboxDebugSeed {
             CaptureOptIn.markBackfillCompleted(userId: userId)
             let items = inboxItems(app: app, now: InboxClock.now())
             store.ingest(items, existingEntries: app.timeEntries)
+        case "store":
+            CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
+            CaptureOptIn.markBackfillCompleted(userId: userId)
+            store.ingest(storeItems(app: app, now: InboxClock.now()), existingEntries: app.timeEntries)
         case "inbox-long":
             CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
             CaptureOptIn.markBackfillCompleted(userId: userId)
@@ -181,6 +185,25 @@ enum InboxDebugSeed {
                  property: oak, category: .legal, confidence: 0.91, backfill: true),
             item("hoa", title: "HOA meeting", start: day(20, 18), hours: 2,
                  property: oak, category: .management, confidence: 0.66, backfill: true),
+        ]
+    }
+
+    /// App Store captures: rental work only, every item with a rental and hours.
+    static func storeItems(app: AppViewModel, now: Date) -> [Suggestion] {
+        let pine = app.properties.first { $0.name == "Pine Cabin" }?.id ?? app.properties.first?.id
+        let oak = app.properties.first { $0.name == "Oak Street Duplex" }?.id ?? app.properties.last?.id
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        func day(_ offset: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            let base = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
+        }
+        return [
+            item("plumber", title: "Plumber", start: day(0, 7), hours: 2, property: pine, category: .repairs, confidence: 0.95),
+            item("showing", title: "Showing", start: day(2, 17, 30), hours: 1, property: oak, category: .leasing, confidence: 0.92),
+            item("gutters", title: "Gutter cleaning", start: day(5, 9), hours: 2, property: oak, category: .repairs, confidence: 0.9),
+            item("inspection", title: "Smoke alarm check", start: day(6, 10), hours: 1, property: pine, category: .repairs, confidence: 0.88),
+            item("lease", title: "Lease signing", start: day(9, 18), hours: 1, property: oak, category: .leasing, confidence: 0.91),
         ]
     }
 
