@@ -675,5 +675,31 @@ class ConsistencyBackCircleXXL(unittest.TestCase):
         self.assertAlmostEqual(m["content_top_pt"], 133.0, delta=0.5)
         self.assertAlmostEqual(m["gap_pt"], 26.0, delta=0.7)
 
+
+class ConsistencyColumn(unittest.TestCase):
+    def test_band_b_frame_is_measured_as_its_content_column(self):
+        """iPad (standard 1.27 IP1): --column measures the centred 672pt column exactly as if the frame had
+        been cropped to it, so the phone's trailing slot and gutters apply (real 13" Records: header end
+        147.5 on the whole frame, 139.0 in the column)."""
+        s, wpt, hpt = 2, 1032, 1376
+        inset = (wpt - 672) // 2
+        a = np.zeros((hpt * s, wpt * s, 3), np.uint8)
+        a[:] = CANVAS
+        a[30 * s:hpt * s, 0:6 * s] = (200, 40, 40)                                      # off-column marks
+        t0 = 113
+        a[t0 * s:(t0 + 25) * s, (inset + 20) * s:(inset + 140) * s] = INK
+        a[(t0 + 51) * s:(t0 + 300) * s, (inset + 20) * s:(inset + 652) * s] = CARD
+        d = tempfile.mkdtemp(prefix="fc-col-")
+        wide, crop = os.path.join(d, "wide.png"), os.path.join(d, "crop.png")
+        Image.fromarray(a).save(wide)
+        Image.fromarray(a[:, inset * s:(wpt - inset) * s]).save(crop)
+        col, ref = fc.header_metrics(wide, 2.0, column_pt=672), fc.header_metrics(crop, 2.0)
+        for k in ("title_baseline_pt", "header_end_pt", "content_top_pt", "gap_pt"):
+            self.assertEqual(col[k], ref[k], k)
+        self.assertAlmostEqual(col["content_top_pt"], 164.0, delta=0.5)
+        # A frame narrower than the column is measured whole.
+        self.assertEqual(fc.header_metrics(crop, 2.0, column_pt=700)["gap_pt"], ref["gap_pt"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

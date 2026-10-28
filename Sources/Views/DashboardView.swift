@@ -291,7 +291,7 @@ struct DashboardView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     page
-                        .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
+                        .frame(maxWidth: .infinity)   // band B: the scaffold's content column (§1.27 interim)
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 24)
                 }

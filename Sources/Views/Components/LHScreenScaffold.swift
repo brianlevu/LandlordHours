@@ -206,13 +206,18 @@ struct LHScrollingScreenModifier<Accessory: View, Trailing: View>: ViewModifier 
     @ViewBuilder var trailing: Trailing
 
     @State private var scrolled: CGFloat = 0
+    /// The screen's width, for the band-B content column (§1.27 interim).
+    @State private var width: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutBand) private var band
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var compact: Bool { scrolled > LHScreenAnatomy.compactThreshold }
+    private var inset: CGFloat { LHMetrics.columnInset(band: band, width: width) }
 
     func body(content: Content) -> some View {
         content
+            .lhContentColumn(inset)
             .contentMargins(.top, LHScreenAnatomy.headerToContent - 8, for: .scrollContent)
             .environment(\.defaultMinListHeaderHeight, 0)
             .toolbar(.hidden, for: .navigationBar)
@@ -226,6 +231,7 @@ struct LHScrollingScreenModifier<Accessory: View, Trailing: View>: ViewModifier 
                 // under it), so it reads as part of the page and leaves with it.
                 LHScreenHeader(title: title, subtitle: subtitle, style: style, back: back,
                                accessory: { accessory }, trailing: { trailing })
+                    .padding(.horizontal, inset)
                     .offset(y: -max(0, scrolled))
                     .opacity(compact ? 0 : 1)
                     .allowsHitTesting(!compact)
@@ -238,6 +244,7 @@ struct LHScrollingScreenModifier<Accessory: View, Trailing: View>: ViewModifier 
                 }
             }
             .animation(reduceMotion ? nil : AppAnimation.quick, value: compact)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
     /// The compact bar: back, the title in `.headline`, the trailing action, on the bar material
@@ -256,6 +263,7 @@ struct LHScrollingScreenModifier<Accessory: View, Trailing: View>: ViewModifier 
                 .frame(maxHeight: LHScreenAnatomy.titleRowHeight)
         }
         .padding(.horizontal, LHMetrics.gutter - 8)
+        .padding(.horizontal, inset)
         .frame(height: LHScreenAnatomy.titleRowHeight)
         .frame(maxWidth: .infinity)
         .background {
@@ -287,6 +295,58 @@ extension View {
     ) -> some View {
         modifier(LHScrollingScreenModifier(title: title, subtitle: subtitle, style: .detail, back: back,
                                            onPage: onPage, accessory: accessory, trailing: trailing))
+    }
+}
+
+// MARK: - The band-B content column (§1.27 interim)
+
+private struct LHColumnInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    /// The extra horizontal inset that centres a band-B screen's content in `LHMetrics.contentColumn`;
+    /// 0 in band A (every iPhone). Set by the scaffolds; read by `lhListGutter()`.
+    var lhColumnInset: CGFloat {
+        get { self[LHColumnInsetKey.self] }
+        set { self[LHColumnInsetKey.self] = newValue }
+    }
+}
+
+private struct LHContentColumnModifier: ViewModifier {
+    let inset: CGFloat
+
+    func body(content: Content) -> some View {
+        // Band A (inset 0) is left exactly as it was: no margin is set, so the phone layout is unchanged.
+        if inset > 0 {
+            content
+                .contentMargins(.horizontal, inset, for: .scrollContent)
+                .environment(\.lhColumnInset, inset)
+        } else {
+            content
+        }
+    }
+}
+
+private struct LHListGutterModifier: ViewModifier {
+    @Environment(\.lhColumnInset) private var inset
+
+    func body(content: Content) -> some View {
+        content.contentMargins(.horizontal, LHMetrics.gutter + inset, for: .scrollContent)
+    }
+}
+
+extension View {
+    /// Content margins move the scroll content into the column while the scroll view (and the page
+    /// behind it) still fills the window, so the whole width scrolls.
+    fileprivate func lhContentColumn(_ inset: CGFloat) -> some View {
+        modifier(LHContentColumnModifier(inset: inset))
+    }
+
+    /// The 20pt list gutter, plus the band-B column inset. Every scaffolded `List` uses this instead of
+    /// its own `.contentMargins(.horizontal, …)`, which would override the scaffold's column.
+    func lhListGutter() -> some View {
+        modifier(LHListGutterModifier())
     }
 }
 
@@ -332,11 +392,15 @@ struct LHSheetScreenModifier: ViewModifier {
     var background: Color
 
     @State private var scrolled: CGFloat = 0
+    @State private var width: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.layoutBand) private var band
 
     func body(content: Content) -> some View {
         let ax = typeSize.isAccessibilitySize
+        let inset = LHMetrics.columnInset(band: band, width: width)
         content
+            .lhContentColumn(inset)
             .contentMargins(.top, LHScreenAnatomy.headerToContent - 8, for: .scrollContent)
             .environment(\.defaultMinListHeaderHeight, 0)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -348,9 +412,11 @@ struct LHSheetScreenModifier: ViewModifier {
                 // Pinned and opaque below AX: scrolled rows never read through the title (§1.20). At AX
                 // the wrapped title would hold half the sheet, so it leaves with the content (§1.20 AX).
                 LHSheetHeader(title: title, subtitle: subtitle, style: style, leading: leading, onClose: onClose)
+                    .padding(.horizontal, inset)
                     .background(background)
                     .offset(y: ax ? -max(0, scrolled) : 0)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 }
 

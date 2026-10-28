@@ -170,7 +170,7 @@ struct InboxView: View {
         .listSectionSpacing(LHMetrics.sectionGap)
         .scrollContentBackground(.hidden)
         // The 20pt list gutter (shared lane): the card, title and header rows sit on it.
-        .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
+        .lhListGutter()
         .animation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse, value: model.visible.map(\.sourceKey))
         .onScrollGeometryChange(for: Bool.self) { geometry in
             // The foot is the last row: it is on screen once the content's end is.

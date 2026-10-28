@@ -23,11 +23,21 @@ enum LHMetrics {
     static let rowMinHeight: CGFloat = 56
     static let rowTargetHeight: CGFloat = 64
     static let rowMaxHeight: CGFloat = 88
-    /// Reading column cap (§1.27).
+    /// Reading column cap for text blocks (§1.27).
     static let readingColumn: CGFloat = 600
+    /// Band B content column (§1.27 interim, 2026-10-27): every scaffolded screen's header and content
+    /// sit in one centred column this wide, gutters included (cards 632, text ≤ 640). Apple's readable
+    /// content width at the default text size is 672.
+    static let contentColumn: CGFloat = 672
+
+    /// The horizontal inset that centres the content column in a band-B window; 0 in band A.
+    static func columnInset(band: LayoutBand, width: CGFloat) -> CGFloat {
+        guard band == .b, width.isFinite, width > contentColumn else { return 0 }
+        return ((width - contentColumn) / 2).rounded(.down)
+    }
 
     /// The page gutter for a band.
-    static func gutter(for band: LayoutBand) -> CGFloat { band == .a ? gutter : wideGutter }
+    static func gutter(for band: LayoutBand) -> CGFloat { gutter }
 }
 
 // MARK: - Layout band

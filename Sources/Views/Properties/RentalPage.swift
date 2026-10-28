@@ -128,7 +128,7 @@ struct PropertyDetailView: View {
                     }
                     Color.clear.frame(height: 24).id("property.end")
                 }
-                .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
+                .frame(maxWidth: .infinity)   // band B: the scaffold's content column (§1.27 interim)
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)

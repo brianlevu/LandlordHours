@@ -105,7 +105,14 @@ final class FoundationsTests: XCTestCase {
         XCTAssertEqual(side(375, 667), 297)            // SE class
         XCTAssertEqual(side(402, 874, ax: true), 295)  // H3
         XCTAssertEqual(side(382, 644), 287)            // H7 Duo closed
-        XCTAssertEqual(side(820, 1180, band: .b), 390) // H6 fixed in bands B and C
+        // H6 band B (amended 2026-10-27): H1's share of the height given, clamped 290…480 and to W − 12.
+        XCTAssertEqual(side(820, 1180, band: .b), 480)
+        XCTAssertEqual(side(1032, 1176, band: .b), 480)   // 13" portrait, under the 200 header allowance
+        XCTAssertEqual(side(834, 1010, band: .b), 450)    // 11" portrait
+        XCTAssertEqual(side(1376, 832, band: .b), 371)    // 13" landscape
+        XCTAssertEqual(side(1210, 634, band: .b), 290)    // 11" landscape: never under 290
+        XCTAssertEqual(side(820, 1180, ax: true, band: .b), 390)   // AX: H3's share, 220…390
+        XCTAssertEqual(side(1210, 634, ax: true, band: .b), 220)
         XCTAssertEqual(side(402, 874, kind: .medium), 300)
         XCTAssertEqual(side(402, 874, ax: true, kind: .medium), 220)
         XCTAssertEqual(side(820, 1180, band: .b, kind: .medium), 300)
@@ -124,6 +131,21 @@ final class FoundationsTests: XCTestCase {
         XCTAssertEqual(ax.side, 295)
         let wide = CraftHeroSide.resolve(previous: first, kind: .hero, window: CGSize(width: 820, height: 874), band: .b, accessibility: false)
         XCTAssertEqual(wide.side, 390)
+    }
+
+    // MARK: Band-B content column (§1.27 interim)
+
+    func testContentColumnInset() {
+        // Band A (every iPhone) is never inset, whatever the width.
+        XCTAssertEqual(LHMetrics.columnInset(band: .a, width: 402), 0)
+        XCTAssertEqual(LHMetrics.columnInset(band: .a, width: 1032), 0)
+        // Band B centres a 672 column.
+        XCTAssertEqual(LHMetrics.columnInset(band: .b, width: 1032), 180)   // 13" portrait
+        XCTAssertEqual(LHMetrics.columnInset(band: .b, width: 1376), 352)   // 13" landscape
+        XCTAssertEqual(LHMetrics.columnInset(band: .b, width: 834), 81)     // 11" portrait
+        XCTAssertEqual(LHMetrics.columnInset(band: .b, width: 672), 0)
+        XCTAssertEqual(LHMetrics.columnInset(band: .b, width: 610), 0)      // narrower than the column
+        XCTAssertEqual(LHMetrics.columnInset(band: .b, width: .infinity), 0)
     }
 
     func testEmptyStateDioramaSide() {

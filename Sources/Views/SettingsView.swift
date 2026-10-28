@@ -90,7 +90,7 @@ struct SettingsView: View {
             }
             .listStyle(.insetGrouped)
             .listSectionSpacing(LHMetrics.sectionGap)
-            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
+            .lhListGutter()
             .scrollContentBackground(.hidden)
             .contentMargins(.bottom, 104, for: .scrollContent)
             .background { LHCanvas() }
@@ -766,7 +766,7 @@ struct MutedSuggestionsView: View {
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(LHMetrics.sectionGap)
-            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
+            .lhListGutter()
         .scrollContentBackground(.hidden)
         .background { LHCanvas() }
         .lhTabScreen(HS.t("muted.title", "Muted"), back: LHBackAction(
@@ -991,7 +991,7 @@ struct TaxProfileView: View {
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(LHMetrics.sectionGap)
-            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
+            .lhListGutter()
         .scrollContentBackground(.hidden)
         .background { LHCanvas() }
         .lhTabScreen(HS.t("filing.title", "Filing and goal"),

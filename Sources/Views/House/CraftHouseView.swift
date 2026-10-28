@@ -346,7 +346,7 @@ struct CraftHeroSide: Equatable, Sendable {
         case (.hero, .a):
             side = CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
         case (.hero, _):
-            side = min(CraftHeroSize.wideBandSide, max(0, window.width - 12))
+            side = CraftHeroSize.wideHero(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
         case (.medium, .a):
             side = CraftHeroSize.medium(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
         case (.medium, _):
