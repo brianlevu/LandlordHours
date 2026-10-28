@@ -28,12 +28,16 @@ struct RecordPageModel: Equatable {
         let rows = report.propertyTotals.map { Row(name: $0.name, kind: kindFor($0.propertyId), hours: report.repsParticipant == .spouse ? $0.spouseRepsHours : $0.selfRepsHours) }
         // One person's own 750 hours (the real estate professional's), never self plus spouse.
         let total = report.repsHours(for: report.repsParticipant)
-        let countable = report.categoryTotals.filter(\.countsForREPS).sorted { $0.hours > $1.hours }
-        let maxHours = max(countable.first?.hours ?? 0, 0.0001)
-        let kinds = countable.prefix(4).map { Kind(label: $0.category.inboxLabel, fraction: $0.hours / maxHours) }
+        // The kinds bars and the recent lines are the same person's countable work as the rows and the Total.
+        let who = report.repsParticipant
+        let personHours: (AuditReport.CategoryTotal) -> Double = { who == .spouse ? $0.spouseHours : $0.selfHours }
+        let countable = report.categoryTotals.filter { $0.countsForREPS && personHours($0) > 0 }.sorted { personHours($0) > personHours($1) }
+        let maxHours = max(countable.first.map(personHours) ?? 0, 0.0001)
+        let kinds = countable.prefix(4).map { Kind(label: $0.category.inboxLabel, fraction: personHours($0) / maxHours) }
         let df = DateFormatter()
         df.dateFormat = "MMM d"
-        let lines = report.entries.sorted { $0.date > $1.date }.prefix(6).map { row -> Line in
+        let lines = report.entries.filter { $0.participant == who && $0.category.countsForREPS }
+            .sorted { $0.date > $1.date }.prefix(6).map { row -> Line in
             let text = row.description.trimmingCharacters(in: .whitespacesAndNewlines)
             return Line(date: df.string(from: row.date), title: text.isEmpty ? row.category.inboxLabel : text, hours: row.hours)
         }

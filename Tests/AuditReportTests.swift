@@ -1014,4 +1014,17 @@ final class REPSPerPersonTests: CaptureTestCase {
         XCTAssertNotNil(text.range(of: #"Repairs & Maintenance[^\n]*100\.00"#, options: .regularExpression))
         XCTAssertTrue(text.replacingOccurrences(of: "\n", with: " ").contains("Counts for the 750 test"))
     }
+
+    func testThePreviewKindsAndLinesAreTheQualifyingPersonsToo() {
+        let (_, rentals) = entries()
+        // Self works repairs and management; the spouse works leasing and bookkeeping.
+        let you = RecordPageModel.from(report: report(repsParticipant: .selfParticipant), owner: "Sam", properties: rentals)
+        XCTAssertEqual(Set(you.kinds.map(\.label)), ["Repairs", "Management"])
+        XCTAssertTrue(you.lines.allSatisfy { ["Repairs", "Management"].contains($0.title) }, "\(you.lines.map(\.title))")
+        XCTAssertEqual(you.lines.reduce(0) { $0 + $1.hours }, 500, accuracy: 0.0001, "the lines are your countable hours, like the Total")
+        let spouse = RecordPageModel.from(report: report(repsParticipant: .spouse), owner: "Sam", properties: rentals)
+        XCTAssertEqual(Set(spouse.kinds.map(\.label)), ["Leasing", "Bookkeeping"])
+        XCTAssertTrue(spouse.lines.allSatisfy { ["Leasing", "Bookkeeping"].contains($0.title) })
+        XCTAssertEqual(spouse.lines.reduce(0) { $0 + $1.hours }, 400, accuracy: 0.0001)
+    }
 }
