@@ -5,7 +5,12 @@ import Foundation
 struct AuditReport {
     struct Summary: Equatable {
         let totalHours: Double
-        let repsCountableHours: Double
+        /// Hours that are not investor-level work, everyone together. Never a 750 figure: the 750 is
+        /// each person's own (`selfRepsHours`, `spouseRepsHours`).
+        let nonInvestorHours: Double
+        /// Each person's own hours toward the 750. Spouse hours never combine with yours (IRC 469(c)(7)(B)).
+        let selfRepsHours: Double
+        let spouseRepsHours: Double
         let nonCountableHours: Double
         let entryCount: Int
         let propertyCount: Int
@@ -23,7 +28,9 @@ struct AuditReport {
         let selfHours: Double
         let spouseHours: Double
         let totalHours: Double
-        let repsCountableHours: Double
+        /// Each person's own hours toward the 750 at this rental, never summed.
+        let selfRepsHours: Double
+        let spouseRepsHours: Double
     }
 
     struct CategoryTotal: Equatable {
@@ -162,6 +169,8 @@ struct AuditReport {
     let qualifications: [ParticipantQualification]
     let materialParticipation: [MaterialParticipationLine]
     let groupingElection: Bool
+    /// Whose own hours the 750 follows.
+    let repsParticipant: Participant
     let propertyTotals: [PropertyTotal]
     let categoryTotals: [CategoryTotal]
     let participantTotals: [ParticipantTotal]
@@ -171,6 +180,11 @@ struct AuditReport {
     let attachments: [AttachmentRef]
 
     var isEmpty: Bool { entries.isEmpty }
+
+    /// One person's own hours toward the 750 (never the two added together).
+    func repsHours(for participant: Participant) -> Double {
+        participant == .spouse ? summary.spouseRepsHours : summary.selfRepsHours
+    }
 }
 
 // MARK: - Builder
@@ -189,6 +203,9 @@ enum AuditReportBuilder {
         var nonRealEstateHours: [Participant: Double] = [:]
         var groupingElection: Bool = false
         var noOneParticipatedMore: Bool? = nil
+        /// The one person whose own hours the 750 follows (the spouse when the spouse is the real estate
+        /// professional). The preview page shows this person's hours; nobody's are added to another's.
+        var repsParticipant: Participant = .selfParticipant
         var generatedAt: Date = Date()
         var calendar: Calendar = .current
     }
@@ -205,6 +222,7 @@ enum AuditReportBuilder {
         nonREWorkHours: Double,
         groupingElection: Bool,
         noOneParticipatedMore: Bool?,
+        repsParticipant: Participant = .selfParticipant,
         generatedAt: Date = Date()
     ) -> Input {
         var participants: [Participant] = [.selfParticipant]
@@ -219,6 +237,7 @@ enum AuditReportBuilder {
             nonRealEstateHours: nonRE,
             groupingElection: groupingElection,
             noOneParticipatedMore: noOneParticipatedMore,
+            repsParticipant: repsParticipant,
             generatedAt: generatedAt
         )
     }
@@ -296,7 +315,8 @@ enum AuditReportBuilder {
                 selfHours: sum(entries.filter { $0.participant == .selfParticipant }),
                 spouseHours: sum(entries.filter { $0.participant == .spouse }),
                 totalHours: sum(entries),
-                repsCountableHours: sum(entries.filter(\.countsForREPS))
+                selfRepsHours: sum(entries.filter { $0.countsForREPS && $0.participant == .selfParticipant }),
+                spouseRepsHours: sum(entries.filter { $0.countsForREPS && $0.participant == .spouse })
             )
         }
         .sorted { lhs, rhs in
@@ -369,7 +389,9 @@ enum AuditReportBuilder {
 
         let summary = AuditReport.Summary(
             totalHours: sum(yearEntries),
-            repsCountableHours: sum(yearEntries.filter(\.countsForREPS)),
+            nonInvestorHours: sum(yearEntries.filter(\.countsForREPS)),
+            selfRepsHours: sum(yearEntries.filter { $0.countsForREPS && $0.participant == .selfParticipant }),
+            spouseRepsHours: sum(yearEntries.filter { $0.countsForREPS && $0.participant == .spouse }),
             nonCountableHours: sum(yearEntries.filter { !$0.countsForREPS }),
             entryCount: yearEntries.count,
             propertyCount: propertyTotals.count,
@@ -386,6 +408,7 @@ enum AuditReportBuilder {
             qualifications: qualifications,
             materialParticipation: mpLines,
             groupingElection: input.groupingElection,
+            repsParticipant: input.repsParticipant,
             propertyTotals: propertyTotals,
             categoryTotals: categoryTotals,
             participantTotals: participantTotals,
@@ -453,5 +476,14 @@ enum AuditReportFormat {
         formatter.timeZone = timeZone
         formatter.dateFormat = format
         return formatter
+    }
+}
+
+// MARK: - The export screen's one 750 figure
+
+enum ExportPDFSummary {
+    /// The export screen's "toward 750" row: one person's own hours for `year`.
+    static func repsHours(entries: [TimeEntry], year: Int, participant: Participant) -> Double {
+        TaxQualificationEngine.qualifyingRealEstateHours(entries: entries, participant: participant, year: year)
     }
 }

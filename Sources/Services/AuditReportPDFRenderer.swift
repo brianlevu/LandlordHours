@@ -126,6 +126,9 @@ private final class Composer {
         finishPage()
     }
 
+    /// Whether the report covers a spouse's hours (then each person's 750 is shown on its own line or column).
+    private var hasSpouse: Bool { report.participantTotals.contains { $0.participant == .spouse } }
+
     private func drawCover() {
         drawText(HS.recordTitle(year: report.taxYear), font: titleFont)
         y += 4
@@ -143,9 +146,12 @@ private final class Composer {
         if let first = s.firstEntryDate, let last = s.lastEntryDate {
             range = "\(dateFormatter.string(from: first)) to \(dateFormatter.string(from: last))"
         }
+        // The 750 is each person's own: one line per person, never the two added together.
+        var repsRows: [[String]] = [[L("pdf.hours.toward.750.you", "Your hours toward 750"), AuditReportFormat.hours(s.selfRepsHours)]]
+        if hasSpouse { repsRows.append([L("pdf.hours.toward.750.spouse", "Spouse hours toward 750"), AuditReportFormat.hours(s.spouseRepsHours)]) }
         let rows: [[String]] = [
             [L("pdf.total.hours.logged", "Total hours logged"), AuditReportFormat.hours(s.totalHours)],
-            [L("pdf.hours.in.h750.counts.activities", "Hours that count toward 750"), AuditReportFormat.hours(s.repsCountableHours)],
+        ] + repsRows + [
             [L("pdf.hours.in.investor.level.activities.not", "Investor hours (don’t count)"), AuditReportFormat.hours(s.nonCountableHours)],
             [L("pdf.time.entries", "Records"), "\(s.entryCount)"],
             [L("pdf.properties.with.logged.time", "Rentals with hours"), "\(s.propertyCount)"],
@@ -221,23 +227,32 @@ private final class Composer {
         guard !report.isEmpty else { return }
 
         sectionTitle(L("pdf.hours.by.property", "Hours by rental"))
-        table(
-            columns: [
-                Column(title: L("pdf.property", "Rental"), width: 150),
-                Column(title: L("pdf.type", "Type"), width: 95),
-                Column(title: L("pdf.address", "Address"), width: 195),
-                Column(title: L("pdf.entries", "Records"), width: 50, alignment: .right),
-                Column(title: L("pdf.self.hours", "Your hours"), width: 60, alignment: .right),
-                Column(title: L("pdf.spouse.hours", "Spouse hours"), width: 60, alignment: .right),
-                Column(title: L("pdf.total.hours", "Total hours"), width: 55, alignment: .right),
-                Column(title: L("pdf.h750.counts", "Counts toward 750"), width: 55, alignment: .right),
-            ],
-            rows: report.propertyTotals.map {
-                [$0.name, $0.propertyType, $0.address, "\($0.entryCount)",
-                 AuditReportFormat.hours($0.selfHours), AuditReportFormat.hours($0.spouseHours),
-                 AuditReportFormat.hours($0.totalHours), AuditReportFormat.hours($0.repsCountableHours)]
-            } + [propertyTotalRow()]
-        )
+        var columns = [
+            Column(title: L("pdf.property", "Rental"), width: hasSpouse ? 140 : 150),
+            Column(title: L("pdf.type", "Type"), width: hasSpouse ? 85 : 95),
+            Column(title: L("pdf.address", "Address"), width: hasSpouse ? 150 : 195),
+            Column(title: L("pdf.entries", "Records"), width: hasSpouse ? 45 : 50, alignment: .right),
+            Column(title: L("pdf.self.hours", "Your hours"), width: hasSpouse ? 55 : 60, alignment: .right),
+            Column(title: L("pdf.spouse.hours", "Spouse hours"), width: hasSpouse ? 55 : 60, alignment: .right),
+            Column(title: L("pdf.total.hours", "Total hours"), width: hasSpouse ? 55 : 55, alignment: .right),
+            Column(title: L("pdf.h750.counts.you", "Your 750 hours"), width: hasSpouse ? 65 : 55, alignment: .right),
+        ]
+        if hasSpouse { columns.append(Column(title: L("pdf.h750.counts.spouse", "Spouse 750 hours"), width: 70, alignment: .right)) }
+        func rentalRow(_ name: String, _ type: String, _ address: String, _ records: Int, _ p: (me: Double, spouse: Double, total: Double, repsMe: Double, repsSpouse: Double)) -> [String] {
+            var cells = [name, type, address, "\(records)", AuditReportFormat.hours(p.me), AuditReportFormat.hours(p.spouse),
+                         AuditReportFormat.hours(p.total), AuditReportFormat.hours(p.repsMe)]
+            if hasSpouse { cells.append(AuditReportFormat.hours(p.repsSpouse)) }
+            return cells
+        }
+        let lines = report.propertyTotals.map {
+            rentalRow($0.name, $0.propertyType, $0.address, $0.entryCount, ($0.selfHours, $0.spouseHours, $0.totalHours, $0.selfRepsHours, $0.spouseRepsHours))
+        }
+        // Totals row: every column is its own column's sum, so each person's 750 stays that person's.
+        let all = report.propertyTotals
+        let totals = rentalRow(L("pdf.total.all.rentals", "Total, all rentals"), "", "", all.reduce(0) { $0 + $1.entryCount },
+                               (all.reduce(0) { $0 + $1.selfHours }, all.reduce(0) { $0 + $1.spouseHours }, all.reduce(0) { $0 + $1.totalHours },
+                                all.reduce(0) { $0 + $1.selfRepsHours }, all.reduce(0) { $0 + $1.spouseRepsHours }))
+        table(columns: columns, rows: lines + [totals])
         y += 12
 
         sectionTitle(L("pdf.hours.by.category", "Hours by category"))
@@ -266,14 +281,6 @@ private final class Composer {
                 [$0.participant.rawValue, "\($0.entryCount)", AuditReportFormat.hours($0.totalHours), AuditReportFormat.hours($0.repsCountableHours)]
             }
         )
-    }
-
-    /// The last line of "Hours by rental": every rental added up, so the table says what its figures sum to.
-    private func propertyTotalRow() -> [String] {
-        let rows = report.propertyTotals
-        func total(_ f: (AuditReport.PropertyTotal) -> Double) -> String { AuditReportFormat.hours(rows.reduce(0) { $0 + f($1) }) }
-        return [L("pdf.total.all.rentals", "Total, all rentals"), "", "", "\(rows.reduce(0) { $0 + $1.entryCount })",
-                total(\.selfHours), total(\.spouseHours), total(\.totalHours), total(\.repsCountableHours)]
     }
 
     private func drawEntryTable() {

@@ -1981,6 +1981,72 @@
         }
       }
     },
+    "pdf.hours.toward.750.you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours toward 750"
+          }
+        }
+      }
+    },
+    "pdf.hours.toward.750.spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spouse hours toward 750"
+          }
+        }
+      }
+    },
+    "pdf.h750.counts.you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your 750 hours"
+          }
+        }
+      }
+    },
+    "pdf.h750.counts.spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spouse 750 hours"
+          }
+        }
+      }
+    },
+    "export.summary.counted.you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours toward 750"
+          }
+        }
+      }
+    },
+    "export.summary.counted.spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spouse hours toward 750"
+          }
+        }
+      }
+    },
     "pdf.total.hours": {
       "extractionState": "manual",
       "localizations": {

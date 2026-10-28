@@ -25,8 +25,9 @@ struct RecordPageModel: Equatable {
         let kindFor: (UUID) -> String = { id in
             (properties.first { $0.id == id }?.propertyType == .str) ? String(localized: "A few nights", table: "ConversionPath") : String(localized: "Long stays", table: "ConversionPath")
         }
-        let rows = report.propertyTotals.map { Row(name: $0.name, kind: kindFor($0.propertyId), hours: $0.repsCountableHours) }
-        let total = report.summary.repsCountableHours
+        let rows = report.propertyTotals.map { Row(name: $0.name, kind: kindFor($0.propertyId), hours: report.repsParticipant == .spouse ? $0.spouseRepsHours : $0.selfRepsHours) }
+        // One person's own 750 hours (the real estate professional's), never self plus spouse.
+        let total = report.repsHours(for: report.repsParticipant)
         let countable = report.categoryTotals.filter(\.countsForREPS).sorted { $0.hours > $1.hours }
         let maxHours = max(countable.first?.hours ?? 0, 0.0001)
         let kinds = countable.prefix(4).map { Kind(label: $0.category.inboxLabel, fraction: $0.hours / maxHours) }
@@ -69,7 +70,8 @@ struct RecordPageModel: Equatable {
         let input = AuditReportBuilder.inputFromTaxProfile(
             entries: entries, properties: properties, taxYear: year,
             spouseTracking: tax.spouseTracking, nonREWorkHours: tax.nonREWorkHours,
-            groupingElection: tax.groupingElection, noOneParticipatedMore: tax.noOneParticipatedMore(forYear: year))
+            groupingElection: tax.groupingElection, noOneParticipatedMore: tax.noOneParticipatedMore(forYear: year),
+            repsParticipant: GoalManager.shared.repsParticipant)
         return await Task.detached(priority: .userInitiated) {
             let report = AuditReportBuilder.build(input)
             return report.isEmpty ? .sample(year: year) : .from(report: report, owner: owner, properties: properties)

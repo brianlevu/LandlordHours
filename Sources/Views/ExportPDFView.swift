@@ -206,7 +206,7 @@ struct ExportPDFView: View {
             LHDivider(leadingInset: LHRow.insets.leading)
             summaryRow(HS.t("export.summary.all", "All hours logged"), value: LHFormat.hours(totalHours))
             LHDivider(leadingInset: LHRow.insets.leading)
-            summaryRow(HS.t("export.summary.counted", "Hours that count toward 750"), value: LHFormat.hours(repsQualifiedHours))
+            summaryRow(repsQualifiedLabel, value: LHFormat.hours(repsQualifiedHours))
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("export.summary")
@@ -356,8 +356,16 @@ struct ExportPDFView: View {
         gate.title(isStale: reportIsStale)
     }
 
+    /// The qualifying person's own hours toward the 750 (the spouse's when the spouse is the real estate
+    /// professional); spouse hours are never added to yours.
     var repsQualifiedHours: Double {
-        yearEntries.filter { $0.countsForREPS }.reduce(0) { $0 + $1.hours }
+        ExportPDFSummary.repsHours(entries: viewModel.timeEntries, year: year, participant: GoalManager.shared.repsParticipant)
+    }
+
+    private var repsQualifiedLabel: String {
+        GoalManager.shared.repsParticipant == .spouse
+            ? HS.t("export.summary.counted.spouse", "Spouse hours toward 750")
+            : HS.t("export.summary.counted.you", "Your hours toward 750")
     }
 
     private func makeReport() -> AuditReport {
@@ -369,7 +377,8 @@ struct ExportPDFView: View {
             spouseTracking: taxProfile.spouseTracking,
             nonREWorkHours: taxProfile.nonREWorkHours,
             groupingElection: taxProfile.groupingElection,
-            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: year)
+            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: year),
+            repsParticipant: GoalManager.shared.repsParticipant
         ))
     }
 
