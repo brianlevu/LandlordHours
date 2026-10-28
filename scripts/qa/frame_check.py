@@ -1326,6 +1326,7 @@ INK_MIN_MEAN_DARK = 150                    # dark theme ink: mean RGB above this
 FILL_DIFF = 12                             # a pixel differs from the row's edge background by more than this (sum |dRGB|)
 CONSIST_BASELINE_TOL_PT = 1.0
 TRAILING_SLOT_PT = 72.0                   # the right edge kept for one trailing .icon (44pt + gutter)
+BACK_SLOT_PT = 100.0                       # a back circle (it grows with Dynamic Type) lives in the leading 100pt
 TITLE_ZONE_PT = 130.0                     # a screen title starts within this far under the safe area; lower is content (Today's numeral)
 CONSIST_GAP_TOL_PT = 2.0
 
@@ -1449,7 +1450,8 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     # 4pt of the header's end) is not content; a short section header lower down ("You") is.
     while rr:
         cols = np.flatnonzero((diff[rr[0][0]:rr[0][1]] > FILL_DIFF).any(axis=0))
-        if cols.size and (cols.max() + x0) <= TRAILING_SLOT_PT * sc and rr[0][0] <= int(4 * sc):
+        if cols.size and (cols.max() + x0) <= BACK_SLOT_PT * sc and rr[0][0] <= int(4 * sc) \
+                and (rr[0][1] - rr[0][0]) <= 24 * sc:
             rr = rr[1:]
             continue
         break

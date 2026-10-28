@@ -660,5 +660,20 @@ class ConsistencyGroups(unittest.TestCase):
         g = fc.consistency_groups(self._args(frames=[make_tab(80, 130, "inbox")], sheet=[make_tab(90, 140, "a")]))
         self.assertIn("sheet-task", g)
 
+
+class ConsistencyBackCircleXXL(unittest.TestCase):
+    def test_wide_back_circle_hanging_below_a_descenderless_title_is_header(self):
+        s = 3
+        a = np.zeros((H, W, 3), np.uint8)
+        a[:] = CANVAS
+        a[79 * s:107 * s, 80 * s:240 * s] = INK                  # "iCloud" at XXL, no descenders
+        a[92 * s:120 * s, 12 * s:78 * s] = (226, 232, 245)        # the back circle at XXL, 66pt wide
+        a[133 * s:400 * s, 60:1146] = CARD
+        path = os.path.join(tempfile.mkdtemp(prefix="fc-back-"), "icloud-xxl.png")
+        Image.fromarray(a).save(path)
+        m = fc.header_metrics(path, 3.0)
+        self.assertAlmostEqual(m["content_top_pt"], 133.0, delta=0.5)
+        self.assertAlmostEqual(m["gap_pt"], 26.0, delta=0.7)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
