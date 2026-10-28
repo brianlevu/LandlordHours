@@ -230,7 +230,7 @@ struct ClassifierChain: CaptureClassifier {
         }
         // A match on the location alone stays "Not sure", whatever the model says.
         if base.evidence.contains(ClassifierThresholds.locationOnlyEvidence) {
-            result.confidence = min(result.confidence, ClassifierThresholds.likely - 0.01)
+            result.confidence = min(result.confidence, ClassifierThresholds.locationOnlyMaxConfidence)
         }
         result.isLandlordWork = result.confidence >= ClassifierThresholds.likely
         result.tier = .onDevice

@@ -97,9 +97,9 @@ final class InboxLogicTests: CaptureTestCase {
     }
 
     func testBadges() {
-        XCTAssertEqual(InboxLogic.badges(for: s("a", start: now, confidence: 0.6)),
+        XCTAssertEqual(InboxLogic.badges(for: s("a", start: now, confidence: 0.7)),
                        SuggestionBadges(notSure: false, mightAlreadyBeLogged: false, needsHours: false))
-        XCTAssertTrue(InboxLogic.badges(for: s("b", start: now, confidence: 0.59)).notSure, "Below the likely line")
+        XCTAssertTrue(InboxLogic.badges(for: s("b", start: now, confidence: 0.69)).notSure, "Below the likely line")
         XCTAssertTrue(InboxLogic.badges(for: s("c", start: now, flagged: true)).mightAlreadyBeLogged)
         XCTAssertTrue(InboxLogic.badges(for: s("d", start: now, hours: nil, basis: .none)).needsHours)
         let receipt = Suggestion(sourceKey: "rcpt:1", kind: .receipt, detectedAt: now, start: now, title: "Depot",

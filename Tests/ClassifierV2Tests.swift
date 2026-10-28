@@ -258,7 +258,7 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(a.band, .unlikely)
         XCTAssertTrue(a.evidence.contains { $0.hasPrefix("model: weak yes") })
         XCTAssertEqual(b.band, .notSure)
-        XCTAssertEqual(ClassifierThresholds.likely, 0.60, "the likely threshold stays at 0.60")
+        XCTAssertEqual(ClassifierThresholds.likely, 0.70, "the likely threshold is 0.70 since the 2.2 retune")
     }
 
     // MARK: 9. Email is rules-only; calendar keeps the 1.x category

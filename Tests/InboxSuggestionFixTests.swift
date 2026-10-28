@@ -63,7 +63,7 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
             Scenario(title: "Showing - Alex", location: oakAddress, context: CalendarContext(), expected: .likely),
             // A tenant call on Zoom is still shown.
             Scenario(title: "Tenant call - Oak Street Duplex", location: nil, context: CalendarContext(attendeeCount: 2, url: "https://us02web.zoom.us/j/123456789"), expected: .likely),
-            Scenario(title: "Tenant call", location: "Zoom", context: CalendarContext(url: "https://us02web.zoom.us/j/123456789"), expected: .notSure),
+            Scenario(title: "Tenant call", location: "Zoom", context: CalendarContext(url: "https://us02web.zoom.us/j/123456789"), expected: .likely),
             // The accepted trade-off: a bare name at a rental address is "Not sure", not Likely.
             Scenario(title: "Alex", location: oakAddress, context: CalendarContext(), expected: .notSure),
         ]
@@ -105,17 +105,28 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
         XCTAssertEqual(result, .hidden)
     }
 
-    func testVideoLinkInTheNotesAloneCountsAgainst() async {
+    func testAVideoLinkAloneNoLongerHidesAnything() async {
+        // Tuned to weight 0 (2026-10-27): tenant and guest calls happen on Zoom.
         let notes = "Join Zoom Meeting https://us02web.zoom.us/j/123456789"
-        let result = await verdict("Planning", location: oakAddress, context: CalendarContext(notes: notes))
-        XCTAssertEqual(result, .hidden)
+        let inNotes = await verdict("Planning", location: oakAddress, context: CalendarContext(notes: notes))
+        XCTAssertEqual(inNotes, .notSure)
+        for link in ["https://us02web.zoom.us/j/1", "https://meet.google.com/abc-defg-hij", teamsLink, "https://acme.webex.com/meet/jo"] {
+            XCTAssertTrue(CalendarEventSignals.hasVideoLink(location: nil, context: CalendarContext(url: link)), link)
+            let result = await verdict("Planning", location: oakAddress, context: CalendarContext(url: link))
+            XCTAssertEqual(result, .notSure, link)
+        }
+        XCTAssertEqual(CalendarEventSignals.videoLinkPenalty, 0)
     }
 
-    func testEachVideoServiceIsRecognised() async {
-        for link in ["https://us02web.zoom.us/j/1", "https://meet.google.com/abc-defg-hij", teamsLink, "https://acme.webex.com/meet/jo"] {
-            let result = await verdict("Planning", location: oakAddress, context: CalendarContext(url: link))
-            XCTAssertEqual(result, .hidden, link)
-        }
+    func testTheTunedWeights() {
+        XCTAssertEqual(CalendarEventSignals.manyAttendeesPenalty, -1.0)
+        XCTAssertEqual(CalendarEventSignals.recurringWithAttendeesPenalty, -1.5)
+        XCTAssertEqual(CalendarEventSignals.organizedByOtherOnWorkCalendarPenalty, -2.0)
+        XCTAssertEqual(CalendarEventSignals.remoteLocationPenalty, -3.0)
+        XCTAssertEqual(CalendarEventSignals.personalServicePenalty, -3.0)
+        XCTAssertEqual(ClassifierThresholds.likely, 0.70)
+        XCTAssertEqual(ClassifierThresholds.notSure, 0.30)
+        XCTAssertEqual(ClassifierThresholds.locationOnlyMaxConfidence, 0.59)
     }
 
     func testAModelYesCannotBringBackAHiddenItem() async {
@@ -144,9 +155,9 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
         let named = await verdict("Tenant call - Oak Street Duplex", location: nil,
                                   context: CalendarContext(attendeeCount: 2, url: "https://us02web.zoom.us/j/123456789"))
         XCTAssertEqual(named, .likely)
-        // No property named: the video link takes the score down, but a tenant word keeps it visible.
+        // No property named: the link no longer counts against it (weight 0), so it stays Likely.
         let bare = await verdict("Tenant call", location: "Zoom", context: CalendarContext(url: "https://us02web.zoom.us/j/123456789"))
-        XCTAssertEqual(bare, .notSure)
+        XCTAssertEqual(bare, .likely)
     }
 
     // MARK: Location alone

@@ -15,8 +15,11 @@ enum CalendarEventSignals {
     /// "likely" line (1.5 maps to a confidence of 0.50) and at the "Not sure" minimum.
     static let locationOnlyMaxScore = RulesEngine.notSureMinScore
 
-    static let videoLinkPenalty = -3.0
-    static let manyAttendeesPenalty = -2.0
+    // Weights tuned 2026-10-27 on 980 synthetic Jev-labelled events (inbox-tune/weights.json).
+    /// 0: tenant and guest calls happen on Zoom; at -3 the link cost about 7 points of recall
+    /// for no gain in precision. A zero-weight signal is not a negative signal.
+    static let videoLinkPenalty = 0.0
+    static let manyAttendeesPenalty = -1.0
     static let recurringWithAttendeesPenalty = -1.5
     static let organizedByOtherOnWorkCalendarPenalty = -2.0
     static let remoteLocationPenalty = -3.0
@@ -71,7 +74,7 @@ enum CalendarEventSignals {
         if mentions(personalServiceWords.map { ($0.phrase, $0.wholeWord) }, in: place) {
             out.append(Penalty(reason: "personal appointment words", score: personalServicePenalty))
         }
-        return out
+        return out.filter { $0.score != 0 }
     }
 
     static func hasVideoLink(location: String?, context: CalendarContext) -> Bool {
