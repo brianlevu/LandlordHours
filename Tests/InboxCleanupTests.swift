@@ -126,4 +126,15 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
         XCTAssertEqual(result?.removed, 0)
         XCTAssertEqual(store.pending.count, 1)
     }
+
+    func testCleanupNeverRemovesAPendingItemWithALandlordWordInItsTitle() async {
+        let lease = snapshot("L", "Lease signing - Dr Patel dental practice", hour: 10, attendees: 6)
+        let alex = snapshot("A", "Alex", hour: 12, attendees: 4)
+        let store = makeStore()
+        store.ingest([oldPending(lease), oldPending(alex)], existingEntries: [], calendar: calendar)
+        let result = await run([lease, alex], store: store)
+        XCTAssertEqual(result?.removed, 0)
+        XCTAssertEqual(Set(store.pending.map(\.title)), ["Lease signing - Dr Patel dental practice", "Alex"])
+        XCTAssertGreaterThanOrEqual(store.suggestion(forKey: "cal:L")?.confidence ?? 0, ClassifierThresholds.notSure)
+    }
 }

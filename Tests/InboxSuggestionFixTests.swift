@@ -160,6 +160,68 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
         XCTAssertEqual(bare, .likely)
     }
 
+    // MARK: Verifier probes (2026-10-27): real property work must never be hidden
+
+    func testRealPropertyWorkWithSpaTherapyOrDentalWordsIsStillShown() async {
+        let titles = ["Hot tub spa drain", "Spa service", "Spa tub repair", "Paint the therapy room",
+                      "Lease signing - Dr Patel dental practice", "Medical office walkthrough"]
+        for title in titles {
+            let result = await verdict(title, location: oakAddress)
+            XCTAssertNotEqual(result, .hidden, title)
+        }
+    }
+
+    func testAHairlineCrackCarriesNoPersonalServiceSignal() {
+        let penalties = CalendarEventSignals.penalties(title: "Repair hairline crack in drywall", location: oakAddress, context: CalendarContext())
+        XCTAssertTrue(penalties.isEmpty, "\(penalties)")
+        for title in ["Hot tub spa drain", "Spa service", "Paint the therapy room", "Medical office walkthrough"] {
+            XCTAssertTrue(CalendarEventSignals.penalties(title: title, location: oakAddress, context: CalendarContext()).isEmpty, title)
+        }
+    }
+
+    func testPersonalAppointmentsAtARentalStreetStayHidden() async {
+        for title in ["Haircut", "Dentist appointment", "Doctor's appointment", "Massage", "Physio", "Therapy session"] {
+            let result = await verdict(title, location: oakAddress)
+            XCTAssertEqual(result, .hidden, title)
+        }
+    }
+
+    func testALandlordWordInTheTitleIsNeverHiddenByPersonalOrAttendeeSignals() async {
+        let crowd = CalendarContext(attendeeCount: 6, organizedByOther: true, isWorkCalendar: true, isRecurring: true)
+        for (title, location) in [("Showing - Alex", oakAddress), ("Lease signing", "Glow Salon, 412 Oak St"),
+                                  ("Tenant walkthrough", "Remote"), ("Repair the hair salon sink", oakAddress)] {
+            let result = await verdict(title, location: location, context: crowd)
+            XCTAssertNotEqual(result, .hidden, title)
+        }
+    }
+
+    func testAPersonNameAtARentalAddressWithAttendeesIsNotHidden() async {
+        let four = await verdict("Alex", location: oakAddress, context: CalendarContext(attendeeCount: 4))
+        let two = await verdict("Alex", location: oakAddress, context: CalendarContext(attendeeCount: 2, isRecurring: true))
+        XCTAssertEqual(four, .notSure)
+        XCTAssertEqual(two, .notSure)
+    }
+
+    func testMeetingsAtARentalStreetStayHidden() async {
+        let team = await verdict("Team sync", location: oakAddress, context: CalendarContext(attendeeCount: 6))
+        let weekly = await verdict("Weekly meeting", location: oakAddress, context: CalendarContext(attendeeCount: 3, isRecurring: true))
+        let work = await verdict("Quarterly review", location: oakAddress, context: CalendarContext(organizedByOther: true, isWorkCalendar: true))
+        XCTAssertEqual(team, .hidden)
+        XCTAssertEqual(weekly, .hidden)
+        XCTAssertEqual(work, .hidden)
+    }
+
+    func testAKeywordFoundOnlyInTheLocationIsCappedAtNotSure() async {
+        let office = "The Leasing Office, 9 Elm Rd"
+        let plain = await verdict("Dana", location: office)
+        let crowd = await verdict("Dana", location: office, context: CalendarContext(attendeeCount: 5))
+        XCTAssertEqual(plain, .notSure)
+        XCTAssertEqual(crowd, .notSure)
+        // The title says it: Likely.
+        let titled = await verdict("Leasing meeting with Dana", location: office)
+        XCTAssertNotEqual(titled, .hidden)
+    }
+
     // MARK: Location alone
 
     func testPersonNameOnlyAtARentalAddressIsNotSure() async {

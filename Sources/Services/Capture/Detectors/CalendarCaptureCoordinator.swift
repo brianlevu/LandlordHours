@@ -202,7 +202,7 @@ final class CalendarCaptureCoordinator {
     /// The 2.2 one-time cleanup. Re-reads the calendar events behind every PENDING calendar
     /// suggestion (the old scanner let in team meetings, salon visits and the like), classifies
     /// them with the current chain, and:
-    /// - removes the ones that now score hidden, as a system call (never "dismissed by user");
+    /// - removes the ones that now score hidden AND have no landlord word in the title, as a system call (never "dismissed by user");
     /// - lowers the confidence, tier and evidence of the ones now below their old score.
     /// Confirmed, dismissed and manual records are never read or changed, and a pending item
     /// whose event can't be found is left as it is. Returns nil when it already ran, or when it
@@ -224,8 +224,18 @@ final class CalendarCaptureCoordinator {
         var hidden = Set<String>()
         for (candidate, outcome) in zip(candidates, outcomes) {
             switch outcome {
-            case .skip:
-                hidden.insert(candidate.sourceKey)
+            case .skip(let classification):
+                if RulesEngine.titleHasLandlordKeyword(candidate.title) {
+                    // A landlord word in the title: never removed, at most lowered to "Not sure".
+                    var floored = classification
+                    floored.confidence = max(classification.confidence, ClassifierThresholds.notSure)
+                    if let current = store.suggestion(forKey: candidate.sourceKey), floored.confidence < current.confidence {
+                        store.lowerConfidence(forKey: candidate.sourceKey, to: floored)
+                        result.updated += 1
+                    }
+                } else {
+                    hidden.insert(candidate.sourceKey)
+                }
             case .suggest(let classification):
                 if let current = store.suggestion(forKey: candidate.sourceKey), classification.confidence < current.confidence {
                     store.lowerConfidence(forKey: candidate.sourceKey, to: classification)

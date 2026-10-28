@@ -42,15 +42,20 @@ enum CalendarEventSignals {
 
     static let remoteWords = ["remote", "virtual", "online", "telehealth", "telemedicine"]
 
-    /// Salons, clinics and other personal appointments. Matched on the title and the location
-    /// (not the notes: "hair" in a tenant's note is not a haircut).
-    static let personalServiceWords: [(phrase: String, wholeWord: Bool)] = [
-        ("salon", false), ("barber", false), ("haircut", false), ("hair", false), ("stylist", false),
-        ("nails", true), ("manicure", false), ("pedicure", false), ("spa", true), ("massage", false),
-        ("clinic", false), ("medical", false), ("doctor", false), ("dentist", false), ("dental", false),
-        ("orthodont", false), ("therapy", false), ("therapist", false), ("checkup", false), ("check up", false),
-        ("optometr", false), ("chiropract", false), ("physio", false), ("telehealth", false), ("telemedicine", false),
+    /// Unambiguous personal appointments, matched as whole words or whole phrases on the title and
+    /// the location (never the notes). Words that also turn up in property work (hair, spa,
+    /// medical, therapy, dental, clinic, nails) are NOT here: "Hot tub spa drain", "Paint the
+    /// therapy room" and "Repair hairline crack" are rental work.
+    static let personalServicePhrases = [
+        "haircut", "hair cut", "barber", "barbershop", "salon", "hair salon", "hair stylist", "stylist",
+        "dentist", "dental appointment", "dental cleaning", "orthodontist", "doctor", "doctor s appointment",
+        "medical appointment", "urgent care", "telehealth", "telemedicine", "therapy session", "physical therapy",
+        "physio", "physiotherapy", "massage", "manicure", "pedicure", "chiropractor", "optometrist",
+        "checkup", "check up",
     ]
+
+    /// Words of a work meeting. With attendees or a repeat they say "someone's team meeting".
+    static let meetingWords = ["meeting", "weekly", "planning", "huddle", "kickoff", "agenda", "briefing"]
 
     /// Every "not rental work" signal on the event.
     static func penalties(title: String, location: String?, context: CalendarContext) -> [Penalty] {
@@ -71,7 +76,7 @@ enum CalendarEventSignals {
             out.append(Penalty(reason: "remote location", score: remoteLocationPenalty))
         }
         let place = [title, location ?? ""].joined(separator: " ")
-        if mentions(personalServiceWords.map { ($0.phrase, $0.wholeWord) }, in: place) {
+        if mentions(personalServicePhrases.map { ($0, true) }, in: place) {
             out.append(Penalty(reason: "personal appointment words", score: personalServicePenalty))
         }
         return out.filter { $0.score != 0 }
@@ -84,6 +89,17 @@ enum CalendarEventSignals {
         return false
     }
 
+    static func titleHasMeetingWord(_ title: String) -> Bool {
+        mentions(meetingWords.map { ($0, true) }, in: title)
+    }
+
+    /// Reasons that count even without a landlord word to weigh them against: a personal
+    /// appointment, a remote place or a work calendar's organizer. Attendees and repeats alone
+    /// do not (a showing has attendees too).
+    static func isStrong(_ penalty: Penalty) -> Bool {
+        !(penalty.reason.hasSuffix("attendees") || penalty.reason.hasPrefix("repeating"))
+    }
+
     /// Word-prefix (or whole-word) match of any phrase in normalized text.
     private static func mentions(_ phrases: [(String, Bool)], in text: String) -> Bool {
         let padded = " \(RulesEngine.normalize(text)) "
@@ -94,14 +110,38 @@ enum CalendarEventSignals {
 }
 
 extension RulesEngine {
+    /// The strongest positive landlord keyword in a title (0 when none), by table weight.
+    static func titleKeywordStrength(_ title: String) -> Double {
+        evidenceKeywordStrength(evaluate(text: title, properties: []).evidence)
+    }
+
+    private static func evidenceKeywordStrength(_ evidence: [String]) -> Double {
+        evidence.compactMap { line -> Double? in
+            guard line.hasPrefix("keyword: ") else { return nil }
+            let phrase = String(line.dropFirst("keyword: ".count))
+            // "rent" is also a verb ("Rent tux for wedding", "Rent the Runway"): it vouches for nothing.
+            if phrase.hasPrefix("rent") { return nil }
+            return ClassifierKeywords.signals.first { $0.phrase == phrase }?.landlord
+        }.max() ?? 0
+    }
+
+    /// True when a landlord word in the title (lease, repair, tenant, ...) vouches for the event.
+    static func titleHasLandlordKeyword(_ title: String) -> Bool { titleKeywordStrength(title) > 0 }
+
+    /// A strong landlord word: the table weight is at least this.
+    static let strongTitleKeyword = 2.0
+
     /// A calendar event: title and location scored apart, plus what the invite says.
     ///
-    /// - A property found only in the LOCATION (nothing in the title names the property or a
-    ///   landlord word) is capped at "Not sure" (`locationOnlyMaxScore`), and hidden when any
-    ///   negative signal sits beside it: a negative keyword or an event signal.
-    /// - Event signals (`CalendarEventSignals`) lower the score of every event. If they leave
-    ///   nothing, the item is hidden for good (the on-device model cannot bring it back); a
-    ///   landlord word in the title still keeps it at "Not sure".
+    /// - Evidence found only in the LOCATION (a property or a landlord word, with nothing in the
+    ///   title) is capped at "Not sure" (`locationOnlyMaxScore`). It is hidden only beside a
+    ///   strong "not rental" reason: a negative keyword, a personal appointment, a remote place, a
+    ///   work calendar's organizer, or attendees/repeat on a meeting-worded title. Attendees or a
+    ///   repeat alone never hide it (a showing has attendees).
+    /// - A landlord word in the TITLE is never pushed to hidden by the event signals: at worst
+    ///   "Not sure". A strong one (weight 2.0+, "lease", "tenant", "showing") also outweighs the
+    ///   keyword table's noise words ("Lease signing - Dr Patel dental practice").
+    /// - Hidden items carry `notRentalEvidence`, so the on-device model cannot bring them back.
     static func evaluateCalendar(
         title: String,
         location: String?,
@@ -113,41 +153,42 @@ extension RulesEngine {
         let titleOnly = evaluate(text: title, properties: properties)
         let penalties = CalendarEventSignals.penalties(title: title, location: location, context: context)
         let penalty = penalties.reduce(0.0) { $0 + $1.score }
-        let eventEvidence = penalties.map { "not rental: \($0.reason)" }
         let hasNegativeKeyword = verdict.evidence.contains { $0.hasPrefix("not landlord:") }
+        let meetingish = CalendarEventSignals.titleHasMeetingWord(title)
+            && penalties.contains { !CalendarEventSignals.isStrong($0) }
+        let hasStrongNegative = hasNegativeKeyword || penalties.contains(where: CalendarEventSignals.isStrong) || meetingish
 
         let propertyCounted = verdict.evidence.contains { $0.hasPrefix("property:") }
-        let titleHasLandlordWord = titleOnly.evidence.contains { $0.hasPrefix("keyword:") }
+        let joinedHasKeyword = verdict.evidence.contains { $0.hasPrefix("keyword:") }
+        let titleStrength = evidenceKeywordStrength(titleOnly.evidence)
         let titleNamesProperty = titleOnly.evidence.contains { $0.hasPrefix("property:") }
-        let locationOnly = propertyCounted && !titleHasLandlordWord && !titleNamesProperty
+        let locationOnly = (propertyCounted || joinedHasKeyword) && titleStrength == 0 && !titleNamesProperty
 
-        verdict.evidence.append(contentsOf: eventEvidence)
-        let hasNegative = hasNegativeKeyword || !penalties.isEmpty
+        verdict.evidence.append(contentsOf: penalties.map { "not rental: \($0.reason)" })
 
         if locationOnly {
-            if hasNegative {
+            if hasStrongNegative {
                 return hidden(verdict, score: min(verdict.score + penalty, 0), note: "location only, with a not-rental signal")
             }
             let capped = min(verdict.score, CalendarEventSignals.locationOnlyMaxScore)
             verdict.score = capped
             verdict.confidence = confidence(forScore: capped)
             verdict.evidence.append(ClassifierThresholds.locationOnlyEvidence)
-            // A counted property match always leaves landlord evidence (never hidden).
             verdict.hasLandlordSignal = capped > 0
             return verdict
         }
 
-        guard penalty < 0 else { return verdict }
         let before = verdict
         verdict.score += penalty
         verdict.confidence = confidence(forScore: verdict.score)
         let stillSignal = before.hasLandlordSignal && verdict.score > 0
             && (verdict.score >= notSureMinScore || propertyCounted)
-        // A landlord word in the title ("Tenant call") keeps the item visible as "Not sure" even
-        // when the event signals outweigh it: the title is stronger than the invite.
-        let titleCarries = titleOnly.hasLandlordSignal && titleOnly.score >= notSureMinScore
+        // The title's landlord word is stronger than the invite: it keeps the item visible
+        // against the event signals, and a strong one against the table's noise words too.
+        let visibleBeforeSignals = before.hasLandlordSignal || titleOnly.hasLandlordSignal
+        let titleCarries = (titleStrength > 0 && visibleBeforeSignals) || titleStrength >= strongTitleKeyword
         verdict.hasLandlordSignal = stillSignal || titleCarries
-        if !verdict.hasLandlordSignal {
+        if !verdict.hasLandlordSignal, penalty < 0 {
             return hidden(verdict, score: verdict.score, note: "event signals outweigh the match")
         }
         return verdict
