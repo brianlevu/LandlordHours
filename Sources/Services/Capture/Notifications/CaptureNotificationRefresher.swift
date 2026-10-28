@@ -117,6 +117,13 @@ final class CaptureNotificationRefresher {
 
         let coordinator = makeCoordinator(store)
         if coordinator.access == .fullAccess {
+            // First launch of 2.2 on this install: re-check what the old scanner left pending.
+            if let chain = coordinator.classifier as? ClassifierChain {
+                let cleanup = await coordinator.cleanUpPendingOnce(chain: chain, properties: model.properties, entries: model.timeEntries)
+                if let cleanup {
+                    refreshLogger.info("Inbox cleanup: \(cleanup.removed) removed, \(cleanup.updated) lowered")
+                }
+            }
             let result = await coordinator.scanUpcoming(properties: model.properties, entries: model.timeEntries)
             refreshLogger.info("Capture refresh (\(reason, privacy: .public)): \(result.added.count) new")
         }

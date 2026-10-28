@@ -138,6 +138,9 @@ final class SuggestionStore {
         /// Dedupe keys the user dismissed, with when. Pruned after a tax year.
         var dismissedKeys: [String: Date] = [:]
         var muteRules: [CaptureMuteRule] = []
+        /// The 2.2 one-time re-check of pending calendar items has run on this install.
+        /// Optional so files written before it still decode.
+        var pendingCleanupDone: Bool?
     }
 
     static let fileName = "suggestions.json"
@@ -207,6 +210,37 @@ final class SuggestionStore {
             guard suggestion.sourceKey != key, case .confirmed(let id) = suggestion.state else { return nil }
             return id
         })
+    }
+
+    var hasRunPendingCleanup: Bool { contents.pendingCleanupDone == true }
+
+    func markPendingCleanupDone() {
+        guard contents.pendingCleanupDone != true else { return }
+        contents.pendingCleanupDone = true
+        save()
+    }
+
+    /// Takes pending items out because the classifier now says they are not rental work. This is
+    /// the system's call, not the user's: nothing is added to the dismissed keys, so it never
+    /// reads as a "not rental work" signal. Only pending items are removed. Returns how many.
+    @discardableResult
+    func removeHiddenBySystem(keys: Set<String>) -> Int {
+        let before = contents.suggestions.count
+        contents.suggestions.removeAll { keys.contains($0.sourceKey) && $0.isPending }
+        let removed = before - contents.suggestions.count
+        if removed > 0 { save() }
+        return removed
+    }
+
+    /// Gives a pending item its new, lower confidence, tier and evidence. Property, category and
+    /// hours are the user's to change and stay as they were.
+    func lowerConfidence(forKey key: String, to classification: CaptureClassification) {
+        guard let index = contents.suggestions.firstIndex(where: { $0.sourceKey == key && $0.isPending }),
+              classification.confidence < contents.suggestions[index].confidence else { return }
+        contents.suggestions[index].confidence = classification.confidence
+        contents.suggestions[index].tier = classification.tier
+        contents.suggestions[index].evidence = classification.evidence
+        save()
     }
 
     func isDismissed(_ key: String) -> Bool { contents.dismissedKeys[key] != nil }

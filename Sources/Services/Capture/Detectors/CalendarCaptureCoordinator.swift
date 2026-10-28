@@ -30,6 +30,12 @@ struct PlaceholderCalendarClassifier: CaptureClassifier {
     }
 }
 
+/// What the one-time pending cleanup did.
+struct InboxCleanupResult: Equatable {
+    var removed = 0
+    var updated = 0
+}
+
 /// What one calendar scan did.
 struct CalendarScanResult: Equatable {
     var access: CalendarAccess
@@ -191,6 +197,47 @@ final class CalendarCaptureCoordinator {
             return CalendarScanResult(access: .fullAccess, added: added, skipped: detector.lastSkipCounts, cancelled: true)
         }
         return CalendarScanResult(access: .fullAccess, added: added, skipped: detector.lastSkipCounts)
+    }
+
+    /// The 2.2 one-time cleanup. Re-reads the calendar events behind every PENDING calendar
+    /// suggestion (the old scanner let in team meetings, salon visits and the like), classifies
+    /// them with the current chain, and:
+    /// - removes the ones that now score hidden, as a system call (never "dismissed by user");
+    /// - lowers the confidence, tier and evidence of the ones now below their old score.
+    /// Confirmed, dismissed and manual records are never read or changed, and a pending item
+    /// whose event can't be found is left as it is. Returns nil when it already ran, or when it
+    /// couldn't run yet (no calendar access, cancelled): the flag stays unset then, so it runs
+    /// later. Idempotent: once the flag is set a second call does nothing.
+    func cleanUpPendingOnce(chain: ClassifierChain, properties: [RentalProperty], entries: [TimeEntry]) async -> InboxCleanupResult? {
+        guard !store.hasRunPendingCleanup, detector.access.canReadEvents else { return nil }
+        let pending = store.pending.filter { $0.kind == .calendar }
+        guard let first = pending.map(\.start).min(), let last = pending.map(\.start).max() else {
+            store.markPendingCleanupDone()
+            return InboxCleanupResult()
+        }
+        let keys = Set(pending.map(\.sourceKey))
+        guard let found = try? await detector.detect(in: DateInterval(start: first, end: last.addingTimeInterval(1))) else { return nil }
+        let candidates = found.filter { keys.contains($0.sourceKey) }
+        guard let outcomes = try? await chain.classifyBatch(candidates, properties: properties), !Task.isCancelled else { return nil }
+
+        var result = InboxCleanupResult()
+        var hidden = Set<String>()
+        for (candidate, outcome) in zip(candidates, outcomes) {
+            switch outcome {
+            case .skip:
+                hidden.insert(candidate.sourceKey)
+            case .suggest(let classification):
+                if let current = store.suggestion(forKey: candidate.sourceKey), classification.confidence < current.confidence {
+                    store.lowerConfidence(forKey: candidate.sourceKey, to: classification)
+                    result.updated += 1
+                }
+            case .muted:
+                continue   // a mute is the user's rule: left to the normal flow
+            }
+        }
+        result.removed = store.removeHiddenBySystem(keys: hidden)
+        store.markPendingCleanupDone()
+        return result
     }
 
     private func prepared(_ suggestion: Suggestion, candidate: CaptureCandidate, properties: [RentalProperty]) -> Suggestion {
