@@ -131,6 +131,11 @@ final class FoundationsTests: XCTestCase {
         XCTAssertEqual(ax.side, 295)
         let wide = CraftHeroSide.resolve(previous: first, kind: .hero, window: CGSize(width: 820, height: 874), band: .b, accessibility: false)
         XCTAssertEqual(wide.side, 390)
+        // Band B: a transient narrow first pass (390 wide) never sticks once the real width arrives.
+        let transient = CraftHeroSide.resolve(previous: nil, kind: .hero, window: CGSize(width: 390, height: 1176), band: .b, accessibility: false)
+        XCTAssertEqual(transient.side, 378)
+        let settled = CraftHeroSide.resolve(previous: transient, kind: .hero, window: CGSize(width: 1032, height: 1176), band: .b, accessibility: false)
+        XCTAssertEqual(settled.side, 480)
     }
 
     // MARK: Band-B content column (§1.27 interim)

@@ -64,12 +64,24 @@ enum LayoutBand: String, Equatable, Sendable, CaseIterable {
     }
 }
 
+private struct LHWindowHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
 private struct LayoutBandKey: EnvironmentKey {
     static let defaultValue: LayoutBand = .a
 }
 
 extension EnvironmentValues {
     /// The window's layout band, set once at the root (`ContentView`).
+    /// The scene's height, safe areas included, read once at the root (`ContentView`). Band B sizes
+    /// Today's hero from it (§1.27 IP4): inside the tab, the iPad's floating tab bar and the header's
+    /// inset are not reported back, so the page measures about 200pt short. 0 until measured.
+    var lhWindowHeight: CGFloat {
+        get { self[LHWindowHeightKey.self] }
+        set { self[LHWindowHeightKey.self] = newValue }
+    }
+
     var layoutBand: LayoutBand {
         get { self[LayoutBandKey.self] }
         set { self[LayoutBandKey.self] = newValue }

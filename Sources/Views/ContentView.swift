@@ -120,6 +120,8 @@ struct ContentView: View {
     @State private var todayRoute: TodayRoute = TodayRoute(legacyIndex: Self.initialTabFromLaunchArguments()) ?? .dashboard
     /// The window's layout band (§1.27), from the scene width with 8pt hysteresis.
     @State private var band: LayoutBand = .a
+    /// The scene's height, safe areas included (§1.27 IP4: band B's hero).
+    @State private var windowHeight: CGFloat = 0
     #if DEBUG
     @State private var showOnboarding = WelcomeStateFixture.forceWelcome
     @State private var showComponentSheet = LHComponentSheetLaunch.isRequested
@@ -182,6 +184,10 @@ struct ContentView: View {
             band = LayoutBand.resolve(previous: band, width: width)
         }
         .environment(\.layoutBand, band)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom } action: { height in
+            windowHeight = height
+        }
+        .environment(\.lhWindowHeight, windowHeight)
         .overlay {
             if let celebration = viewModel.activeCelebration {
                 CelebrationOverlayView(type: celebration) {

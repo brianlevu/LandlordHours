@@ -257,11 +257,13 @@ struct InboxView: View {
         Button(InboxText.confirmLikely(batch.count)) { confirmLikely() }
             .buttonStyle(LHButton.tertiary)
             .frame(maxWidth: .infinity)
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-            .listRowBackground(colors.backgroundSecondary)
             .accessibilityIdentifier("inbox.confirm.batch")
+            // Before the row modifiers: anything chained after `.listRowBackground` hides it, and the row
+            // fell back to the system's grouped grey in dark (visual gate r2).
             .onScrollVisibilityChange(threshold: 0.9) { footOnScreen = $0 }
             .onDisappear { footOnScreen = false }
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .listRowBackground(colors.backgroundSecondary)
     }
 
     // MARK: Actions

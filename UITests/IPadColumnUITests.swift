@@ -54,6 +54,24 @@ final class IPadColumnUITests: XCTestCase {
         }
     }
 
+    /// §1.27 IP4: Today's hero side is H1's share of the scene height under the 200pt header allowance,
+    /// clamped 290…480 (13" portrait 480, 11" portrait 450, 13" landscape 371, 11" landscape 290).
+    func testTodayHeroScalesWithTheWindowHeight() throws {
+        try requireIPad()
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            launch(tab: 0)
+            let hero = app.descendants(matching: .any)["today.hero"].firstMatch
+            XCTAssertTrue(hero.waitForExistence(timeout: 15))
+            sleep(2)
+            let window = app.windows.firstMatch.frame
+            let expected = min(480, max(290, (0.446 * (window.height - 200)).rounded()))
+            XCTAssertEqual(hero.frame.height, expected, accuracy: 1,
+                           "hero side at \(Int(window.width))×\(Int(window.height))")
+            app.terminate()
+        }
+    }
+
     func testInboxRowsSitInTheColumn() throws {
         try requireIPad()
         launch(tab: 5)

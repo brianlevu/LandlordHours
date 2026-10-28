@@ -86,6 +86,7 @@ struct DashboardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutBand) private var band
+    @Environment(\.lhWindowHeight) private var sceneHeight
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.todayShellUncovered) private var shellUncovered
     /// The Inbox's model (shell-owned): Today's To confirm reads and writes the same list, so the
@@ -359,6 +360,7 @@ struct DashboardView: View {
             }
             .onChange(of: dynamicTypeSize) { _, _ in resolveHeroSide() }
             .onChange(of: band) { _, _ in resolveHeroSide() }
+            .onChange(of: sceneHeight) { _, _ in if band == .b { resolveHeroSide() } }
             .onChange(of: focuses.map(\.id)) { _, _ in resolveFocus() }
             .onChange(of: liveHeroState()) { _, _ in
                 // A change while Today is visible plays now; a hidden one waits for the return.
@@ -617,7 +619,10 @@ struct DashboardView: View {
         guard window.width > 0, window.height > 0 else { return }
         // Screen anatomy: Today now carries the tab header (title row + rental chip), so H1 is taken
         // from the height under it; the rows and their foot stay above the bar (D3b).
-        let underHeader = CGSize(width: window.width, height: max(0, window.height - (ax ? 0 : LHScreenAnatomy.heroHeaderAllowance)))
+        // Band B (§1.27 IP4) takes the scene's own height from the root: on iPad the page settles about
+        // 200pt short (the floating tab bar and the header's inset), which shrank the hero by 9-22%.
+        let height = band == .b && sceneHeight > 0 ? sceneHeight : window.height
+        let underHeader = CGSize(width: window.width, height: max(0, height - (ax ? 0 : LHScreenAnatomy.heroHeaderAllowance)))
         heroSide = CraftHeroSide.resolve(previous: heroSide, kind: .hero, window: underHeader, band: band, accessibility: ax)
     }
 
