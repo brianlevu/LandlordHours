@@ -2,6 +2,11 @@ import XCTest
 import UIKit
 @testable import LandlordHours
 
+/// The device word the catalog's device variations resolve to on this run ("iPad" or "iPhone").
+enum TestDevice {
+    static var name: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone" }
+}
+
 /// The iCloud screen's footnote names the device it runs on: "this iPad" on iPad, "this iPhone" on
 /// iPhone, from one catalog entry with device variations (never built by joining strings).
 final class DeviceCopyTests: XCTestCase {

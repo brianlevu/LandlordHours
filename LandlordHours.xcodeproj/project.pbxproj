@@ -167,6 +167,7 @@
 		826B4790C35C2F223F1B5C19 /* HouseRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6C712F36C0B59A33BB4D48 /* HouseRenderingTests.swift */; };
 		84DE670DB1373A17E2492B91 /* Rentals.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7EFF1A62FB52ACFBA349CFB9 /* Rentals.xcstrings */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
+		863347615E08D3695252107A /* UITestDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0785ED096BD565538A93154F /* UITestDevice.swift */; };
 		874E4639B3AFACC6422540B5 /* LearnArticles.json in Resources */ = {isa = PBXBuildFile; fileRef = 86103C34CCCA866F131145AD /* LearnArticles.json */; };
 		876C10EA91016A84CCDE88D7 /* WelcomeRecordsFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DAA1C8D4BCD072CE0838F76 /* WelcomeRecordsFooter.swift */; };
 		87DBB30F160545549CF94050 /* PropertyComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */; };
@@ -403,6 +404,7 @@
 		05D6E55446ACD86EE664D6EB /* D5-201-local.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "D5-201-local.plist"; sourceTree = "<group>"; };
 		06883004BB1E57213877840B /* Foundations.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Foundations.xcstrings; sourceTree = "<group>"; };
 		07304A69757DB91D8CF20A79 /* IdentityJourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityJourneyUITests.swift; sourceTree = "<group>"; };
+		0785ED096BD565538A93154F /* UITestDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestDevice.swift; sourceTree = "<group>"; };
 		090AC6457EB4FB394F170292 /* InboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxTests.swift; sourceTree = "<group>"; };
 		0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchasesTests.swift; sourceTree = "<group>"; };
 		0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHScreenScaffold.swift; sourceTree = "<group>"; };
@@ -1193,6 +1195,7 @@
 				435624AEE2D53F77DFB56482 /* TodayConfirmUITests.swift */,
 				C8714D4DBCB581DD7B4C3F7B /* TodayHouseUITests.swift */,
 				895DED5292E6EFA986E744B1 /* TodayLoadingUITests.swift */,
+				0785ED096BD565538A93154F /* UITestDevice.swift */,
 				4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */,
 				B8595069CED3C00604518A91 /* WPLCaptureUITests.swift */,
 				96BF92C5B015766E5E7D43F5 /* Fixtures */,
@@ -1943,6 +1946,7 @@
 				9A4861CCD161E7AEBD9ABCD9 /* TodayConfirmUITests.swift in Sources */,
 				9870A084F15EEFB88DC5D372 /* TodayHouseUITests.swift in Sources */,
 				CB01259AC7A91CF603A4AFA8 /* TodayLoadingUITests.swift in Sources */,
+				863347615E08D3695252107A /* UITestDevice.swift in Sources */,
 				5AA0D982BB42E25BA085B2A6 /* UITestIsolation.swift in Sources */,
 				9AB1EED1A55B244ACC72AF79 /* WPLCaptureUITests.swift in Sources */,
 			);

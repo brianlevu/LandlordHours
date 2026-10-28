@@ -412,7 +412,7 @@ final class ToastQueueTests: XCTestCase {
 
     func testPersistenceCopy() {
         // Device-aware: the catalog's device variation names the device the app runs on.
-        let device = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+        let device = TestDevice.name
         XCTAssertEqual(AppViewModel.saveFailureMessage, "Couldn’t save your last change. Your \(device) may be out of space.")
         XCTAssertEqual(AppViewModel.loadFailureMessage, "Couldn’t open your records. They’re still safe on this \(device).")
     }

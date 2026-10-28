@@ -157,7 +157,7 @@ final class ConversionPathTests: XCTestCase {
     /// Package K: Welcome has no account sheet; its footer says where records live (P1), that it
     /// is checking iCloud (P3) or what it found (P2), and the button then reads Continue.
     func testWelcomeFooterCopyIsPlain() {
-        XCTAssertEqual(IdentityCopy.welcomeFooter, "Your records stay on your iPhone and in your iCloud.")
+        XCTAssertEqual(IdentityCopy.welcomeFooter, "Your records stay on your \(TestDevice.name) and in your iCloud.")
         XCTAssertEqual(IdentityCopy.welcomeChecking, "Checking iCloud for earlier records…")
         XCTAssertEqual(IdentityCopy.welcomeFound(42), "We found 42 hours from an earlier version. They’re already here.")
         XCTAssertEqual(IdentityCopy.welcomeFound(1), "We found 1 hour from an earlier version. They’re already here.")
