@@ -9,9 +9,13 @@ struct HistoryView: View {
     @Environment(\.isPresented) private var isPushed
     /// Opens narrowed to one rental (the rental page's "See all in Records").
     var initialPropertyId: UUID? = nil
+    /// Set by a caller that pushes Records onto its own stack (the rental page's "See all"): a nested
+    /// NavigationStack inside a pushed destination renders SwiftUI's missing-destination placeholder, and
+    /// `isPresented` alone was not reliable there.
+    var pushed = false
 
     var body: some View {
-        if isPushed {
+        if pushed || isPushed {
             RecordsScreen(showsBackButton: true, initialPropertyId: initialPropertyId)
         } else {
             NavigationStack {

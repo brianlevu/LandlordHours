@@ -97,7 +97,7 @@ struct PropertiesView: View {
                 case .detail(let id):
                     PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) })
                 case .records(let id):
-                    HistoryView(initialPropertyId: id)
+                    HistoryView(initialPropertyId: id, pushed: true)
                 case .record(let id):
                     if let entry = viewModel.timeEntries.first(where: { $0.id == id }) {
                         TimeEntryDetailView(entry: entry)

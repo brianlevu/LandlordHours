@@ -7,8 +7,13 @@ extension LogTimeSheet {
     /// from the user's own recent entries. Hidden until there are two past entries. At AX sizes
     /// each pick is a full-width secondary button so the whole phrase can wrap.
     var recentsView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LHSectionHeader(lt("Recent"), style: .day)
+        VStack(alignment: .leading, spacing: 4) {
+            // The day-header style without its 28pt row: with the keyboard up the strip, the details
+            // line and "Enter details yourself" all sit above the pinned primary (S7).
+            Text(lt("Recent"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .accessibilityAddTraits(.isHeader)
             if isAX {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(recents) { recent in

@@ -246,6 +246,12 @@ final class LogTimeUITests: XCTestCase {
         app.buttons["tab.logTime"].tap()
         let toTimer = app.buttons["log.startTimer"]
         XCTAssertTrue(toTimer.waitForExistence(timeout: 8))
+        // Only the primary is pinned (standard §S7): the timer link scrolls with the body, so drop the
+        // note's keyboard and bring the link on screen before tapping it.
+        if app.buttons["log.done"].exists { app.buttons["log.done"].tap() }
+        var swipes = 0
+        while !toTimer.isHittable && swipes < 3 { app.swipeUp(); swipes += 1 }
+        XCTAssertTrue(toTimer.isHittable, "the timer link is reachable in the body")
         toTimer.tap()
         let start = app.buttons["timer.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 4))
