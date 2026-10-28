@@ -204,7 +204,7 @@ struct PaywallView: View {
 
     /// Apple's standard EULA (no custom EULA is configured for the app).
     static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    static let privacyURL = URL(string: "https://gist.github.com/brianlevu/5e4dbbf64a69c0be6b981aabcea1b8db#file-privacy-html")!
+    static let privacyURL = URL(string: "https://altaiventures.co/products/dormer/privacy/")!
 
     /// The record preview's share of the scroll viewport (≤ 0.40, standard §1.23).
     static let previewShare: CGFloat = 0.35

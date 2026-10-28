@@ -382,7 +382,7 @@ struct SettingsView: View {
             LHRow.Browse(title: HS.t("settings.terms.title", "Terms and privacy"),
                          systemImage: "hand.raised", tint: .neutral,
                          action: {
-                if let url = URL(string: "https://www.altaiventures.co/landlord-hours/terms") {
+                if let url = URL(string: "https://altaiventures.co/products/dormer/privacy/") {
                     UIApplication.shared.open(url)
                 }
             })
