@@ -675,5 +675,30 @@ class ConsistencyBackCircleXXL(unittest.TestCase):
         self.assertAlmostEqual(m["content_top_pt"], 133.0, delta=0.5)
         self.assertAlmostEqual(m["gap_pt"], 26.0, delta=0.7)
 
+class InboxDividers(unittest.TestCase):
+    """Real Inbox frames (3x, 402x874pt): system-inset hairlines (grey, 1pt, stopping 16pt short of the
+    card edge) split rows, and a list faded out above the pinned bar does not merge its last rows.
+    Hand-measured by the visual gate: default pitch 62.3pt (divider 501.0pt), XXL pitch 71.0pt (divider 568.0pt)."""
+    FX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "inbox-dividers")
+
+    def _rows(self, name, dt, items=6):
+        res = fc.analyse(os.path.join(self.FX, name), dt, 3.0, 0.88, items)
+        card = [c for c in res["cards"] if c["list_container"]][0]
+        return res, [r for r in card["rows"] if r["complete"] and not r["foot"]]
+
+    def test_default_five_rows_with_pitch_62(self):
+        res, rows = self._rows("inbox-default-light.png", "default")
+        self.assertEqual(len(rows), 5)
+        self.assertAlmostEqual(rows[2]["h_pt"], 62.3, delta=2.0)   # the row above the 501pt divider
+        self.assertTrue(all(56 <= r["h_pt"] <= 88 for r in rows))
+        self.assertEqual([c for c in res["checks"] if not c["pass_"]], [])
+
+    def test_xxl_four_rows_with_pitch_71(self):
+        res, rows = self._rows("inbox-xxl-light.png", "xxl")
+        self.assertEqual(len(rows), 4)
+        self.assertAlmostEqual(rows[2]["h_pt"], 71.0, delta=2.0)   # the row above the 568pt divider
+        self.assertEqual([c for c in res["checks"] if not c["pass_"]], [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
