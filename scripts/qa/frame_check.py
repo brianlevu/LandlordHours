@@ -1403,6 +1403,15 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     header_end = e
     last_base = base + 1
     merged = 0
+    # A wrapped title: its next line is as tall as the first (within 30%) and starts within 12pt.
+    for bs, be in bands:
+        if bs >= e and bs - e <= 12 * sc and abs((be - bs) - (e - s)) <= 0.3 * (e - s):
+            e = be
+            header_end = e
+            base_line2 = baseline_of(bs, be)
+            last_base = base_line2
+        elif bs >= e:
+            break
     for bs, be in bands:
         # The subtitle starts <= 16pt under the title; a wrapped subtitle's next line follows within 8pt.
         # A band further down (a section header such as "You") is content, not header.

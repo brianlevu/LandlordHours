@@ -116,10 +116,15 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
                 Text(title)
                     .font(style.font)
                     .foregroundStyle(colors.textPrimary)
-                    .lineLimit(ax ? nil : (style == .detail ? 2 : 1))
-                    .minimumScaleFactor(style == .detail ? 1 : 0.6)
+                    // A tab title is one line that shrinks before it breaks a word; detail and sheet titles
+                    // wrap to two lines instead (a sheet title that shrank moved its baseline, S2).
+                    .lineLimit(ax ? nil : (style == .collection ? 1 : 2))
+                    .minimumScaleFactor(style == .collection ? 0.6 : 1)
                     .accessibilityAddTraits(.isHeader)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Top-aligned in the row with the one-line centring inset, so a title that wraps keeps
+                    // its first baseline where a one-line title sits (S2).
+                    .padding(.top, titleRowInset)
+                    .frame(maxWidth: .infinity, minHeight: LHScreenAnatomy.titleRowHeight, alignment: .topLeading)
                 if !trailingBelow {
                     // S5: an action that grows with Dynamic Type never makes the row taller, so the
                     // title's baseline holds at every size below AX.
@@ -133,7 +138,9 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
                     // One line at default; it wraps from xLarge so it is never cut (owner ruling 2026-10-27).
-                    .lineLimit(typeSize >= .xLarge ? nil : 1)
+                    // Tabs and details: one line at default, wrapping from xLarge. Sheets: the subtitle says
+                    // what the task is, so it wraps at every size.
+                    .lineLimit(style == .sheet || typeSize >= .xLarge ? nil : 1)
                     .lhWrapsText()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -153,6 +160,11 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
         .padding(.top, style == .sheet ? LHScreenAnatomy.sheetHeaderTopInset : LHScreenAnatomy.headerTopInset)
         .padding(.bottom, 8 + baselineCompensation)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Half the room a one-line title leaves in the 44pt row.
+    private var titleRowInset: CGFloat {
+        max(0, (LHScreenAnatomy.titleRowHeight - style.uiFont.lineHeight) / 2)
     }
 
     /// S3 is measured from the header's last baseline. A subtitle's line hangs less below its baseline
