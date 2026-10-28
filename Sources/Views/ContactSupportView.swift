@@ -22,13 +22,6 @@ struct ContactSupportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                LongTailHeader(
-                    title: HS.t("support.title", "Get help"),
-                    subtitle: HS.t("support.subtitle", "Write to Brian. You’ll hear back by email."),
-                    style: .detail,
-                    back: (label: HS.t("common.back", "Back"), identifier: "support.back", action: { dismiss() })
-                )
-
                 VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
                     LHSectionHeader(HS.t("support.section", "Your message"))
                     VStack(spacing: 12) {
@@ -48,7 +41,6 @@ struct ContactSupportView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }
@@ -67,7 +59,9 @@ struct ContactSupportView: View {
                     .background(colors.background)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhDetailScreen(HS.t("support.title", "Get help"),
+                        subtitle: HS.t("support.subtitle", "Write to Brian. You’ll hear back by email."),
+                        back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "support.back") { dismiss() })
         .hidesAppTabBar()
         .sheet(isPresented: $showingMailComposer) {
             MailComposeView(subject: subject, body: message, to: supportEmail)

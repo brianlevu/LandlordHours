@@ -27,6 +27,7 @@ struct EarlierRecordsView: View {
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
                     .textCase(nil)
+                    .padding(.top, -LHSectionHeader.firstListHeaderInset)
             }
             if identity.searchFailed {
                 Section {
@@ -93,8 +94,8 @@ struct EarlierRecordsView: View {
         .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(colors.background)
-        .navigationTitle(String(localized: "Earlier records", table: "Identity"))
-        .navigationBarTitleDisplayMode(.inline)
+        .lhTabScreen(String(localized: "Earlier records", table: "Identity"), back: LHBackAction(identifier: "earlier.back") { dismiss() })
+        .hidesAppTabBar()
         .confirmationDialog(acting.map(dialogTitle) ?? "", isPresented: Binding(get: { acting != nil }, set: { if !$0 { acting = nil } }),
                             titleVisibility: .visible, presenting: acting) { group in
             actions(for: group)
@@ -171,6 +172,7 @@ struct EarlierRecordsView: View {
 struct RecentlyRemovedView: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
     @State private var selected: RemovedRecord?
 
     var body: some View {
@@ -202,8 +204,8 @@ struct RecentlyRemovedView: View {
         .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(colors.background)
-        .navigationTitle(String(localized: "Recently removed", table: "Identity"))
-        .navigationBarTitleDisplayMode(.inline)
+        .lhTabScreen(String(localized: "Recently removed", table: "Identity"), back: LHBackAction(identifier: "removed.back") { dismiss() })
+        .hidesAppTabBar()
         .confirmationDialog(selected.map(title) ?? "", isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } }),
                             titleVisibility: .visible, presenting: selected) { item in
             Button(String(localized: "Put back", table: "Identity")) { viewModel.putBack([item.name]) }

@@ -17,17 +17,11 @@ struct LearningCenterView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
-                    LongTailHeader(
-                        title: HS.t("learnList.title", "Learning center"),
-                        back: (label: HS.t("common.back", "Back"), identifier: "learn.back", action: { dismiss() })
-                    )
-                    LHCard.Summary(
-                        value: HS.f("learnList.count", "%lld short reads", LearnLibrary.shared.count),
-                        label: LearnLibrary.line("learn.hero.line")
-                    )
-                    .accessibilityIdentifier("learn.hero")
-                }
+                LHCard.Summary(
+                    value: HS.f("learnList.count", "%lld short reads", LearnLibrary.shared.count),
+                    label: LearnLibrary.line("learn.hero.line")
+                )
+                .accessibilityIdentifier("learn.hero")
 
                 section(HS.t("learnList.start", "Start here"), articles: LearnLibrary.startHere, numbered: true)
                 section(HS.t("learnList.all", "All topics"), articles: LearnLibrary.allTopics, numbered: false)
@@ -36,12 +30,11 @@ struct LearningCenterView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhTabScreen(HS.t("learnList.title", "Learning center"), back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "learn.back") { dismiss() })
         .hidesAppTabBar()
         .navigationDestination(item: $openedArticle) { LearnArticleView(article: $0) }
         .accessibilityIdentifier("learn.screen")
@@ -110,12 +103,6 @@ struct LearnArticleView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                LongTailHeader(
-                    title: article.title,
-                    style: .detail,
-                    back: (label: HS.t("common.back", "Back"), identifier: "learn.article.back", action: { dismiss() })
-                )
-                .accessibilityIdentifier("learn.article.title")
                 ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { _, paragraph in
                     Text(paragraph)
                         .font(.body)
@@ -136,12 +123,11 @@ struct LearnArticleView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhDetailScreen(article.title, back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "learn.article.back") { dismiss() })
         .hidesAppTabBar()
         .accessibilityIdentifier("learn.article.\(article.id)")
     }
