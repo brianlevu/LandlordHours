@@ -99,14 +99,16 @@ struct InboxView: View {
     }
 
     /// The list runs the full height and the pinned slot (the batch bar, or the undo toast) is a bottom
-    /// safe-area inset over it, so rows scroll beneath the slot and fade out there (`InboxBottomFade`) instead of being cut at a hard frame edge. The slot
-    /// is still a constant (see `bottomSlot`), so the list's own frame never depends on the bar.
+    /// safe-area inset over it. Rows scroll beneath the slot and dissolve (`InboxBottomFadeMask`): the mask
+    /// is clear from the slot's top to the screen's bottom edge, so no row returns to full ink under the
+    /// pill or under the floating tab bar, and nothing is cut mid-glyph. The slot is a constant (see
+    /// `bottomSlot`), so the list's own frame never depends on the bar.
     private var list: some View {
         listBody
+            .modifier(InboxBottomFadeMask(slot: bottomSlot, enabled: !Self.systemFadeOnly))
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Color.clear
                     .frame(height: bottomSlot)
-                    .background(alignment: .top) { if bottomSlot > 0 { InboxBottomFade(slot: bottomSlot) } }
                     .overlay(alignment: .center) {
                         if barShows && toasts.current == nil {
                             InboxBatchBar(count: batch.count) { confirmLikely() }
@@ -117,6 +119,15 @@ struct InboxView: View {
                     .animation(reduceMotion ? AppAnimation.quick : AppAnimation.reveal, value: barShows)
                     .animation(reduceMotion ? AppAnimation.quick : AppAnimation.reveal, value: bottomSlot)
             }
+    }
+
+    /// DEBUG probe (`-LHInboxFadeSystemOnly`): only the system's soft scroll edge, to measure it alone.
+    private static var systemFadeOnly: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-LHInboxFadeSystemOnly")
+        #else
+        false
+        #endif
     }
 
     private var listBody: some View {
@@ -407,30 +418,39 @@ enum InboxText {
 /// "Confirm N likely" pinned 12pt above the tab bar when the card's foot is off screen. Capsule 44,
 /// `.regularMaterial` with a hairline, `.subheadline.semibold` `action` ink. Not a row, not a
 /// `.primary`: excluded from D1/D2/D3/D6 and D8.
-/// The canvas fading in under the pinned slot, so rows that scroll beneath the bar (or the undo toast)
-/// dissolve behind it instead of ending at a line or showing through the capsule. The system's soft
-/// scroll edge only follows its own bars, and this slot is ours, so it draws on every OS.
-private struct InboxBottomFade: View {
-    /// The pinned slot's height; the fade starts `lead` above it and trails `tail` below it, into the
-    /// tab bar's safe area, so there is no edge where it ends.
+/// Fades the list out above the pinned slot and keeps it clear to the screen's bottom edge. The system's
+/// soft scroll edge (iOS 26+) is applied too, but it follows only its own bars: it left the row under a
+/// floating tab bar at full ink, cut by the screen edge. With no slot (no pill, no toast) nothing is masked.
+private struct InboxBottomFadeMask: ViewModifier {
     let slot: CGFloat
-    private let lead: CGFloat = 16
-    private let tail: CGFloat = 44
-    @Environment(\.colorScheme) private var colorScheme
+    var enabled = true
+    /// The list's bottom safe area: the tab bar plus the pinned slot (the slot is an inset on the list).
+    @State private var bottomInset: CGFloat = 0
+    private let fadeHeight: CGFloat = 56
 
-    var body: some View {
-        let canvas = AdaptiveColors(colorScheme: colorScheme).background
-        let total = lead + slot + tail
-        LinearGradient(stops: [.init(color: canvas.opacity(0), location: 0),
-                               .init(color: canvas.opacity(0.94), location: (lead + slot * 0.45) / total),
-                               .init(color: canvas.opacity(0.98), location: (lead + slot) / total),
-                               .init(color: canvas.opacity(0), location: 1)],
-                       startPoint: .top, endPoint: .bottom)
-            .frame(height: total)
-            .offset(y: -lead)
-            .ignoresSafeArea(edges: .bottom)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
+            .modifier(SoftBottomEdge())
+            .mask {
+                if enabled && slot > 0 {
+                    VStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: fadeHeight)
+                        Color.clear.frame(height: max(bottomInset, slot))
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                } else {
+                    Color.black.ignoresSafeArea(edges: .bottom)
+                }
+            }
+    }
+}
+
+private struct SoftBottomEdge: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) { content.scrollEdgeEffectStyle(.soft, for: .bottom) } else { content }
     }
 }
 

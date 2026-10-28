@@ -83,4 +83,15 @@ final class ShotBugsCaptureUITests: XCTestCase {
             }
         }
     }
+
+    /// The system's soft scroll edge alone (no mask), to measure what it does under the pill and the tab bar.
+    func testCaptureInboxSystemFadeOnly() {
+        for scheme in ["light", "dark"] {
+            app.terminate()
+            app.launchArguments = InboxUITests.arguments(seed: "inbox", scheme: scheme, extra: ["-LHInboxFadeSystemOnly"])
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 20))
+            write("inbox-systemonly-default-\(scheme)")
+        }
+    }
 }

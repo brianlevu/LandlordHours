@@ -69,6 +69,10 @@ struct SuggestionConfirmSheet: View {
     private var limitedToPicker: Bool { model.needsNewRental(suggestion) }
     private var propertyName: String? { model.properties.first(where: { $0.id == propertyId })?.name }
     private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
+    /// 0 at rest, 1 once the content has scrolled under the header.
+    @State private var topFade: CGFloat = 0
+    /// The pinned header's height (the scroll view runs under it).
+    @State private var headerInset: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -92,6 +96,22 @@ struct SuggestionConfirmSheet: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
+        // Content that scrolls up under the pinned header dissolves into it instead of being cut flat (the
+        // stepper's circles showed as crescents). The scroll view runs under the header, so the mask starts
+        // at the header's bottom edge; its fade is 0 at rest, so the first block is never dimmed.
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
+            topFade = min(max(offset / 12, 0), 1)
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { headerInset = $0 }
+        .mask {
+            VStack(spacing: 0) {
+                Color.clear.frame(height: headerInset)
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 28 * topFade)
+                Color.black
+            }
+            .ignoresSafeArea(edges: .top)
+        }
         // Screen anatomy: a sheet about one item, led by its 56pt tool (§H.5). The scaffold pins the
         // header below AX and scrolls it away at AX sizes, so the field and the primary keep the room.
         .lhSheetScreen(InboxFormat.rowTitle(suggestion, propertyName: propertyName),
