@@ -729,15 +729,6 @@ struct MutedSuggestionsView: View {
 
     var body: some View {
         List {
-            Section {
-                LongTailHeader(
-                    title: HS.t("muted.title", "Muted"),
-                    back: (label: HS.t("common.back", "Back"), identifier: "muted.back", action: { dismiss() })
-                )
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
             if rules.isEmpty {
                 Section {
                     LHEmptyState(
@@ -778,7 +769,8 @@ struct MutedSuggestionsView: View {
             .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhTabScreen(HS.t("muted.title", "Muted"), back: LHBackAction(
+            label: HS.t("common.back", "Back"), identifier: "muted.back") { dismiss() })
         .hidesAppTabBar()
         .onAppear { rules = AppModelHost.shared.suggestionStore?.muteRules ?? [] }
         .accessibilityIdentifier("settings.muted.screen")
@@ -859,17 +851,6 @@ struct TaxProfileView: View {
     var body: some View {
         List {
             Section {
-                LongTailHeader(
-                    title: HS.t("filing.title", "Filing and goal"),
-                    subtitle: HS.t("filing.subtitle", "The few facts that decide which hours count."),
-                    back: (label: HS.t("common.back", "Back"), identifier: "filing.back", action: { dismiss() })
-                )
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-
-            Section {
                 Menu {
                     Picker(HS.t("filing.status", "Filing status"), selection: $taxProfile.filingStatus) {
                         ForEach(FilingStatus.allCases, id: \.self) { status in
@@ -888,7 +869,7 @@ struct TaxProfileView: View {
                     .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
                     .accessibilityIdentifier("taxProfile.spouseTracking")
             } header: {
-                header(HS.t("filing.section.you", "You"))
+                header(HS.t("filing.section.you", "You"), leadsList: true)
             }
 
             Section {
@@ -1013,7 +994,9 @@ struct TaxProfileView: View {
             .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhTabScreen(HS.t("filing.title", "Filing and goal"),
+                     subtitle: HS.t("filing.subtitle", "The few facts that decide which hours count."),
+                     back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "filing.back") { dismiss() })
         .hidesAppTabBar()
         .sheet(isPresented: $showWorkHoursInput) { workHoursSheet }
         .sheet(isPresented: $showAddProperty) { addPropertySheet }
@@ -1028,8 +1011,8 @@ struct TaxProfileView: View {
         .accessibilityIdentifier("taxProfile.screen")
     }
 
-    private func header(_ title: String, count: Int? = nil) -> some View {
-        LHSectionHeader(title, count: count).textCase(nil)
+    private func header(_ title: String, count: Int? = nil, leadsList: Bool = false) -> some View {
+        LHSectionHeader(title, count: count, leadsList: leadsList).textCase(nil)
     }
 
     /// A label and its value as a `Menu` label.

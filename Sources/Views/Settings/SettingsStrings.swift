@@ -38,35 +38,6 @@ enum HS {
     }
 }
 
-// MARK: - Header for the long-tail screens (standard §1.14)
-
-/// `LHScreenTitle` with the back control the tests and VoiceOver find by name. Settings goes back
-/// to Today; the pushed pages (filing, Learn, Contact support, Delete all data) go back one level.
-struct LongTailHeader: View {
-    let title: String
-    var subtitle: String? = nil
-    var style: LHScreenTitle.Style = .collection
-    var back: (label: String, identifier: String, action: () -> Void)? = nil
-
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let back {
-                HStack {
-                    Button(action: back.action) { Image(systemName: "chevron.backward") }
-                        .buttonStyle(LHButton.icon)
-                        .accessibilityLabel(back.label)
-                        .accessibilityIdentifier(back.identifier)
-                    Spacer(minLength: 0)
-                }
-                .padding(.bottom, 8)
-            }
-            LHScreenTitle(title, subtitle: subtitle, style: style)
-        }
-    }
-}
-
 // MARK: - Value row for grouped lists
 
 /// A label and its value on one row inside a grouped list (the group is the container, so no inner

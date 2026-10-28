@@ -157,6 +157,7 @@ struct ICloudStatusRow: View {
 struct ICloudRecordsView: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
@@ -217,13 +218,13 @@ struct ICloudRecordsView: View {
                     .foregroundStyle(colors.textSecondary)
             }
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.vertical, 16)
+            .padding(.bottom, 16)
             .frame(maxWidth: LHMetrics.readingColumn)
             .frame(maxWidth: .infinity)
         }
         .background(colors.background)
-        .navigationTitle(String(localized: "iCloud", table: "Identity"))
-        .navigationBarTitleDisplayMode(.inline)
+        .lhTabScreen(String(localized: "iCloud", table: "Identity"), back: LHBackAction(identifier: "icloud.back") { dismiss() })
+        .hidesAppTabBar()
         .onAppear { identity.refresh(sync: viewModel.syncService) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("icloud.detail")
