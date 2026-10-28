@@ -672,7 +672,7 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 |---|---|---|
 | `.lhTabScreen(title, subtitle:, back: LHBackAction?, onPage:, accessory:, trailing:)` | tab roots (Today, Inbox, Records, Rentals) and collection roots (Settings, Reports, Muted, Filing and goal, Learning centre, iCloud, Earlier records, Recently removed) | Fraunces 34/500 |
 | `.lhDetailScreen(title, subtitle:, back:, onPage:, accessory:, trailing:)` | a pushed screen about one item (a rental page, a record, an article, Get help, Delete all data) and every onboarding step (through `OnbStepScaffold`) | SF `.title1.semibold` |
-| `.lhSheetScreen(title, subtitle:, style:, leading:, onClose:, background:)` and `LHSheet` | sheets: `.sheet` style for task sheets (Log time, capture setup, pickers); `.detail` style for a sheet about one item (the confirm sheet, `leading` = its 56pt tool render) | Fraunces 28/500 (task) · SF `.title1.semibold` (item) |
+| `.lhSheetScreen(title, subtitle:, style:, leading:, onClose:, background:)` and `LHSheet` | sheets, in **two kinds on purpose** (conductor ruling 2026-10-27): **task sheets** (`.sheet` style: Log time, capture setup, pickers) and **item sheets** (`.detail` style + `leading` = the 56pt render: the confirm sheet). S2 and S3 are checked **within a kind, never across kinds** | Fraunces 28/500 (task) · SF `.title1.semibold` + 56pt render (item) |
 | `LHHeaderAction(symbol:label:…)` / `(title:…)`, `LHBackAction` | the one trailing action; the back button (keeps the screen's identifier) | |
 
 Code: `Sources/Views/Components/LHScreenScaffold.swift`. `LHScreenTitle`, `ScreenHeader` and `LongTailHeader` are deleted.
@@ -690,18 +690,19 @@ Code: `Sources/Views/Components/LHScreenScaffold.swift`. `LHScreenTitle`, `Scree
 | S5 | At most one trailing action, on the title row; it never makes the row taller below AX (row 44pt). At AX a label action ("Add rental") moves under the title | ≤ 1; row 44 | grep + measured |
 | S6 | A list that opens on a section header uses `LHSectionHeader(…, leadsList: true)`, which takes back the system's 15.5pt first-header padding | S3 holds | measured |
 | S7 | Sheets pin only the primary (§1.20). Log time keeps its recents in one strip above the details line, visible with the keyboard up at default; at AX the prompt is the short question and the field is never cut by the primary | recents above the primary's top edge at default | measured |
-| S8 | Subtitles are one line at default and wrap from xLarge; titles wrap at AX (§1.14) | no ellipsis at XXL or AX | measured |
+| S8 | Subtitles are one line at default and wrap from xLarge (sheet subtitles wrap at every size); tab titles wrap at AX, detail and sheet titles wrap to two lines instead of shrinking, keeping the one-line inset above and below so the first baseline and the gap hold (§1.14) | no ellipsis at XXL or AX | measured |
+| S9 | **Text-first content.** S3 measures a card's edge or a text's cap line. A screen whose first content is text puts `.lhLeadsContent(<style>)` on that text (a List section header uses `LHSectionHeader(…, leadsList: true)`), so its cap line lands where a card edge would. The pull-up is the font's half-leading + ascender − cap height, plus a measured term for `.body`-family styles (4.4pt at 17pt, 1.4pt at 21pt, linear, iOS 27.0). Every step of one flow uses one structure (the capture setup steps both open on their intro paragraph) | S3 holds per group | grep + measured |
 
 **Section rhythm (unchanged, now owned by the scaffold):** gutter 20, section gap 24 (`listSectionSpacing`), header → content 8 (§1.15). Today's "To confirm" sits a full section gap (24) under the pace line.
 
 **Today (amends §H.8):** the numeral and its goal read as one phrase on the 20pt gutter ("88 of 100 hours": numeral Fraunces 84, goal `.title3.medium` `textSecondary`, last-baseline aligned), the pace sentence under it. H1 is taken from the height left under the header (`LHScreenAnatomy.heroHeaderAllowance` = 200pt), so the two rows and the "See all" foot stay above the bar (D3b). The page dots sit beside the rental chip, not on the lot.
 
 **Exceptions (written down, not drift):**
-- **Onboarding** follows the scaffold: `OnbStepScaffold` puts each step's title in the detail header (`.lhDetailScreen`), so every step's title sits on one baseline under the flow's own top bar (back + progress). The step's `.body` subtitle is the first content. **Welcome** is a display screen on the dusk page (Fraunces 34 headline, §1.24) and has no scaffold header.
+- **Onboarding** follows the scaffold: `OnbStepScaffold` puts each step's title in the detail header (`.lhDetailScreen`), so every step's title sits on one baseline under the flow's own top bar (back + progress). The step's `.body` subtitle is the first content, led in (S9). The capture-setup steps reached from onboarding are task sheets with one structure: the intro paragraph is the first content, led in. **Welcome** is a display screen on the dusk page (Fraunces 34 headline, §1.24) and has no scaffold header.
 - **Paywall** (§1.23) keeps its own header (headline `.title2.semibold` + close): it is a conversion surface with its own scaffold and is reviewed with the paywall rules. Moving it onto `.lhSheetScreen` is a later, separately reviewed change.
 - **DEBUG tools** (component gallery, Engagement Lab) use the scaffolds too.
 
-**Gate:** `scripts/qa/gate_rubric.md` §1a — every gate runs `frame_check.py consistency` on one frame per tab plus the sheets, default and XXL, light and dark; a FAIL is a blocker after a hand measurement.
+**Gate:** `scripts/qa/gate_rubric.md` §1a — every gate runs `frame_check.py consistency` with every group: tabs + collection roots (positional, Today as `--hero`), `--detail`, `--sheet-task`, `--sheet-item`, and the onboarding steps as their own run; default and XXL, light and dark. Each group must pass; a FAIL is a blocker after a hand measurement.
 
 ## 2. Density rules
 

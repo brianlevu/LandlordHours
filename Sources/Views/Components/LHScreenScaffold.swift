@@ -123,7 +123,7 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
                     .accessibilityAddTraits(.isHeader)
                     // Top-aligned in the row with the one-line centring inset, so a title that wraps keeps
                     // its first baseline where a one-line title sits (S2).
-                    .padding(.top, titleRowInset)
+                    .padding(.vertical, titleRowInset)
                     .frame(maxWidth: .infinity, minHeight: LHScreenAnatomy.titleRowHeight, alignment: .topLeading)
                 if !trailingBelow {
                     // S5: an action that grows with Dynamic Type never makes the row taller, so the
@@ -162,7 +162,8 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Half the room a one-line title leaves in the 44pt row.
+    /// Half the room a one-line title leaves in the 44pt row, above and below the title, so a wrapped
+    /// title keeps the same distance from its last baseline to the content as a one-line title (S3).
     private var titleRowInset: CGFloat {
         max(0, (LHScreenAnatomy.titleRowHeight - style.uiFont.lineHeight) / 2)
     }
@@ -405,3 +406,43 @@ struct LHHeaderAction: View {
     }
 }
 
+
+// MARK: - Text-first content (S9)
+
+/// S3 measures the first content's top edge: a card's edge, or a text's cap line. A text's line box
+/// starts above its cap line, so a screen that opens on text would sit lower than one that opens on a
+/// card. Put `.lhLeadsContent(.body)` (the text's style) on that first text and its cap line lands where
+/// a card's edge would. `LHSectionHeader(…, leadsList: true)` is the same rule for a List section header.
+struct LHLeadInModifier: ViewModifier {
+    let style: UIFont.TextStyle
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    static func inset(_ style: UIFont.TextStyle, _ size: DynamicTypeSize) -> CGFloat {
+        let font = UIFont.preferredFont(forTextStyle: style,
+                                        compatibleWith: UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size)))
+        let halfLeading = max(0, font.lineHeight - (font.ascender - font.descender)) / 2
+        return (halfLeading + font.ascender - font.capHeight + measuredExtra(style, pointSize: font.pointSize)).rounded()
+    }
+
+    /// What the font metrics miss, measured on iOS 27.0 frames (2026-10-27, `frame_check.py consistency`):
+    /// a `.body` paragraph's cap line sat 4.4pt lower than a card edge at 17pt and 1.4pt lower at XXL
+    /// (21pt) after the metric pull-up; a `.headline` section header matched. Linear between the two
+    /// measurements, never negative. Re-measure on an OS update; the cross-group gate catches drift.
+    private static func measuredExtra(_ style: UIFont.TextStyle, pointSize: CGFloat) -> CGFloat {
+        switch style {
+        case .body, .callout, .subheadline: return max(0, 4.4 - (pointSize - 17) * 0.75)
+        default: return 0
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content.padding(.top, -Self.inset(style, typeSize))
+    }
+}
+
+extension View {
+    /// The first element of a screen's content is text in this style (standard §S, S9).
+    func lhLeadsContent(_ style: UIFont.TextStyle) -> some View {
+        modifier(LHLeadInModifier(style: style))
+    }
+}

@@ -351,7 +351,7 @@ struct LogTimeSheet: View {
             if !recents.isEmpty && !isFirstRun && !isListening { recentsView.opacity(exiting ? 0 : 1).transition(.identity) }
             VStack(alignment: .leading, spacing: 0) {
                 detailsLine
-                enterDetailsButton
+                if !doorInToolsRow { enterDetailsButton }
             }
             .opacity(exiting ? 0 : 1)
             .transition(.identity)

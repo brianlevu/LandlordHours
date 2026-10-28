@@ -632,5 +632,33 @@ class ConsistencyDark(unittest.TestCase):
         self.assertAlmostEqual(m["title_baseline_pt"], 105.0, delta=0.5)
         self.assertAlmostEqual(m["content_top_pt"], 130.0, delta=0.5)
 
+
+class ConsistencyGroups(unittest.TestCase):
+    def _args(self, **kw):
+        import argparse
+        base = dict(frames=[], hero=None, sheet=None, sheet_task=None, sheet_item=None, detail=None, scale=3.0)
+        base.update(kw)
+        return argparse.Namespace(**base)
+
+    def test_sheet_kinds_are_compared_within_their_kind(self):
+        # task sheets agree with each other; the item sheet sits elsewhere: still a PASS (no cross-kind check)
+        t1, t2 = make_tab(90, 140, "task1"), make_tab(90, 140, "task2")
+        item = make_tab(84, 150, "item")
+        g = fc.consistency_groups(self._args(frames=[make_tab(80, 130, "inbox")], sheet_task=[t1, t2], sheet_item=[item]))
+        self.assertEqual(set(g), {"tabs", "sheet-task", "sheet-item"})
+        for name, (ms, nogap) in g.items():
+            _, ok = fc.consistency_verdict(ms, no_gap=nogap)
+            self.assertTrue(ok, name)
+
+    def test_drift_inside_a_kind_fails(self):
+        g = fc.consistency_groups(self._args(frames=[make_tab(80, 130, "inbox")],
+                                             sheet_task=[make_tab(90, 140, "a"), make_tab(93, 143, "b")]))
+        _, ok = fc.consistency_verdict(g["sheet-task"][0])
+        self.assertFalse(ok)
+
+    def test_old_sheet_flag_is_task(self):
+        g = fc.consistency_groups(self._args(frames=[make_tab(80, 130, "inbox")], sheet=[make_tab(90, 140, "a")]))
+        self.assertIn("sheet-task", g)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

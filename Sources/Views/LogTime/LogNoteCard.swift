@@ -157,9 +157,20 @@ extension LogTimeSheet {
                         undo: form.canUndoFill, identifier: "log.noneFound")
         } else if let source = form.fillSource, form.canUndoFill, !noteDirty {
             captionLine(text: source.caption(tier: form.fillTier), sparkle: true, undo: true, identifier: "log.fill.caption")
+        } else if doorInToolsRow {
+            // The manual door shares the row with Done and the mic while the caption is empty, so it
+            // stays above the pinned primary with the keyboard up at every size below AX (§S7).
+            enterDetailsButton
         } else {
             Color.clear.frame(height: LHMetrics.minTap)
         }
+    }
+
+    /// True when the caption slot is free and the door would otherwise sit under the details line.
+    var doorInToolsRow: Bool {
+        guard !unfolded, !showVoiceIntro, !isListening, reviewCaption == nil, !isReading, !noneFound else { return false }
+        if form.fillSource != nil, form.canUndoFill, !noteDirty { return false }
+        return true
     }
 
     func captionLine(text: String, reading: Bool = false, sparkle: Bool = false, caution: Bool = false,

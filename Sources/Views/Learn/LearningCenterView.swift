@@ -98,17 +98,19 @@ struct LearnArticleView: View {
     let article: LearnArticle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { index, paragraph in
                     Text(paragraph)
                         .font(.body)
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, index == 0 ? -LHLeadInModifier.inset(.body, typeSize) : 0)
                 }
                 LHDivider()
                     .padding(.top, 8)

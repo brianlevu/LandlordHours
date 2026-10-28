@@ -35,6 +35,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
                         Text(subtitle)
                             .font(.body)
                             .foregroundStyle(colors.textSecondary)
+                            .lhLeadsContent(.body)   // S9: its cap line sits where a card's edge would
                     }
                     content.padding(.top, subtitle == nil ? 0 : LHMetrics.sectionGap)
                     if let note { note.padding(.top, 16) }

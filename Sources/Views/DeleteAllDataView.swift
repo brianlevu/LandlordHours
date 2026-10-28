@@ -39,6 +39,7 @@ struct DeleteAllDataView: View {
                 Text(HS.t("delete.subtitle", "This removes everything from this iPhone and iCloud:"))
                     .font(.body)
                     .foregroundStyle(colors.textPrimary)
+                    .lhLeadsContent(.body)
 
                 LHRowGroup {
                     item("house", propertiesText)

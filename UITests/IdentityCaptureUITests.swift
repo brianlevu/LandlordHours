@@ -131,6 +131,36 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
         if element("today.identity.p10").waitForExistence(timeout: 25) { scrollTo(element("today.identity.p10"), maxSwipes: 3); shoot("today-p10-\(s)") }
     }
 
+    // Screen anatomy frames (standard §S): iCloud, Earlier records, Recently removed on the scaffolds.
+    func testCaptureScaffoldLightDefault() { captureScaffold("light-default", scheme: "light", size: nil) }
+    func testCaptureScaffoldDarkDefault() { captureScaffold("dark-default", scheme: "dark", size: nil) }
+    func testCaptureScaffoldLightXXL() { captureScaffold("light-xxl", scheme: "light", size: "xxl") }
+    func testCaptureScaffoldDarkXXL() { captureScaffold("dark-xxl", scheme: "dark", size: "xxl") }
+
+    private func captureScaffold(_ s: String, scheme: String, size: String?) {
+        launch(fixture: "D3-106-signed-out-two", zone: "empty", scheme: scheme, size: size)
+        if element("identity.mergeQuestion").waitForExistence(timeout: 25) { tap(element("sheet.close")) }
+        openSettings()
+        scrollTo(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
+        XCTAssertTrue(element("earlier.list").waitForExistence(timeout: 10))
+        shoot("c-earlier-\(s)")
+        launch(fixture: "D2-106-signed-in", zone: "fail", scheme: scheme, size: size)
+        openSettings()
+        scrollTo(element("settings.icloud.status"))
+        tap(reveal("settings.icloud.status"))
+        XCTAssertTrue(element("icloud.detail").waitForExistence(timeout: 10))
+        shoot("c-icloud-\(s)")
+        launch(fixture: "D5-201-local", zone: "bulk", scheme: scheme, size: size)
+        tap(app.buttons["identity.bulk.remove"], timeout: 25)
+        openSettings()
+        scrollTo(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
+        tap(element("earlier.recentlyRemoved"))
+        XCTAssertTrue(element("removed.list").waitForExistence(timeout: 10))
+        shoot("c-removed-\(s)")
+    }
+
     private func captureTail(_ s: String, scheme: String, size: String?) {
         // Recently removed (after "Remove them" on the bulk question), Your name.
         launch(fixture: "D5-201-local", zone: "bulk", scheme: scheme, size: size)

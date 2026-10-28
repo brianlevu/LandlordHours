@@ -111,6 +111,13 @@ struct CaptureSetupFlow: View {
     private var priming: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                // One structure for every setup step (§S9): the intro is the first content, led in.
+                Text(String(localized: "capture.body", defaultValue: "We look for things like a plumber visit or a showing in your calendar, then ask you. Nothing counts until you confirm it.", table: "Inbox"))
+                    .font(.body)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lhLeadsContent(.body)
+
                 switches
 
                 preview
@@ -126,8 +133,6 @@ struct CaptureSetupFlow: View {
             mode == .whatsNew
                 ? String(localized: "capture.title.whatsNew", defaultValue: "We can notice your rental work", table: "Inbox")
                 : String(localized: "capture.title.onboarding", defaultValue: "Let us notice your rental work", table: "Inbox"),
-            // The intro is the step's subtitle (it says what the task is), so the switches start on the S3 gap.
-            subtitle: String(localized: "capture.body", defaultValue: "We look for things like a plumber visit or a showing in your calendar, then ask you. Nothing counts until you confirm it.", table: "Inbox"),
             style: .sheet,
             background: colors.background
         )
@@ -334,6 +339,7 @@ struct CaptureSetupFlow: View {
                     .font(.body)
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .lhLeadsContent(.body)
                 if ax {
                     continueWithoutButton
                         .frame(maxWidth: .infinity)

@@ -81,15 +81,20 @@ The gate compares tabs, not a screen alone. On every gate, whatever the diff tou
 root plus the sheets on the same seed and device, at default and XXL, in light and dark, and run:
 
 ```bash
-python3 scripts/qa/frame_check.py consistency <inbox> <records> <rentals> <settings> \
-    --hero <today> --sheet <logtime> --sheet <confirm> --json consistency.json
+python3 scripts/qa/frame_check.py consistency <inbox> <records> <rentals> <settings> <collection roots…> \
+    --hero <today> --detail <detail screens…> \
+    --sheet-task <logtime> --sheet-task <setup> --sheet-task <setup-denied> \
+    --sheet-item <confirm> --json consistency.json
+python3 scripts/qa/frame_check.py consistency <every onboarding step…> --json consistency-onboarding.json
 ```
 
-- **S1** every frame has a title; **S2** tab title baselines within 1pt; **S3** first content within 2pt of the same
-  distance under the header's last baseline. Sheets are compared with each other the same way.
+- **S1** every frame has a title; **S2** title baselines within 1pt; **S3** first content within 2pt of the same
+  distance under the header's last baseline — **within each group**: tabs + collection roots, detail screens,
+  task sheets, item sheets, onboarding steps. Sheets are never compared across kinds (task vs item, §S).
+- Always pass every group, the sheets included; a run without `--sheet-task`/`--sheet-item` is incomplete.
 - FAIL is a BLOCKER, but measure it by hand on the frame first (the tool is a heuristic; the 2026-10-27 rule).
-- A screen the diff adds or moves joins the run: a collection root is checked with the tabs; a detail screen with
-  the other detail screens. Empty-state frames are held to S1/S2 only (an empty state carries its own padding).
+- A screen the diff adds or moves joins its group: a collection root with the tabs, a detail screen with the details,
+  a sheet with its kind, an onboarding step with the steps. Empty-state frames are held to S1/S2 only (an empty state carries its own padding).
 - The scroll-away header: one scrolled frame per touched tab must show the compact bar (title, back, the one
   action) and no header remnant.
 

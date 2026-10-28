@@ -1319,6 +1319,7 @@ TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 96.0   # a large-title glyph band (Fraunces 3
 SHEET_TITLE_MIN_PT = 14.0                  # SF title2 / title1 in sheets (~16-24pt)
 WRAPPED_TITLE_PT = 50.0                    # a title band taller than this below AX is two lines that touch
 SUBTITLE_LINE_GAP_PT = 12.0                # a wrapped subtitle's next line starts this close under the last
+SUBTITLE_FROM_BASELINE_PT = 19.0           # a subtitle starts this close under the title baseline (scaled)
 SUBTITLE_GAP_PT = 16.0                     # a short text band starting this close under the title (line-box descent + 2pt) is the subtitle
 INK_MAX_MEAN = 110                         # light theme ink: mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
 INK_MIN_MEAN_DARK = 150                    # dark theme ink: mean RGB above this (textPrimary #F2F4FA, textSecondary #A9B0C8)
@@ -1409,6 +1410,8 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
         d = c[st:-1] - c[st + 1:]
         return bs + st + int(np.argmax(d)) + 1 if d.size else be
 
+    # The title's size relative to a one-line Fraunces 34 at default (cap band ~25pt), for scaled thresholds.
+    cap_scale = max(0.7, ((base + 1 - s) / sc) / 25.0)
     header_end = e
     last_base = base + 1
     if two_lines and drops.size:   # the header ends on the wrapped line's baseline
@@ -1427,7 +1430,10 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
         # The subtitle starts <= 16pt under the title; a wrapped subtitle's next line follows within 8pt.
         # A band further down (a section header such as "You") is content, not header.
         reach = SUBTITLE_GAP_PT if merged == 0 else SUBTITLE_LINE_GAP_PT
-        if bs >= header_end and bs - header_end <= reach * sc and be - bs < TITLE_MIN_PT * sc:
+        # A subtitle's first line starts close under the title's baseline (<= 19pt at a 25pt cap,
+        # scaled with the title); content led in to the S3 gap (~24pt) starts lower.
+        near_base = merged > 0 or (bs - (base + 1)) <= SUBTITLE_FROM_BASELINE_PT * sc * cap_scale
+        if bs >= header_end and bs - header_end <= reach * sc and be - bs < TITLE_MIN_PT * sc and near_base:
             header_end = be
             last_base = baseline_of(bs, be)
             merged += 1
@@ -1479,25 +1485,36 @@ def consistency_verdict(metrics, baseline_tol=CONSIST_BASELINE_TOL_PT, gap_tol=C
     return checks, all(c["pass_"] for c in checks)
 
 
-def cmd_consistency(args) -> int:
-    tabs = [header_metrics(f, args.scale, "tab") for f in list(args.frames) + list(args.hero or [])]
-    sheets = [header_metrics(f, args.scale, "sheet") for f in (args.sheet or [])]
+def consistency_groups(args):
+    """{group name: (metrics, no-gap names)} from the CLI. Sheets come in two kinds (standard §S): task
+    sheets (Fraunces 28) and item sheets (SF title1 + a 56pt leading render); S2/S3 hold WITHIN a kind,
+    never across kinds. `--sheet` is the old spelling of `--sheet-task`."""
     hero = {os.path.basename(f) for f in (args.hero or [])}
-    checks, ok = consistency_verdict(tabs, args.baseline_tol, args.gap_tol, hero)
-    result = {"tabs": tabs, "checks": checks}
-    if len(sheets) >= 2:
-        s_checks, s_ok = consistency_verdict(sheets, args.baseline_tol, args.gap_tol)
-        result["sheets"], result["sheet_checks"] = sheets, s_checks
-        ok = ok and s_ok
+    groups = {"tabs": ([header_metrics(f, args.scale, "tab") for f in list(args.frames) + list(args.hero or [])], hero)}
+    for name, frames, kind in (("detail", args.detail, "tab"), ("sheet-task", (args.sheet or []) + (args.sheet_task or []), "sheet"),
+                               ("sheet-item", args.sheet_item, "sheet")):
+        if frames:
+            groups[name] = ([header_metrics(f, args.scale, kind) for f in frames], set())
+    return groups
+
+
+def cmd_consistency(args) -> int:
+    groups = consistency_groups(args)
+    ok = True
+    result = {}
+    for name, (ms, nogap) in groups.items():
+        for m in ms:
+            print(f"  {name:10} {os.path.basename(m['frame']):30} title top {m['title_top_pt']} baseline {m['title_baseline_pt']} "
+                  f"h {m['title_height_pt']} header end {m['header_end_pt']} content {m['content_top_pt']} gap {m['gap_pt']}")
+        checks, g_ok = consistency_verdict(ms, args.baseline_tol, args.gap_tol, nogap)
+        result[name] = {"frames": ms, "checks": checks, "pass": bool(g_ok)}
+        ok = ok and g_ok
+        for c in checks:
+            print(f"{'PASS' if c['pass_'] else 'FAIL':5} [{name}] {c['rule']}" + (f" (spread {c['spread_pt']}pt)" if "spread_pt" in c else
+                                                                     (f" missing: {c['detail']}" if c["detail"] else "")))
     if args.json:
         with open(args.json, "w") as fh:
             json.dump(result, fh, indent=2, default=_j)
-    for m in tabs + sheets:
-        print(f"  {m['kind']:5} {os.path.basename(m['frame']):32} title top {m['title_top_pt']} baseline {m['title_baseline_pt']} "
-              f"h {m['title_height_pt']} header end {m['header_end_pt']} content {m['content_top_pt']} gap {m['gap_pt']}")
-    for c in checks + result.get("sheet_checks", []):
-        print(f"{'PASS' if c['pass_'] else 'FAIL':5} {c['rule']}" + (f" (spread {c['spread_pt']}pt)" if "spread_pt" in c else
-                                                                    (f" missing: {c['detail']}" if c["detail"] else "")))
     print(f"consistency: {'PASS' if ok else 'FAIL'}")
     return 0 if ok else 1
 
@@ -1551,7 +1568,10 @@ def main():
                                     description="one header system across tabs: title baselines and header-to-content gaps")
         p.add_argument("mode")
         p.add_argument("frames", nargs="+", help="one frame per tab root, same device, same Dynamic Type")
-        p.add_argument("--sheet", action="append", help="a sheet frame (repeatable); sheets are compared with each other")
+        p.add_argument("--sheet", action="append", help="old spelling of --sheet-task")
+        p.add_argument("--sheet-task", action="append", help="a task sheet frame (Fraunces 28 title; repeatable); compared within its kind")
+        p.add_argument("--sheet-item", action="append", help="an item sheet frame (SF title1 + 56pt render; repeatable); compared within its kind")
+        p.add_argument("--detail", action="append", help="a detail screen frame (SF title1; repeatable); compared with the other details")
         p.add_argument("--hero", action="append", help="a hero tab frame (Today): held to S1/S2 only, since the art has no top edge")
         p.add_argument("--scale", type=float)
         p.add_argument("--baseline-tol", type=float, default=CONSIST_BASELINE_TOL_PT)
