@@ -52,9 +52,18 @@ final class CaptureNotificationRefresher {
         self.isProtectedDataAvailable = isProtectedDataAvailable
         let center = SystemCaptureNotificationCenter()
         self.canDeliver = canDeliver ?? { await center.canDeliver() }
-        self.makeCoordinator = makeCoordinator ?? { store in
-            CalendarCaptureCoordinator(detector: CalendarDetector(source: EventKitCalendarSource()), store: store)
-        }
+        self.makeCoordinator = makeCoordinator ?? { Self.defaultCoordinator(store: $0) }
+    }
+
+    /// The coordinator a real refresh uses.
+    static func defaultCoordinator(store: SuggestionStore) -> CalendarCaptureCoordinator {
+        CalendarCaptureCoordinator(
+            detector: CalendarDetector(source: EventKitCalendarSource()),
+            // The same rules and on-device model as the 90-day backfill, with the profile's mute
+            // rules. The calendar category stays 1.x's, so the 1.1 duplicate check still holds.
+            classifier: ClassifierChain.forStore(store),
+            store: store
+        )
     }
 
     private var rerunRequested = false
@@ -108,6 +117,13 @@ final class CaptureNotificationRefresher {
 
         let coordinator = makeCoordinator(store)
         if coordinator.access == .fullAccess {
+            // First launch of 2.2 on this install: re-check what the old scanner left pending.
+            if let chain = coordinator.classifier as? ClassifierChain {
+                let cleanup = await coordinator.cleanUpPendingOnce(chain: chain, properties: model.properties, entries: model.timeEntries)
+                if let cleanup {
+                    refreshLogger.info("Inbox cleanup: \(cleanup.removed) removed, \(cleanup.updated) lowered")
+                }
+            }
             let result = await coordinator.scanUpcoming(properties: model.properties, entries: model.timeEntries)
             refreshLogger.info("Capture refresh (\(reason, privacy: .public)): \(result.added.count) new")
         }

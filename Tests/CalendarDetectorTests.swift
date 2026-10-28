@@ -657,7 +657,8 @@ final class CalendarCaptureCoordinatorTests: CalendarCaptureTestCase {
         let propertyId = UUID()
         // 23:00 on 4 May to 01:00 on 5 May (device timezone).
         let s = calendarSuggestion(start: date(2026, 5, 4, 23), propertyId: propertyId, hours: 2)
-        func manual(_ date: Date, hours: Double = 1) -> TimeEntry {
+        // 2.2: the logged hours must match the event's length (2 h) within 15 minutes.
+        func manual(_ date: Date, hours: Double = 2) -> TimeEntry {
             TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: hours, date: date)
         }
         XCTAssertTrue(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(date(2026, 5, 4, 8))], calendar: calendar), "Same first day")

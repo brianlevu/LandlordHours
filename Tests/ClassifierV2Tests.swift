@@ -77,9 +77,11 @@ final class ClassifierV2Tests: XCTestCase {
             XCTAssertFalse(c.isLandlordWork, title)
             XCTAssertEqual(c.band, .unlikely, title)
         }
-        // The same event at a rental (not owner-occupied) is a showing-style address match.
+        // The same event at a rental (not owner-occupied) is an address match on the location
+        // alone (2.2): shown as "Not sure", never "Likely".
         let atRental = rules("Game night", kind: .calendar, location: "412 Oak St, Austin, TX 78704")
-        XCTAssertTrue(atRental.isLandlordWork)
+        XCTAssertFalse(atRental.isLandlordWork)
+        XCTAssertEqual(atRental.band, .notSure)
         XCTAssertEqual(atRental.propertyId, oak.id)
     }
 
@@ -123,8 +125,10 @@ final class ClassifierV2Tests: XCTestCase {
     }
 
     func testPersonNameShowingWithTheAddressAsLocation() {
+        // 2.2: the address is the only evidence, so this is "Not sure" (shown), never "Likely".
         let c = rules("Jordan Lee and Pat", kind: .calendar, location: "240 San Marco Ave, Austin, TX 78746")
-        XCTAssertTrue(c.isLandlordWork)
+        XCTAssertFalse(c.isLandlordWork)
+        XCTAssertEqual(c.band, .notSure)
         XCTAssertEqual(c.propertyId, cedar.id)
     }
 
@@ -254,7 +258,7 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(a.band, .unlikely)
         XCTAssertTrue(a.evidence.contains { $0.hasPrefix("model: weak yes") })
         XCTAssertEqual(b.band, .notSure)
-        XCTAssertEqual(ClassifierThresholds.likely, 0.60, "the likely threshold stays at 0.60")
+        XCTAssertEqual(ClassifierThresholds.likely, 0.70, "the likely threshold is 0.70 since the 2.2 retune")
     }
 
     // MARK: 9. Email is rules-only; calendar keeps the 1.x category

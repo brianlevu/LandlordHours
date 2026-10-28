@@ -21,10 +21,14 @@ import Foundation
 // 100%. On the owner's private held-out split the shipped rules scored precision ~0.4; see
 // the WP2b report for the before/after table. `likely` stays 0.60: sweeping 0.5–0.9 did not
 // fix precision (false positives were single strong signals at 0.82).
+//
+// 2.2 retune, 2026-10-27 (980 synthetic Jev-labelled events, inbox-tune/report.md): `likely`
+// 0.70 (held-out precision .879 / recall .817, was .862 / .704 at 0.60). Calendar event
+// signals: video link 0, 3+ attendees 1, the other four unchanged.
 
 enum ClassifierThresholds {
     /// At or above: "rental work" — a normal inbox card.
-    static let likely = 0.60
+    static let likely = 0.70
     /// Confidence floor for items with a landlord signal: they show as "Not sure this is
     /// rental work" (never hidden) and their confidence never drops below this.
     static let notSure = 0.30
@@ -66,6 +70,16 @@ enum ConfidenceBand: String, Equatable {
 }
 
 extension ClassifierThresholds {
+    /// Evidence marker the rules add to a calendar item that points away from rental work (a
+    /// location match beside a video call, a team invite, a salon). Nothing brings it back:
+    /// the on-device model is not asked and its "yes" cannot make the item visible.
+    /// Confidence ceiling for a match on the location alone (tuned 2026-10-27).
+    static let locationOnlyMaxConfidence = 0.59
+    static let notRentalEvidence = "signal: not rental"
+    /// Evidence marker on an item whose only landlord evidence is its location. The chain keeps
+    /// its confidence under `likely` even when the model agrees.
+    static let locationOnlyEvidence = "capped: location only"
+
     /// Evidence marker the rules add when a landlord keyword or property matched and noise
     /// words don't outweigh it.
     static let landlordSignalEvidence = "signal: landlord"
@@ -83,6 +97,7 @@ extension CaptureClassification {
     }
 
     var hasLandlordEvidence: Bool {
-        isLandlordWork || evidence.contains { $0 == ClassifierThresholds.landlordSignalEvidence || $0.hasPrefix("model: yes") }
+        if evidence.contains(ClassifierThresholds.notRentalEvidence) { return false }
+        return isLandlordWork || evidence.contains { $0 == ClassifierThresholds.landlordSignalEvidence || $0.hasPrefix("model: yes") }
     }
 }

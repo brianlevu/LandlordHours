@@ -74,14 +74,16 @@ struct SuggestionRowView: View {
         case .none:
             break
         }
-        if badges.mightAlreadyBeLogged {
-            return LHTag(String(localized: "inbox.tag.mightBeLogged", defaultValue: "Might be logged", table: "Inbox"), tone: .informational)
-        }
+        // Needs hours, then Not sure, then Might be logged: whether it is rental work at all
+        // outranks whether it is already logged.
         if badges.needsHours {
             return LHTag(String(localized: "inbox.tag.needsHours", defaultValue: "Needs hours", table: "Inbox"), tone: .caution)
         }
         if badges.notSure {
             return LHTag(String(localized: "inbox.tag.notSure", defaultValue: "Not sure", table: "Inbox"), tone: .neutral)
+        }
+        if badges.mightAlreadyBeLogged {
+            return LHTag(String(localized: "inbox.tag.mightBeLogged", defaultValue: "Might be logged", table: "Inbox"), tone: .informational)
         }
         guard let category = suggestion.proposedCategory else { return nil }
         return LHTag(category.inboxLabel, tone: .custom(ink: colors.categoryInk(category), wash: colors.categoryWash(category)))

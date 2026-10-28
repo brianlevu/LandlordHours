@@ -99,13 +99,20 @@ enum CaptureReconciler {
             let overlaps = entry.date < windowEnd && entryEnd > windowStart
             let onTouchedDay = entry.date >= firstDay && entry.date < daysEnd
             guard overlaps || onTouchedDay else { return false }
+            // The logged hours must be this event's length, give or take 15 minutes. A rental with
+            // any other entry that day (a long day of repairs) is not this event, and flagging it
+            // took the row's single tag away from "Not sure".
+            guard let hours = suggestion.proposedHours ?? suggestion.end.map({ $0.timeIntervalSince(windowStart) / 3600 }),
+                  hours > 0, abs(entry.hours - hours) <= hoursMatchTolerance else { return false }
             if let propertyId = suggestion.proposedPropertyId {
                 return entry.propertyId == propertyId
             }
-            guard let hours = suggestion.proposedHours else { return false }
-            return abs(entry.hours - hours) <= 0.25
+            return true
         }
     }
+
+    /// Fifteen minutes: logged hours this close to the event's length look like the same work.
+    static let hoursMatchTolerance = 0.25
 
     static func normalizedTitle(_ title: String) -> String {
         title
@@ -131,6 +138,9 @@ final class SuggestionStore {
         /// Dedupe keys the user dismissed, with when. Pruned after a tax year.
         var dismissedKeys: [String: Date] = [:]
         var muteRules: [CaptureMuteRule] = []
+        /// The 2.2 one-time re-check of pending calendar items has run on this install.
+        /// Optional so files written before it still decode.
+        var pendingCleanupDone: Bool?
     }
 
     static let fileName = "suggestions.json"
@@ -202,7 +212,46 @@ final class SuggestionStore {
         })
     }
 
+    var hasRunPendingCleanup: Bool { contents.pendingCleanupDone == true }
+
+    func markPendingCleanupDone() {
+        guard contents.pendingCleanupDone != true else { return }
+        contents.pendingCleanupDone = true
+        save()
+    }
+
+    /// Takes pending items out because the classifier now says they are not rental work. This is
+    /// the system's call, not the user's: nothing is added to the dismissed keys, so it never
+    /// reads as a "not rental work" signal. Only pending items are removed. Returns how many.
+    @discardableResult
+    func removeHiddenBySystem(keys: Set<String>) -> Int {
+        let before = contents.suggestions.count
+        contents.suggestions.removeAll { keys.contains($0.sourceKey) && $0.isPending }
+        let removed = before - contents.suggestions.count
+        if removed > 0 { save() }
+        return removed
+    }
+
+    /// Gives a pending item its new, lower confidence, tier and evidence. Property, category and
+    /// hours are the user's to change and stay as they were.
+    func lowerConfidence(forKey key: String, to classification: CaptureClassification) {
+        guard let index = contents.suggestions.firstIndex(where: { $0.sourceKey == key && $0.isPending }),
+              classification.confidence < contents.suggestions[index].confidence else { return }
+        contents.suggestions[index].confidence = classification.confidence
+        contents.suggestions[index].tier = classification.tier
+        contents.suggestions[index].evidence = classification.evidence
+        save()
+    }
+
     func isDismissed(_ key: String) -> Bool { contents.dismissedKeys[key] != nil }
+
+    /// False when `ingest` would ignore this key anyway: dismissed, or already confirmed. A scan
+    /// skips classifying these (no model call for an event that is settled).
+    func wouldIngest(sourceKey: String) -> Bool {
+        if isDismissed(sourceKey) { return false }
+        if let existing = contents.suggestions.first(where: { $0.sourceKey == sourceKey }) { return existing.isPending }
+        return true
+    }
 
     func isMuted(_ suggestion: Suggestion) -> Bool {
         contents.muteRules.contains { $0.mutes(suggestion) }

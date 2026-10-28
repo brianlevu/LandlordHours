@@ -205,6 +205,8 @@ struct ClassifierChain: CaptureClassifier {
 
     func shouldAskModel(_ candidate: CaptureCandidate, rulesResult: CaptureClassification) -> Bool {
         guard Self.modelKinds.contains(candidate.kind) else { return false }
+        // Points away from rental work: nothing the model says brings it back.
+        if rulesResult.evidence.contains(ClassifierThresholds.notRentalEvidence) { return false }
         guard onDevice.availability.isAvailable else { return false }
         if rulesResult.confidence >= ClassifierThresholds.skipModelAbove { return false }
         if rulesResult.confidence <= ClassifierThresholds.skipModelBelow { return false }
@@ -225,6 +227,10 @@ struct ClassifierChain: CaptureClassifier {
         result.confidence = (base.confidence + model.confidence) / 2
         if base.evidence.contains(ClassifierThresholds.landlordSignalEvidence) {
             result.confidence = max(result.confidence, ClassifierThresholds.notSure)
+        }
+        // A match on the location alone stays "Not sure", whatever the model says.
+        if base.evidence.contains(ClassifierThresholds.locationOnlyEvidence) {
+            result.confidence = min(result.confidence, ClassifierThresholds.locationOnlyMaxConfidence)
         }
         result.isLandlordWork = result.confidence >= ClassifierThresholds.likely
         result.tier = .onDevice

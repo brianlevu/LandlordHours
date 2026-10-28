@@ -45,6 +45,17 @@ struct CalendarEventSnapshot: Equatable {
     var isDetached: Bool
     /// EventKit `timeZone == nil`: floating time, the same wall-clock time in every time zone.
     var isFloating: Bool
+    /// People on the invite, the owner included (EventKit `attendees` of type person). 0 when the
+    /// event has no invite list.
+    var attendeeCount: Int
+    /// EventKit `url`, as text. Local only; never stored or synced.
+    var url: String?
+    /// EventKit `notes`, cut to `CalendarContext.maxNotesLength`. Local only.
+    var notes: String?
+    /// The event has an organizer who is not the owner.
+    var organizedByOther: Bool
+    /// The event sits on an Exchange (work) calendar.
+    var isWorkCalendar: Bool
 
     /// Part of a series, so `occurrenceDate` (the ORIGINAL start) identifies it. For a one-off
     /// event EventKit sets `occurrenceDate` to the current start, which moves with it.
@@ -64,7 +75,12 @@ struct CalendarEventSnapshot: Equatable {
         isCanceled: Bool = false,
         hasRecurrenceRules: Bool = false,
         isDetached: Bool = false,
-        isFloating: Bool = false
+        isFloating: Bool = false,
+        attendeeCount: Int = 0,
+        url: String? = nil,
+        notes: String? = nil,
+        organizedByOther: Bool = false,
+        isWorkCalendar: Bool = false
     ) {
         self.externalId = externalId
         self.eventIdentifier = eventIdentifier
@@ -80,6 +96,11 @@ struct CalendarEventSnapshot: Equatable {
         self.hasRecurrenceRules = hasRecurrenceRules
         self.isDetached = isDetached
         self.isFloating = isFloating
+        self.attendeeCount = attendeeCount
+        self.url = url
+        self.notes = notes
+        self.organizedByOther = organizedByOther
+        self.isWorkCalendar = isWorkCalendar
     }
 }
 
@@ -134,7 +155,13 @@ final class EventKitCalendarSource: CalendarEventSource {
             // the device-local eventIdentifier, which another device won't share).
             let sharedId = externalId.isEmpty ? nil : externalId
             guard sharedId != nil || !(event.eventIdentifier ?? "").isEmpty else { return nil }
-            let declined = event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
+            let attendees = event.attendees ?? []
+            let declined = attendees.contains { $0.isCurrentUser && $0.participantStatus == .declined }
+            // Rooms, resources and groups are not people on the invite.
+            let people = attendees.filter { $0.participantType == .person || $0.participantType == .unknown }.count
+            let organizedByOther = event.organizer.map { !$0.isCurrentUser } ?? false
+            let source = event.calendar.source
+            let isWork = event.calendar.type == .exchange || source?.sourceType == .exchange
             return CalendarEventSnapshot(
                 externalId: sharedId,
                 eventIdentifier: event.eventIdentifier,
@@ -149,7 +176,12 @@ final class EventKitCalendarSource: CalendarEventSource {
                 isCanceled: event.status == .canceled,
                 hasRecurrenceRules: event.hasRecurrenceRules,
                 isDetached: event.isDetached,
-                isFloating: event.timeZone == nil
+                isFloating: event.timeZone == nil,
+                attendeeCount: people,
+                url: event.url?.absoluteString,
+                notes: CalendarContext.trimmedNotes(event.notes),
+                organizedByOther: organizedByOther,
+                isWorkCalendar: isWork
             )
         }
     }
