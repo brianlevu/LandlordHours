@@ -291,27 +291,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "We read event titles on your iPhone. Only events you confirm are saved."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "We read event titles on your iPad. Only events you confirm are saved."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "We read event titles on your iPhone. Only events you confirm are saved."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "We read event titles on this device. Only events you confirm are saved."
           }
         }
       }
@@ -320,27 +302,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Stays on your iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Stays on your iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Stays on your iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stays on this device"
           }
         }
       }

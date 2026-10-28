@@ -36,7 +36,7 @@ struct DeleteAllDataView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                Text(HS.t("delete.subtitle", "This removes everything from this iPhone and iCloud:"))
+                Text(HS.t("delete.subtitle", "This removes everything from this device and iCloud:"))
                     .font(.body)
                     .foregroundStyle(colors.textPrimary)
                     .lhLeadsContent(.body)
@@ -116,19 +116,19 @@ struct DeleteAllDataView: View {
             Button(HS.t("delete.alert.keep", "Keep"), role: .cancel) { }
             Button(HS.t("delete.alert.delete", "Delete"), role: .destructive) { runDelete(allowLocalOnly: false) }
         } message: {
-            Text(HS.t("delete.alert.message", "This removes everything from this iPhone and iCloud. This can’t be undone."))
+            Text(HS.t("delete.alert.message", "This removes everything from this device and iCloud. This can’t be undone."))
         }
         .alert(HS.t("delete.icloud.title", "iCloud is off"), isPresented: $showICloudOffPrompt) {
             Button(HS.t("delete.alert.keep", "Keep"), role: .cancel) { }
-            Button(HS.t("delete.icloud.delete", "Delete from this iPhone"), role: .destructive) { runDelete(allowLocalOnly: true) }
+            Button(HS.t("delete.icloud.delete", "Delete from this device"), role: .destructive) { runDelete(allowLocalOnly: true) }
         } message: {
-            Text(HS.t("delete.icloud.message", "Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again."))
+            Text(HS.t("delete.icloud.message", "Copies saved in iCloud can’t be removed right now. Delete from this device anyway, or turn on iCloud and try again."))
         }
         .alert(HS.t("delete.otherAccount.title", "Different iCloud account"), isPresented: $showOtherAccountPrompt) {
             Button(HS.t("delete.alert.keep", "Keep"), role: .cancel) { }
-            Button(HS.t("delete.icloud.delete", "Delete from this iPhone"), role: .destructive) { runDelete(allowLocalOnly: true) }
+            Button(HS.t("delete.icloud.delete", "Delete from this device"), role: .destructive) { runDelete(allowLocalOnly: true) }
         } message: {
-            Text(HS.t("delete.otherAccount.message", "This iPhone is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPhone only?"))
+            Text(HS.t("delete.otherAccount.message", "This device is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this device only?"))
         }
     }
 

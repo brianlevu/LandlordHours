@@ -34,27 +34,9 @@
     "%@ of %@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%1$@ of %2$@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%1$@ of %2$@ on this iPad are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%1$@ of %2$@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ of %2$@ on this device are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
           }
         }
       }
@@ -108,27 +90,9 @@
     "Couldn’t open your records. They’re still safe on this iPhone.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t open your records. They’re still safe on this iPhone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t open your records. They’re still safe on this iPad."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t open your records. They’re still safe on this iPhone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t open your records. They’re still safe on this device."
           }
         }
       }
@@ -137,27 +101,9 @@
     "Couldn’t save your last change. Your iPhone may be out of space.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t save your last change. Your iPhone may be out of space."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t save your last change. Your iPad may be out of space."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t save your last change. Your iPhone may be out of space."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t save your last change. Your device may be out of space."
           }
         }
       }
@@ -170,27 +116,9 @@
     "Delete from this iPhone?": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Delete from this iPhone?"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Delete from this iPad?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Delete from this iPhone?"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete from this device?"
           }
         }
       }
@@ -201,27 +129,9 @@
     "Deleted on this iPhone.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Deleted on this iPhone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Deleted on this iPad."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Deleted on this iPhone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted on this device."
           }
         }
       }
@@ -229,27 +139,9 @@
     "Deleted on this iPhone. Kept until %@.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Deleted on this iPhone. Kept until %@."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Deleted on this iPad. Kept until %@."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Deleted on this iPhone. Kept until %@."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted on this device. Kept until %@."
           }
         }
       }
@@ -261,27 +153,9 @@
     "Every record on this iPhone goes. This can’t be undone.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Every record on this iPhone goes. This can’t be undone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Every record on this iPad goes. This can’t be undone."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Every record on this iPhone goes. This can’t be undone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every record on this device goes. This can’t be undone."
           }
         }
       }
@@ -289,27 +163,9 @@
     "Everything on this iPhone": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Everything on this iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Everything on this iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Everything on this iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything on this device"
           }
         }
       }
@@ -326,27 +182,9 @@
     "Keep them on this iPhone and in iCloud": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Keep them on this iPhone and in iCloud"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Keep them on this iPad and in iCloud"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Keep them on this iPhone and in iCloud"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep them on this device and in iCloud"
           }
         }
       }
@@ -355,27 +193,9 @@
     "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Keep this iPad’s copy and put it back in iCloud, or delete it here too?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep this device’s copy and put it back in iCloud, or delete it here too?"
           }
         }
       }
@@ -399,27 +219,9 @@
     "On this iPhone": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "On this iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "On this iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "On this iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "On this device"
           }
         }
       }
@@ -427,27 +229,9 @@
     "On this iPhone and in iCloud": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "On this iPhone and in iCloud"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "On this iPad and in iCloud"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "On this iPhone and in iCloud"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "On this device and in iCloud"
           }
         }
       }
@@ -456,27 +240,9 @@
     "Only on this iPhone": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Only on this iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Only on this iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Only on this iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only on this device"
           }
         }
       }
@@ -484,27 +250,9 @@
     "Opens iPhone Settings": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Opens iPhone Settings"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Opens iPad Settings"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Opens iPhone Settings"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Settings"
           }
         }
       }
@@ -518,27 +266,9 @@
     "Remove them from this iPhone": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Remove them from this iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Remove them from this iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Remove them from this iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove them from this device"
           }
         }
       }
@@ -548,27 +278,9 @@
     "Safe on this iPhone": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Safe on this iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Safe on this iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Safe on this iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safe on this device"
           }
         }
       }
@@ -589,27 +301,9 @@
     "They go from iCloud and this iPhone. This can’t be undone.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "They go from iCloud and this iPhone. This can’t be undone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "They go from iCloud and this iPad. This can’t be undone."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "They go from iCloud and this iPhone. This can’t be undone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "They go from iCloud and this device. This can’t be undone."
           }
         }
       }
@@ -618,27 +312,9 @@
     "This iPhone and your iCloud": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone and your iCloud"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad and your iCloud"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone and your iCloud"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device and your iCloud"
           }
         }
       }
@@ -646,27 +322,9 @@
     "This iPhone is now signed in to a different iCloud account.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is now signed in to a different iCloud account."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad is now signed in to a different iCloud account."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is now signed in to a different iCloud account."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device is now signed in to a different iCloud account."
           }
         }
       }
@@ -674,27 +332,9 @@
     "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad is signed in to a different iCloud account. Nothing in that iCloud was deleted."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device is signed in to a different iCloud account. Nothing in that iCloud was deleted."
           }
         }
       }
@@ -702,27 +342,9 @@
     "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPad only?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device is signed in to a different iCloud account. Nothing there will be deleted. Delete from this device only?"
           }
         }
       }
@@ -730,27 +352,9 @@
     "This iPhone isn’t signed in to iCloud.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone isn’t signed in to iCloud."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad isn’t signed in to iCloud."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone isn’t signed in to iCloud."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device isn’t signed in to iCloud."
           }
         }
       }
@@ -758,27 +362,9 @@
     "This iPhone uses a different iCloud now. Sync is paused until you choose.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone uses a different iCloud now. Sync is paused until you choose."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad uses a different iCloud now. Sync is paused until you choose."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone uses a different iCloud now. Sync is paused until you choose."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device uses a different iCloud now. Sync is paused until you choose."
           }
         }
       }
@@ -805,27 +391,9 @@
     "What this iPhone held before": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "What this iPhone held before"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "What this iPad held before"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "What this iPhone held before"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "What this device held before"
           }
         }
       }
@@ -834,27 +402,9 @@
     "Your %@ at %@ are still on this iPhone. What should happen to them?": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your %1$@ at %2$@ are still on this iPhone. What should happen to them?"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your %1$@ at %2$@ are still on this iPad. What should happen to them?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your %1$@ at %2$@ are still on this iPhone. What should happen to them?"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your %1$@ at %2$@ are still on this device. What should happen to them?"
           }
         }
       }
@@ -862,27 +412,9 @@
     "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your hours are only on this iPad. Turn on iCloud for Dormer to keep a copy."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours are only on this device. Turn on iCloud for Dormer to keep a copy."
           }
         }
       }
@@ -891,27 +423,9 @@
     "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records live on this iPad and in your own iCloud. We never see them. Photos stay on this iPad."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your records live on this device and in your own iCloud. We never see them. Photos stay on this device."
           }
         }
       }
@@ -920,27 +434,9 @@
     "Your records stay on your iPhone and in your iCloud.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records stay on your iPhone and in your iCloud."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records stay on your iPad and in your iCloud."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records stay on your iPhone and in your iCloud."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your records stay on this device and in your iCloud."
           }
         }
       }
@@ -957,27 +453,9 @@
     "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing.": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "iCloud is full. Your records are safe on this iPad; free up iCloud space to keep syncing."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud is full. Your records are safe on this device; free up iCloud space to keep syncing."
           }
         }
       }
@@ -985,27 +463,9 @@
     "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?": {
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this iPad anyway, or turn on iCloud and retry?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud is off, so copies saved there can’t be removed now. Delete from this device anyway, or turn on iCloud and retry?"
           }
         }
       }

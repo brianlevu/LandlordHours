@@ -77,7 +77,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
             XCTAssertTrue(disclosure.label.contains("we never see it"), disclosure.label)
             XCTAssertTrue(element("settings.capture.pcc").exists, "PCC toggle is offered with the entitlement")
         } else {
-            let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "on your \(UITestDevice.name), to fill in the form")).firstMatch
+            let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "on this device, to fill in the form")).firstMatch
             XCTAssertTrue(scrollTo(disclosure), "Apple AI disclosure is shown")
             XCTAssertTrue(disclosure.label.contains("we never see it"), disclosure.label)
             XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle below iOS 27")

@@ -60,27 +60,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This removes everything from this iPhone and iCloud. This can’t be undone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This removes everything from this iPad and iCloud. This can’t be undone."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This removes everything from this iPhone and iCloud. This can’t be undone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes everything from this device and iCloud. This can’t be undone."
           }
         }
       }
@@ -166,27 +148,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Delete from this iPhone"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Delete from this iPad"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Delete from this iPhone"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete from this device"
           }
         }
       }
@@ -195,27 +159,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Copies saved in iCloud can’t be removed right now. Delete from this iPad anyway, or turn on iCloud and try again."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copies saved in iCloud can’t be removed right now. Delete from this device anyway, or turn on iCloud and try again."
           }
         }
       }
@@ -257,27 +203,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPhone only?"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPad is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPad only?"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This iPhone is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPhone only?"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this device only?"
           }
         }
       }
@@ -407,27 +335,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This removes everything from this iPhone and iCloud:"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This removes everything from this iPad and iCloud:"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "This removes everything from this iPhone and iCloud:"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes everything from this device and iCloud:"
           }
         }
       }
@@ -2328,27 +2238,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Follow your iPhone or pick a theme"
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Follow your iPad or pick a theme"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Follow your iPhone or pick a theme"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow this device or pick a theme"
           }
         }
       }
@@ -2423,27 +2315,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Spot work in your events. Titles are read on your iPhone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Spot work in your events. Titles are read on your iPad."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Spot work in your events. Titles are read on your iPhone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spot work in your events. Titles are read on this device."
           }
         }
       }
@@ -2463,27 +2337,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on your iPad, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on this device, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
           }
         }
       }
@@ -2536,27 +2392,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Lets Apple’s Private Cloud Compute read a Log time note when your iPhone’s model can’t. Apple runs it and keeps nothing. Off keeps every note on your iPhone."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Lets Apple’s Private Cloud Compute read a Log time note when your iPad’s model can’t. Apple runs it and keeps nothing. Off keeps every note on your iPad."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Lets Apple’s Private Cloud Compute read a Log time note when your iPhone’s model can’t. Apple runs it and keeps nothing. Off keeps every note on your iPhone."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lets Apple’s Private Cloud Compute read a Log time note when this device’s model can’t. Apple runs it and keeps nothing. Off keeps every note on this device."
           }
         }
       }
@@ -2697,27 +2535,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Photos attached to records stay on this iPhone. They aren’t included in iCloud sync."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Photos attached to records stay on this iPad. They aren’t included in iCloud sync."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Photos attached to records stay on this iPhone. They aren’t included in iCloud sync."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos attached to records stay on this device. They aren’t included in iCloud sync."
           }
         }
       }
@@ -2748,27 +2568,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records live on this iPhone and in your own iCloud. We never see them."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records live on this iPad and in your own iCloud. We never see them."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Your records live on this iPhone and in your own iCloud. We never see them."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your records live on this device and in your own iCloud. We never see them."
           }
         }
       }

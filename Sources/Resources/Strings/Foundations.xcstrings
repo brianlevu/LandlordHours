@@ -150,27 +150,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Used only if your iPhone can’t read a note. Apple keeps nothing, and we never see it."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Used only if your iPad can’t read a note. Apple keeps nothing, and we never see it."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Used only if your iPhone can’t read a note. Apple keeps nothing, and we never see it."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used only if this device can’t read a note. Apple keeps nothing, and we never see it."
           }
         }
       }

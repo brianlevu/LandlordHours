@@ -335,27 +335,9 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "variations": {
-            "device": {
-              "iphone": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t save this. Free up some space on your iPhone and try again."
-                }
-              },
-              "ipad": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t save this. Free up some space on your iPad and try again."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Couldn’t save this. Free up some space on your iPhone and try again."
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t save this. Free up some space on this device and try again."
           }
         }
       }

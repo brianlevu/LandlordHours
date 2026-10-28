@@ -71,7 +71,7 @@ final class LearnDeleteRestoreUITests: XCTestCase {
         let iCloudOff = app.alerts["iCloud is off"]
         if iCloudOff.waitForExistence(timeout: 8) {
             XCTAssertTrue(iCloudOff.buttons["Keep"].exists, "Keep (cancel) stays available at every step")
-            iCloudOff.buttons["Delete from this \(UITestDevice.name)"].tap()
+            iCloudOff.buttons["Delete from this device"].tap()
         }
         // On a device signed in to iCloud this deletes real records in batches: give it time.
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 150), "After deleting, the app is back at Welcome")

@@ -377,11 +377,11 @@ final class PropertyDeletionTests: CaptureTestCase {
             let d = PropertyDeletion(property: property, entryCount: 41, loggedHours: 34.5)
             XCTAssertEqual(d.title, "Delete this rental?")
             XCTAssertLessThanOrEqual(d.title.split(separator: " ").count, 6)
-            XCTAssertEqual(d.message, "\(property.name), its 34h 30m of logged time and any photos go from this \(TestDevice.name) and iCloud. This can’t be undone.")
+            XCTAssertEqual(d.message, "\(property.name), its 34h 30m of logged time and any photos go from this device and iCloud. This can’t be undone.")
         }
         let d0 = PropertyDeletion(property: p, entryCount: 0)
         XCTAssertEqual(d0.title, "Delete this rental?")
-        XCTAssertEqual(d0.message, "Pine Cabin goes from this \(TestDevice.name) and iCloud. This can’t be undone.")
+        XCTAssertEqual(d0.message, "Pine Cabin goes from this device and iCloud. This can’t be undone.")
     }
 
     func testDeleteGoesThroughTheViewModelAndTombstonesPropertyAndEntries() {
