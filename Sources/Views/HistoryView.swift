@@ -137,6 +137,12 @@ private struct RecordsScreen: View {
             guard !appliedInitialFilter else { return }
             appliedInitialFilter = true
             if let initialPropertyId { filter.propertyId = initialPropertyId }
+            #if DEBUG
+            // App Store capture: `-LHOpenRecordExport` opens the export sheet (Pro) on launch.
+            if ProcessInfo.processInfo.arguments.contains("-LHOpenRecordExport") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showExport = true }
+            }
+            #endif
         }
         // Screen anatomy: the scaffold owns the title, the back icon, the one trailing action and the gaps.
         .lhTabScreen(RR.t("records.title", "Records"), back: showsBackButton ? LHBackAction(label: RR.t("records.back", "Back"), identifier: "records.back") { dismiss() } : nil,

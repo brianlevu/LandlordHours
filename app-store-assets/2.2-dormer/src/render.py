@@ -11,7 +11,7 @@ panels=[
  ("03-log",    dict(h=H("Log by voice ","or a quick note"), img='03-log.png', crop=[188/2868,2520/2868])),
  ("04-inbox",  dict(h=H("Your calendar ","finds rental work"), img='04-inbox.png')),
  ("05-rentals",dict(h=H("One record ","per rental"), img='05-rentals.png')),
- ("06-cpa",    dict(h=H("A PDF your ","CPA can use"), img='06-cpa.png')),
+ ("06-cpa",    dict(h=H("A PDF your ","CPA can use"), img='06-export.png', raw='final4', crop=[188/2868,2500/2868])),
  ("07-icloud", dict(h=H("Your iCloud. ","No sign-in."), img='07-icloud.png', crop=[0,640/2868], note='Your records live on this iPhone and in your own iCloud. We never see them.', house=ART+'/craft_complete_dark.png',
                     nt='45.5%', hw='84vw', htop='54%', gt='70%')),
 ]
@@ -26,7 +26,7 @@ with sync_playwright() as pw:
             if ONLY and n not in ONLY.split(','): continue
             d=dict(d)
             if 'img' in d:
-                d['img']=(RAWPAD if mode=='ipad' else RAW)+'/'+d['img']
+                d['img']=(RAWPAD if mode=='ipad' else (B+'/raw/'+d.pop('raw') if 'raw' in d else RAW))+'/'+d['img']
                 from PIL import Image
                 iw,ih=Image.open(d['img']).size; d['ar']=iw; d['arh']=ih
             pg.goto('file://'+B+'/src/index.html?m='+mode+'&d='+urllib.parse.quote(json.dumps(d)))
