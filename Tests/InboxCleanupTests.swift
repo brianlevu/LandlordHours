@@ -189,4 +189,25 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
         copy.occurrenceDate = start
         return copy
     }
+
+    func testCleanupKeepsAKeywordTitleEvenWhenTheRulesMarkedItNotRental() async throws {
+        // The live scan may hide a new "HOA meeting" at a remote place; an item already in the
+        // Inbox is never deleted: it drops to Not sure instead.
+        let hoa = CalendarEventSnapshot(
+            externalId: "HOA", eventIdentifier: "LOCAL-HOA", title: "HOA meeting", location: "Remote",
+            start: date(2026, 5, 20, 10), end: date(2026, 5, 20, 11), occurrenceDate: date(2026, 5, 20, 10),
+            hasRecurrenceRules: true, attendeeCount: 8)
+        let team = snapshot("T", "Weekly team meeting", hour: 14, attendees: 5)
+        let store = makeStore()
+        var oldHoa = oldPending(hoa)
+        oldHoa.sourceKey = SuggestionKey.calendar(externalId: "HOA", occurrence: hoa.start)   // a series' key
+        store.ingest([oldHoa, oldPending(team)], existingEntries: [], calendar: calendar)
+        let result = await run([hoa, team], store: store)
+
+        let kept = try XCTUnwrap(store.suggestion(forKey: oldHoa.sourceKey))
+        XCTAssertTrue(kept.isPending)
+        XCTAssertEqual(kept.confidence, ClassifierThresholds.notSure, accuracy: 0.0001)
+        XCTAssertNil(store.suggestion(forKey: "cal:T"), "No landlord word: removed")
+        XCTAssertEqual(result?.removed, 1)
+    }
 }

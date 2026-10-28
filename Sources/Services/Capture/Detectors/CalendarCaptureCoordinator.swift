@@ -37,12 +37,15 @@ enum CalendarVisibility {
     /// is kept as "Not sure" (confidence at least 0.30), unless the rules marked it as clearly
     /// not rental work (a personal appointment, a remote place). Muted items are nil: a mute is
     /// the user's rule, handled by the caller.
-    static func shown(_ outcome: ClassifierOutcome, title: String) -> CaptureClassification? {
+    ///
+    /// `keepKeywordTitles`: the cleanup of items already in the Inbox. It never deletes one with a
+    /// landlord word in its title, even when the rules marked it not rental; it drops to "Not sure".
+    static func shown(_ outcome: ClassifierOutcome, title: String, keepKeywordTitles: Bool = false) -> CaptureClassification? {
         switch outcome {
         case .suggest(let classification):
             return classification
         case .skip(var classification):
-            guard !classification.evidence.contains(ClassifierThresholds.notRentalEvidence),
+            guard keepKeywordTitles || !classification.evidence.contains(ClassifierThresholds.notRentalEvidence),
                   RulesEngine.titleHasLandlordKeyword(title) else { return nil }
             classification.confidence = max(classification.confidence, ClassifierThresholds.notSure)
             classification.evidence.append(ClassifierThresholds.landlordSignalEvidence)
@@ -246,7 +249,7 @@ final class CalendarCaptureCoordinator {
         var hidden = Set<String>()
         for (candidate, outcome) in zip(candidates, outcomes) {
             if case .muted = outcome { continue }   // a mute is the user's rule: left to the normal flow
-            if let shown = CalendarVisibility.shown(outcome, title: candidate.title) {
+            if let shown = CalendarVisibility.shown(outcome, title: candidate.title, keepKeywordTitles: true) {
                 if let current = store.suggestion(forKey: candidate.sourceKey), shown.confidence < current.confidence {
                     store.lowerConfidence(forKey: candidate.sourceKey, to: shown)
                     result.updated += 1
