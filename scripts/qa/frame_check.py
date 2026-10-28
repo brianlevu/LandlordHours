@@ -873,6 +873,10 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             tab = device not in ("iphone", "unknown", "custom")
             t0, t1 = (int(24 * scale), int(16 * scale)) if tab else (int(15 * scale), int(8 * scale))
             tail = (d_up[:, -t0:-t1].mean(axis=1) >= 0.9) & (d_dn[:, -t0:-t1].mean(axis=1) >= 0.9)
+            # system-inset dividers (Inbox list) stop ~16pt short of the container edge: accept a
+            # divider that is solid in the window 18-28pt from the edge too (progress tracks and text are not)
+            u0, u1 = int(28 * scale), int(18 * scale)
+            tail |= (d_up[:, -u0:-u1].mean(axis=1) >= 0.97) & (d_dn[:, -u0:-u1].mean(axis=1) >= 0.97)
             # a progress bar (coloured fill + grey track) is not a divider: hairlines are neutral
             chroma = np.hypot(band[ys][:, :, 1], band[ys][:, :, 2])
             neutral = (chroma > 38).mean(axis=1) < 0.03  # dark-theme hairlines are navy (chroma ~29)
@@ -916,7 +920,11 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
                     headers.append(dict(ink_top=y0 + b[0], ink_bot=y0 + b[1],
                                         prev_bot=(y0 + bands[bi - 1][1]) if bi > 0 else None,
                                         next_top=y0 + bands[bi + 1][0]))
-        if bands and cut and not c["hero"]:
+        # a list clipped by a fade above the pinned bottom controls (Inbox "Confirm N likely") ends in a
+        # card bottom that is not a real edge: the last pixel row is already blending into the canvas
+        faded = bool(not cut and y1 >= fold - int(240 * scale) and (x1 - x0) > 40
+                     and np.linalg.norm(lab[y1 - 1, (x0 + x1) // 2] - c["fill"]) > 1.2)
+        if bands and (cut or faded) and not c["hero"]:
             b = bands[-1]
             lo, hi = extent(b)
             if (lo <= int(24 * scale) and hi <= 0.62 * cw and (b[1] - b[0]) <= 30 * scale
