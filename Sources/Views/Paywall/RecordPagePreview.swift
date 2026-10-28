@@ -44,6 +44,13 @@ struct RecordPageModel: Equatable {
                                range: range, rows: rows, total: total, kinds: Array(kinds), lines: Array(lines), isSample: false)
     }
 
+    /// The rentals past the first `limit` rows: how many and their hours, or nil when every row shows.
+    func overflow(limit: Int) -> (count: Int, hours: Double)? {
+        let hidden = rows.dropFirst(max(0, limit))
+        guard !hidden.isEmpty else { return nil }
+        return (hidden.count, hidden.reduce(0) { $0 + $1.hours })
+    }
+
     static func sample(year: Int) -> RecordPageModel {
         RecordPageModel(
             year: year, owner: String(localized: "Sample owner", table: "ConversionPath"), range: String(localized: "Jan 1 – Oct 19, \(String(year))", table: "ConversionPath"),
@@ -143,12 +150,23 @@ struct RecordPagePreview: View {
             ForEach(Array(model.rows.prefix(rentalLimit).enumerated()), id: \.offset) { _, row in
                 rentalRow(row.name, row.kind, value: hoursText(row.hours), isNew: false)
             }
+            if let more = model.overflow(limit: rentalLimit) {
+                Text(Self.overflowText(count: more.count, hours: more.hours, shownRows: min(rentalLimit, model.rows.count)))
+                    .font(.footnote)
+                    .foregroundStyle(paper.textSecondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .accessibilityIdentifier("paywall.page.moreRentals")
+            }
             if case .newRow(let name) = highlight {
                 rentalRow(name, String(localized: "New rental", table: "ConversionPath"), value: "—", isNew: true)
             }
             LHDivider()
             HStack {
-                Text(String(localized: "Total", table: "ConversionPath")).font(.subheadline.weight(.semibold))
+                Text(model.rows.count > 1 ? String(localized: "Total, all rentals", table: "ConversionPath")
+                                          : String(localized: "Total", table: "ConversionPath"))
+                    .font(.subheadline.weight(.semibold))
                 Spacer()
                 Text(verbatim: "\(hoursText(model.total))h")
                     .font(.subheadline.weight(.semibold))
@@ -185,6 +203,17 @@ struct RecordPagePreview: View {
         .frame(maxWidth: .infinity, maxHeight: fillsHeight ? .infinity : nil, alignment: .top)
         .background(paper.backgroundSecondary)
         .environment(\.colorScheme, .light)
+    }
+
+    /// The line for rentals the page has no room to list, so the rows and the Total always agree:
+    /// "+2 more rentals · 34.0h", or "4 rentals · 40.0h" when none are listed.
+    static func overflowText(count: Int, hours: Double, shownRows: Int) -> String {
+        let h = String(format: "%.1f", max(0, hours))
+        if shownRows == 0 {
+            return String(localized: "\(count) rentals \u{00B7}\u{00A0}\(h)h", table: "ConversionPath")
+        }
+        if count == 1 { return String(localized: "+1 more rental \u{00B7}\u{00A0}\(h)h", table: "ConversionPath") }
+        return String(localized: "+\(count) more rentals \u{00B7}\u{00A0}\(h)h", table: "ConversionPath")
     }
 
     private func rentalRow(_ name: String, _ kind: String, value: String, isNew: Bool) -> some View {

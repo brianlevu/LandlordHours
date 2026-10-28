@@ -1970,6 +1970,17 @@
         }
       }
     },
+    "pdf.total.all.rentals": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total, all rentals"
+          }
+        }
+      }
+    },
     "pdf.total.hours": {
       "extractionState": "manual",
       "localizations": {

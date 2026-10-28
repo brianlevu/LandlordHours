@@ -745,3 +745,105 @@ final class AuditExportGatingTests: XCTestCase {
         XCTAssertEqual(shared, [.pdf, .csv])
     }
 }
+
+// MARK: - Totals equal the sum of their lines (shot-bug 3, 2026-10-27)
+
+final class AuditReportTotalsAgreeTests: XCTestCase {
+    private typealias F = AuditFixture
+
+    private func manyRentalReport() -> (AuditReport, [RentalProperty]) {
+        let rentals = (1...5).map { RentalProperty(name: "Rental \($0)", address: "\($0) Main St", propertyType: $0 % 2 == 0 ? .str : .ltr) }
+        let cats: [ActivityCategory] = [.repairs, .management, .leasing, .investing, .financing, .bookkeeping]
+        var entries: [TimeEntry] = []
+        for (i, r) in rentals.enumerated() {
+            for (j, cat) in cats.enumerated() {
+                let who: Participant = (i + j) % 3 == 0 ? .spouse : .selfParticipant
+                entries.append(F.entry(property: r, participant: who, category: cat, hours: Double(i + 1) * 1.25 + Double(j) * 0.5,
+                                       date: F.date(2026, 1 + j, 3 + i)))
+            }
+        }
+        // An entry whose rental was deleted still counts, under "Unknown property".
+        let ghost = RentalProperty(name: "Deleted", address: "", propertyType: .ltr)
+        entries.append(F.entry(property: ghost, hours: 2.75, date: F.date(2026, 7, 7)))
+        let report = AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: entries, properties: rentals, taxYear: 2026, participants: [.selfParticipant, .spouse],
+            nonRealEstateHours: [.selfParticipant: 100], generatedAt: F.date(2026, 10, 17, 12)))
+        return (report, rentals)
+    }
+
+    func testEveryTotalEqualsTheSumOfItsLines() {
+        let (report, _) = manyRentalReport()
+        let s = report.summary
+        func sum<T>(_ xs: [T], _ f: (T) -> Double) -> Double { xs.reduce(0) { $0 + f($1) } }
+        XCTAssertEqual(report.propertyTotals.count, 6, "five rentals plus the deleted one")
+        XCTAssertEqual(sum(report.propertyTotals, \.totalHours), s.totalHours, accuracy: 0.0001, "rentals")
+        XCTAssertEqual(sum(report.propertyTotals, \.repsCountableHours), s.repsCountableHours, accuracy: 0.0001, "rentals toward 750")
+        XCTAssertEqual(sum(report.propertyTotals, \.selfHours) + sum(report.propertyTotals, \.spouseHours), s.totalHours, accuracy: 0.0001, "self + spouse by rental")
+        for p in report.propertyTotals {
+            XCTAssertEqual(p.selfHours + p.spouseHours, p.totalHours, accuracy: 0.0001, p.name)
+        }
+        XCTAssertEqual(sum(report.participantTotals, \.totalHours), s.totalHours, accuracy: 0.0001, "people")
+        XCTAssertEqual(sum(report.participantTotals, \.repsCountableHours), s.repsCountableHours, accuracy: 0.0001, "people toward 750")
+        XCTAssertEqual(sum(report.participantTotals) { Double($0.entryCount) }, Double(s.entryCount))
+        XCTAssertEqual(sum(report.categoryTotals, \.hours), s.totalHours, accuracy: 0.0001, "categories")
+        XCTAssertEqual(sum(report.entries, \.hours), s.totalHours, accuracy: 0.0001, "entry lines")
+        XCTAssertEqual(s.repsCountableHours + s.nonCountableHours, s.totalHours, accuracy: 0.0001)
+        XCTAssertEqual(s.propertyCount, report.propertyTotals.count)
+    }
+
+    func testTheExportedPDFTotalsMatchItsLines() throws {
+        let (report, _) = manyRentalReport()
+        let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { _ in nil }).render(report)))
+        let text = document.string ?? ""
+        let lineSum = report.entries.reduce(0) { $0 + $1.hours }
+        XCTAssertTrue(text.contains("Total: \(report.entries.count) records, \(AuditReportFormat.hours(lineSum)) hours."),
+                      "the entry table's total is the sum of its lines")
+        // Every rental's own total is printed, and the by-rental table totals them (all rentals).
+        for p in report.propertyTotals { XCTAssertTrue(text.contains(AuditReportFormat.hours(p.totalHours)), p.name) }
+        let rentalSum = report.propertyTotals.reduce(0) { $0 + $1.totalHours }
+        XCTAssertTrue(text.contains("Total, all rentals"), "the by-rental table says what its total covers")
+        XCTAssertTrue(text.contains(AuditReportFormat.hours(rentalSum)))
+        // Spouse and self columns: the totals row carries both.
+        let selfSum = report.propertyTotals.reduce(0) { $0 + $1.selfHours }
+        let spouseSum = report.propertyTotals.reduce(0) { $0 + $1.spouseHours }
+        XCTAssertTrue(text.contains(AuditReportFormat.hours(selfSum)))
+        XCTAssertTrue(text.contains(AuditReportFormat.hours(spouseSum)))
+    }
+
+    // MARK: The preview page (paywall and Today's lock)
+
+    private func previewModel() throws -> RecordPageModel {
+        let (report, rentals) = manyRentalReport()
+        return RecordPageModel.from(report: report, owner: "Sam", properties: rentals)
+    }
+
+    func testPreviewVisibleRowsPlusOverflowEqualTheTotal() throws {
+        let model = try previewModel()
+        XCTAssertEqual(model.rows.count, 6)
+        XCTAssertEqual(model.rows.reduce(0) { $0 + $1.hours }, model.total, accuracy: 0.0001, "all rows sum to the total")
+        for limit in [3, 1, 0, 6, 9] {
+            let shown = model.rows.prefix(limit).reduce(0) { $0 + $1.hours }
+            let more = model.overflow(limit: limit)
+            XCTAssertEqual(shown + (more?.hours ?? 0), model.total, accuracy: 0.0001, "limit \(limit): visible rows + overflow line = total")
+            XCTAssertEqual(min(limit, model.rows.count) + (more?.count ?? 0), model.rows.count, "limit \(limit)")
+        }
+    }
+
+    func testPreviewOverflowIsNilWhenEveryRentalIsShown() throws {
+        let model = try previewModel()
+        XCTAssertNil(model.overflow(limit: 6))
+        XCTAssertNil(model.overflow(limit: 7))
+        XCTAssertEqual(model.overflow(limit: 3)?.count, 3)
+        XCTAssertEqual(model.overflow(limit: 0)?.count, 6)
+    }
+
+    func testPreviewOverflowLineSaysHowManyAndHowLong() throws {
+        let model = try previewModel()
+        let more = try XCTUnwrap(model.overflow(limit: 3))
+        let line = RecordPagePreview.overflowText(count: more.count, hours: more.hours, shownRows: 3)
+        XCTAssertTrue(line.hasPrefix("+3 more rentals"), line)
+        XCTAssertTrue(line.hasSuffix("\u{00B7}\u{00A0}" + String(format: "%.1f", more.hours) + "h") || line.contains(String(format: "%.1f", more.hours) + "h"), line)
+        XCTAssertEqual(RecordPagePreview.overflowText(count: 1, hours: 4, shownRows: 2).prefix(14), "+1 more rental")
+        XCTAssertTrue(RecordPagePreview.overflowText(count: 4, hours: 40, shownRows: 0).contains("4 rentals"), "no rows shown: it names all of them")
+    }
+}

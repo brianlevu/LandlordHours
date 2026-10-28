@@ -236,7 +236,7 @@ private final class Composer {
                 [$0.name, $0.propertyType, $0.address, "\($0.entryCount)",
                  AuditReportFormat.hours($0.selfHours), AuditReportFormat.hours($0.spouseHours),
                  AuditReportFormat.hours($0.totalHours), AuditReportFormat.hours($0.repsCountableHours)]
-            }
+            } + [propertyTotalRow()]
         )
         y += 12
 
@@ -266,6 +266,14 @@ private final class Composer {
                 [$0.participant.rawValue, "\($0.entryCount)", AuditReportFormat.hours($0.totalHours), AuditReportFormat.hours($0.repsCountableHours)]
             }
         )
+    }
+
+    /// The last line of "Hours by rental": every rental added up, so the table says what its figures sum to.
+    private func propertyTotalRow() -> [String] {
+        let rows = report.propertyTotals
+        func total(_ f: (AuditReport.PropertyTotal) -> Double) -> String { AuditReportFormat.hours(rows.reduce(0) { $0 + f($1) }) }
+        return [L("pdf.total.all.rentals", "Total, all rentals"), "", "", "\(rows.reduce(0) { $0 + $1.entryCount })",
+                total(\.selfHours), total(\.spouseHours), total(\.totalHours), total(\.repsCountableHours)]
     }
 
     private func drawEntryTable() {

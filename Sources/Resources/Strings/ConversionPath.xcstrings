@@ -338,6 +338,18 @@
     "PDF and spreadsheet" : {
 
     },
+    "%lld rentals · %@h" : {
+
+    },
+    "+1 more rental · %@h" : {
+
+    },
+    "+%lld more rentals · %@h" : {
+
+    },
+    "Total, all rentals" : {
+
+    },
     "Page 1" : {
 
     },
