@@ -1060,6 +1060,13 @@ A scene is the house acknowledging the record, once. If a reviewer can describe 
 9. Say the effect, not the state ("Nothing counts until you confirm it") **[judgment]**.
 10. Same word for the same thing: canonical keys (C.5) **[grep]**.
 
+### C.1a Device-neutral copy and tests
+
+- Copy is device-neutral: say "this device", never "iPhone" or "iPad", unless the sentence is about a device-only feature **[grep]**.
+- One string per message; no per-device variants in the String Catalog **[grep]**.
+- Tests assert a string's key or accessibility identifier, not its English wording **[judgment]**.
+- The copy gate (Jev) checks the wording **[judgment]**.
+
 ### C.2 Tone by context
 
 | Context | Tone | Do | Don't |
