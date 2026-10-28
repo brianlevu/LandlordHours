@@ -32,6 +32,10 @@ struct InboxView: View {
     @State private var confirming: Set<String> = []
     /// The card's foot ("Confirm N likely") is on screen: no pinned bar then.
     @State private var footVisible = true
+    /// The foot row itself is on screen (a tall window can show it while the content's end, which
+    /// includes the list's bottom margin, is still below the fold: the 11" iPad showed both the foot
+    /// and the pinned bar).
+    @State private var footOnScreen = false
     /// The background 90-day look-back (header + streaming rows).
     @ObservedObject private var backfill = BackfillJob.shared
     @ObservedObject private var toasts = LHToastCenter.shared
@@ -88,7 +92,7 @@ struct InboxView: View {
     /// visibility sent the first build into a 100% CPU loop).
     private static let batchSlot: CGFloat = LHMetrics.minTap + 24
 
-    private var barShows: Bool { showsBatch && !footVisible && !typeSize.isAccessibilitySize }
+    private var barShows: Bool { showsBatch && !footVisible && !footOnScreen && !typeSize.isAccessibilitySize }
 
     /// Room under the rows for whatever pins above the tab bar: the batch bar, or the undo toast
     /// the shell draws there. A real layout slot, so no row is ever painted under either.
@@ -256,6 +260,8 @@ struct InboxView: View {
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             .listRowBackground(colors.backgroundSecondary)
             .accessibilityIdentifier("inbox.confirm.batch")
+            .onScrollVisibilityChange(threshold: 0.9) { footOnScreen = $0 }
+            .onDisappear { footOnScreen = false }
     }
 
     // MARK: Actions
