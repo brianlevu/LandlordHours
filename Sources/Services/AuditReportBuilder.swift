@@ -37,7 +37,11 @@ struct AuditReport {
         let category: ActivityCategory
         let countsForREPS: Bool
         let entryCount: Int
+        /// Everyone's hours in this category together (a plain total, not a 750 figure).
         let hours: Double
+        /// Each person's own hours in this category.
+        let selfHours: Double
+        let spouseHours: Double
     }
 
     struct ParticipantTotal: Equatable {
@@ -332,7 +336,9 @@ enum AuditReportBuilder {
                 category: category,
                 countsForREPS: category.countsForREPS,
                 entryCount: entries.count,
-                hours: sum(entries)
+                hours: sum(entries),
+                selfHours: sum(entries.filter { $0.participant == .selfParticipant }),
+                spouseHours: sum(entries.filter { $0.participant == .spouse })
             )
         }
 

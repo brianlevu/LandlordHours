@@ -2047,6 +2047,39 @@
         }
       }
     },
+    "pdf.counts.for.h750.test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Counts for the 750 test"
+          }
+        }
+      }
+    },
+    "pdf.hours.you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours"
+          }
+        }
+      }
+    },
+    "pdf.hours.spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spouse hours"
+          }
+        }
+      }
+    },
     "pdf.total.hours": {
       "extractionState": "manual",
       "localizations": {

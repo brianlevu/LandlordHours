@@ -256,17 +256,33 @@ private final class Composer {
         y += 12
 
         sectionTitle(L("pdf.hours.by.category", "Hours by category"))
-        table(
-            columns: [
-                Column(title: L("pdf.category", "Category"), width: 220),
-                Column(title: L("pdf.counts.toward.h750", "Counts toward 750"), width: 110),
-                Column(title: L("pdf.entries", "Records"), width: 70, alignment: .right),
-                Column(title: L("pdf.hours", "Hours"), width: 80, alignment: .right),
-            ],
-            rows: report.categoryTotals.map {
-                [$0.category.rawValue, $0.countsForREPS ? L("pdf.yes", "Yes") : L("pdf.no.investor.level", "No (investor hours)"), "\($0.entryCount)", AuditReportFormat.hours($0.hours)]
-            }
-        )
+        // With a spouse, hours are shown per person beside the Yes/No flag, never as one combined figure that
+        // could be read as hours toward the 750.
+        let flag = { (c: AuditReport.CategoryTotal) in c.countsForREPS ? L("pdf.yes", "Yes") : L("pdf.no.investor.level", "No (investor hours)") }
+        if hasSpouse {
+            table(
+                columns: [
+                    Column(title: L("pdf.category", "Category"), width: 200),
+                    Column(title: L("pdf.counts.for.h750.test", "Counts for the 750 test"), width: 150),
+                    Column(title: L("pdf.entries", "Records"), width: 70, alignment: .right),
+                    Column(title: L("pdf.hours.you", "Your hours"), width: 90, alignment: .right),
+                    Column(title: L("pdf.hours.spouse", "Spouse hours"), width: 90, alignment: .right),
+                ],
+                rows: report.categoryTotals.map {
+                    [$0.category.rawValue, flag($0), "\($0.entryCount)", AuditReportFormat.hours($0.selfHours), AuditReportFormat.hours($0.spouseHours)]
+                }
+            )
+        } else {
+            table(
+                columns: [
+                    Column(title: L("pdf.category", "Category"), width: 220),
+                    Column(title: L("pdf.counts.for.h750.test", "Counts for the 750 test"), width: 150),
+                    Column(title: L("pdf.entries", "Records"), width: 70, alignment: .right),
+                    Column(title: L("pdf.hours", "Hours"), width: 80, alignment: .right),
+                ],
+                rows: report.categoryTotals.map { [$0.category.rawValue, flag($0), "\($0.entryCount)", AuditReportFormat.hours($0.hours)] }
+            )
+        }
         y += 12
 
         sectionTitle(L("pdf.hours.by.person", "Hours by person"))

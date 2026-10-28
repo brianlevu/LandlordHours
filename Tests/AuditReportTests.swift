@@ -967,7 +967,51 @@ final class REPSPerPersonTests: CaptureTestCase {
     func testWriteTheFiveHundredFourHundredSample() throws {
         guard let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty else { return }
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        let pdf = AuditReportPDFRenderer(attachmentData: { _ in nil }).render(report())
-        try pdf.write(to: URL(fileURLWithPath: dir).appendingPathComponent("reps-500-400.pdf"))
+        // Same 500h / 400h, with Repairs worked by both people (the spouse's 150h of leasing becomes repairs).
+        var (e, rentals) = entries()
+        e = e.map { entry in
+            var copy = entry
+            if entry.participant == .spouse && entry.category == .leasing { copy.category = .repairs }
+            return copy
+        }
+        let shared = AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: e, properties: rentals, taxYear: 2026, participants: [.selfParticipant, .spouse],
+            nonRealEstateHours: [.selfParticipant: 100], generatedAt: F.date(2026, 10, 17, 12)))
+        let pdf = AuditReportPDFRenderer(attachmentData: { _ in nil }).render(shared)
+        try pdf.write(to: URL(fileURLWithPath: dir).appendingPathComponent("reps-500-400-shared-category.pdf"))
+    }
+
+    // MARK: Category table and preview detail follow the same per-person rule
+
+    private func sharedCategoryReport(spouse: Bool = true) -> AuditReport {
+        let oak = F.oak
+        var e = [F.entry(property: oak, participant: .selfParticipant, category: .repairs, hours: 100, date: F.date(2026, 2, 3)),
+                 F.entry(property: oak, participant: .selfParticipant, category: .management, hours: 10, date: F.date(2026, 3, 3))]
+        if spouse { e.append(F.entry(property: oak, participant: .spouse, category: .repairs, hours: 50, date: F.date(2026, 4, 3))) }
+        return AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: e, properties: [oak], taxYear: 2026, participants: spouse ? [.selfParticipant, .spouse] : [.selfParticipant],
+            generatedAt: F.date(2026, 10, 17, 12)))
+    }
+
+    func testCategoryTotalsKeepEachPersonsHoursApart() throws {
+        let repairs = try XCTUnwrap(sharedCategoryReport().categoryTotals.first { $0.category == .repairs })
+        XCTAssertEqual(repairs.selfHours, 100, accuracy: 0.0001)
+        XCTAssertEqual(repairs.spouseHours, 50, accuracy: 0.0001)
+        XCTAssertEqual(repairs.hours, 150, accuracy: 0.0001, "the plain all-hours total stays")
+    }
+
+    func testThePDFCategoryTableNeverShowsACombinedNumberBesideThe750Flag() throws {
+        let text = try pdfText(sharedCategoryReport())
+        let flat = text.replacingOccurrences(of: "\n", with: " ")
+        XCTAssertTrue(flat.contains("Counts for the 750 test"))
+        XCTAssertFalse(flat.contains("Counts toward 750"), "the old heading is gone")
+        XCTAssertNil(text.range(of: #"Repairs & Maintenance[^\n]*150\.00"#, options: .regularExpression), "100 + 50 must not read 150 on a 750 line")
+        XCTAssertNotNil(text.range(of: #"Repairs & Maintenance[^\n]*100\.00[^\n]*50\.00"#, options: .regularExpression), "you, then your spouse")
+    }
+
+    func testThePDFCategoryTableWithoutASpouseKeepsOneHoursColumn() throws {
+        let text = try pdfText(sharedCategoryReport(spouse: false))
+        XCTAssertNotNil(text.range(of: #"Repairs & Maintenance[^\n]*100\.00"#, options: .regularExpression))
+        XCTAssertTrue(text.replacingOccurrences(of: "\n", with: " ").contains("Counts for the 750 test"))
     }
 }
