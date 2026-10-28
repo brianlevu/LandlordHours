@@ -1277,6 +1277,17 @@
         }
       }
     },
+    "What did you do?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did you do?"
+          }
+        }
+      }
+    },
     "What did you do? (optional)": {
       "extractionState": "manual",
       "localizations": {
@@ -1361,6 +1372,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yesterday"
+          }
+        }
+      }
+    },
+    "Yesterday · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday · %@"
           }
         }
       }

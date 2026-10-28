@@ -317,8 +317,8 @@ struct LogTimeSheet: View {
 
     var eyebrow: String {
         switch mode {
-        case .review(let draft): return lt("Timer \u{00B7}\u{00A0}\(LogTimeFormat.longDay(draft.startDate))")
-        case .recovery(let r): return lt("Timer \u{00B7}\u{00A0}\(LogTimeFormat.longDay(r.startTime))")
+        case .review(let draft): return LogTimeFormat.timerEyebrow(draft.startDate)
+        case .recovery(let r): return LogTimeFormat.timerEyebrow(r.startTime)
         case .log: return LogTimeFormat.eyebrow(form.date)
         default: return LogTimeFormat.eyebrow(Date())
         }
