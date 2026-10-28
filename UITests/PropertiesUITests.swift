@@ -104,9 +104,10 @@ final class PropertiesUITests: XCTestCase {
         second.tap()
         let hero = app.descendants(matching: .any)["property.hero"]
         XCTAssertTrue(hero.waitForExistence(timeout: 8))
-        let title = app.descendants(matching: .any)["property.title"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertTrue(title.label.contains("Delaney Ct"), "that rental's page: \(title.label)")
+        // The rental's name is the detail scaffold's title, in the screen header.
+        let title = app.descendants(matching: .any)["screen.header"].staticTexts["Delaney Ct"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "that rental's page: Delaney Ct in the header")
+        XCTAssertTrue(title.isHittable, "the title is on screen")
     }
 
     func testProUserSeesNoLockAndAddOpensTheSheet() {

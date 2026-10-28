@@ -208,6 +208,9 @@ struct ReportsView: View {
                 goalPicker
             }
         }
+        // The chips draw 34pt inside a 44pt tap frame: lift the row by the inset so the visible
+        // edge, not the tap frame, sits on the scaffold's content line (S3 is measured in pixels).
+        .padding(.top, -(LHMetrics.minTap - LHChip.height) / 2)
     }
 
     private var yearMenu: some View {
