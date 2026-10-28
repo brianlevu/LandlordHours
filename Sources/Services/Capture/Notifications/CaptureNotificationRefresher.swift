@@ -52,9 +52,12 @@ final class CaptureNotificationRefresher {
         self.isProtectedDataAvailable = isProtectedDataAvailable
         let center = SystemCaptureNotificationCenter()
         self.canDeliver = canDeliver ?? { await center.canDeliver() }
-        self.makeCoordinator = makeCoordinator ?? { store in
-            CalendarCaptureCoordinator(detector: CalendarDetector(source: EventKitCalendarSource()), store: store)
-        }
+        self.makeCoordinator = makeCoordinator ?? { Self.defaultCoordinator(store: $0) }
+    }
+
+    /// The coordinator a real refresh uses.
+    static func defaultCoordinator(store: SuggestionStore) -> CalendarCaptureCoordinator {
+        CalendarCaptureCoordinator(detector: CalendarDetector(source: EventKitCalendarSource()), store: store)
     }
 
     private var rerunRequested = false

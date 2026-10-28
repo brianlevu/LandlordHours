@@ -31,6 +31,12 @@ class CalendarImportService {
 
     private init() {}
 
+    /// True when the text names landlord work by one of `propertyKeywords`.
+    func matchesPropertyKeyword(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return propertyKeywords.contains { lower.contains($0) }
+    }
+
     /// Request calendar access. Returns true if granted.
     func requestAccess() async -> Bool {
         if #available(iOS 17.0, *) {

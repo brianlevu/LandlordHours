@@ -60,7 +60,7 @@ struct CalendarScanResult: Equatable {
 @MainActor
 final class CalendarCaptureCoordinator {
     private let detector: CalendarDetector
-    private let classifier: CaptureClassifier
+    let classifier: CaptureClassifier
     private let store: SuggestionStore
     private let clock: () -> Date
     private let calendar: Calendar

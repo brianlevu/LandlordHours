@@ -6,6 +6,36 @@ import Foundation
 // WP0 defines only the contracts; implementations arrive in later work packages. Tests use the
 // fakes in the test target.
 
+/// What a calendar event says besides its title and place. Read by the classifier for signals
+/// that an event is NOT rental work (a video call, a team invite). Local only: never stored,
+/// never synced, never sent to the model.
+struct CalendarContext: Equatable {
+    static let maxNotesLength = 500
+
+    /// People on the invite, the owner included.
+    var attendeeCount = 0
+    var url: String?
+    var notes: String?
+    var organizedByOther = false
+    var isWorkCalendar = false
+    var isRecurring = false
+
+    init(attendeeCount: Int = 0, url: String? = nil, notes: String? = nil, organizedByOther: Bool = false,
+         isWorkCalendar: Bool = false, isRecurring: Bool = false) {
+        self.attendeeCount = attendeeCount
+        self.url = url
+        self.notes = notes
+        self.organizedByOther = organizedByOther
+        self.isWorkCalendar = isWorkCalendar
+        self.isRecurring = isRecurring
+    }
+
+    static func trimmedNotes(_ notes: String?) -> String? {
+        guard let notes, !notes.isEmpty else { return nil }
+        return String(notes.prefix(maxNotesLength))
+    }
+}
+
 /// A raw activity a detector found, before classification.
 struct CaptureCandidate: Equatable {
     var sourceKey: String
@@ -22,6 +52,8 @@ struct CaptureCandidate: Equatable {
     var isBackfill: Bool
     /// When the detector first saw it. Calendar items use max(firstSeen, eventEnd).
     var detectedAt: Date
+    /// Calendar only: attendees, link, notes, organizer, calendar type, repeat. Empty otherwise.
+    var context = CalendarContext()
 
     init(
         sourceKey: String,
@@ -34,8 +66,10 @@ struct CaptureCandidate: Equatable {
         containerId: String? = nil,
         location: String? = nil,
         isBackfill: Bool = false,
-        detectedAt: Date
+        detectedAt: Date,
+        context: CalendarContext = CalendarContext()
     ) {
+        self.context = context
         self.sourceKey = sourceKey
         self.kind = kind
         self.start = start

@@ -127,7 +127,12 @@ final class CalendarDetector: CaptureDetector {
                 containerId: event.calendarId,
                 location: event.location,
                 isBackfill: isBackfill,
-                detectedAt: max(now, event.end)
+                detectedAt: max(now, event.end),
+                context: CalendarContext(
+                    attendeeCount: event.attendeeCount, url: event.url, notes: event.notes,
+                    organizedByOther: event.organizedByOther, isWorkCalendar: event.isWorkCalendar,
+                    isRecurring: event.isRecurring
+                )
             ))
         }
         lastSkipCounts = counts
