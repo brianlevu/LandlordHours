@@ -4,6 +4,14 @@ import XCTest
 /// fakes (`-LHFakeCalendar`, `-LHFakeNotifications`); the 90-day look-back runs the fixture scan
 /// through the real inbox store (22 items, 35h).
 final class OnboardingUITests: XCTestCase {
+
+    // The staked title is the scaffold header's Text (no per-screen identifier): find it by its words.
+    private var stakedSetup: XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You’re set up")).firstMatch
+    }
+    private var stakedFound: XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", " found. ")).firstMatch
+    }
     private var app: XCUIApplication!
 
     override func setUp() {
@@ -94,7 +102,7 @@ final class OnboardingUITests: XCTestCase {
         tap(field)
         field.typeText("Elm")
         tap(app.buttons["onb-primary"])                            // Save it
-        let setUp = app.staticTexts["staked-setup"]
+        let setUp = stakedSetup
         XCTAssertTrue(setUp.waitForExistence(timeout: 10))
         XCTAssertEqual(setUp.label, "You’re set up for 750 hours.")
     }
@@ -126,7 +134,7 @@ final class OnboardingUITests: XCTestCase {
         let yes = app.buttons["onb-primary"]
         XCTAssertTrue(app.staticTexts["Want a nudge to log it while it’s fresh?"].waitForExistence(timeout: 6))
         tap(yes)                                                   // fake notifications "Allow"
-        let found = app.staticTexts["staked-found"]
+        let found = stakedFound
         XCTAssertTrue(found.waitForExistence(timeout: 10))
         XCTAssertEqual(found.label, "35 hours found. 0 counted.", "The fixture look-back: 22 items, 35h")
         let review = app.buttons["onb-today"]
@@ -198,8 +206,8 @@ final class OnboardingUITests: XCTestCase {
         field.typeText("Pine")
         XCTAssertFalse(app.descendants(matching: .any)["property-hint"].exists, "No count without the calendar")
         tap(app.buttons["onb-primary"])                            // Save it
-        XCTAssertTrue(app.staticTexts["staked-setup"].waitForExistence(timeout: 8), "No visit-end note without the calendar")
-        XCTAssertEqual(app.staticTexts["staked-setup"].label, "You’re set up to keep a record.")
+        XCTAssertTrue(stakedSetup.waitForExistence(timeout: 8), "No visit-end note without the calendar")
+        XCTAssertEqual(stakedSetup.label, "You’re set up to keep a record.")
         XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
         tap(app.buttons["onb-today"])
         XCTAssertTrue(app.buttons["today.confirm.turnOn"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
@@ -309,7 +317,7 @@ final class OnboardingUITests: XCTestCase {
         tapAlertButton(alert, ["Don’t Allow", "Don't Allow"])
         XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8), "Denied: on to Who does the work, no scolding")
         nameRental("Pine")
-        XCTAssertTrue(app.staticTexts["staked-setup"].waitForExistence(timeout: 8), "No visit-end note without the calendar")
+        XCTAssertTrue(stakedSetup.waitForExistence(timeout: 8), "No visit-end note without the calendar")
         XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
         tap(app.buttons["onb-today"])
         XCTAssertTrue(app.buttons["today.confirm.turnOn"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
@@ -332,8 +340,8 @@ final class OnboardingUITests: XCTestCase {
         let line = app.staticTexts["staked-nothing-countable"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label.lowercased(), "we found 22 things, but none count toward your hours yet.")
-        XCTAssertTrue(app.staticTexts["staked-setup"].exists)
-        XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never a found-hours headline")
+        XCTAssertTrue(stakedSetup.exists)
+        XCTAssertFalse(stakedFound.exists, "Never a found-hours headline")
         XCTAssertEqual(app.buttons["onb-today"].label, "Review 22 suggestions", "They still wait in the Inbox")
         tap(app.buttons["onb-today"])
         tap(todayTab)
