@@ -1339,7 +1339,7 @@ TITLE_ZONE_PT = 130.0                     # a screen title starts within this fa
 CONSIST_GAP_TOL_PT = 2.0
 
 
-def header_metrics(path, scale=None, kind="tab", search_to=0.55):
+def header_metrics(path, scale=None, kind="tab", search_to=0.55, column_pt=None):
     """Measure the screen header of one frame, in points from the top of the window.
 
     Returns {frame, scale, safe_top_pt, title_top_pt, title_baseline_pt, title_height_pt, header_end_pt,
@@ -1359,9 +1359,14 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
                    differs from the row's own edge pixel (x = 3pt): a card fill, a field, a chip, or text
     """
     im = Image.open(path).convert("RGB")
+    sc = scale or infer_scale(*im.size)[0]
+    if column_pt and im.width / sc > column_pt:
+        # A band-B window (iPad, standard §1.27 IP1): measure the centred content column, so the trailing
+        # slot and the gutters sit where they do on a phone-width frame.
+        inset = (im.width / sc - column_pt) // 2
+        im = im.crop((int(inset * sc), 0, int(im.width - inset * sc), im.height))
     a = np.asarray(im).astype(np.int16)
     h, w = a.shape[:2]
-    sc = scale or infer_scale(w, h)[0]
     hpt = round(h / sc)
     safe = SAFE_TOP_PT.get(hpt, 62 if hpt > 860 else 47)
     x0, x1 = int(8 * sc), w - int(8 * sc)
@@ -1502,11 +1507,12 @@ def consistency_groups(args):
     sheets (Fraunces 28) and item sheets (SF title1 + a 56pt leading render); S2/S3 hold WITHIN a kind,
     never across kinds. `--sheet` is the old spelling of `--sheet-task`."""
     hero = {os.path.basename(f) for f in (args.hero or [])}
-    groups = {"tabs": ([header_metrics(f, args.scale, "tab") for f in list(args.frames) + list(args.hero or [])], hero)}
+    col = getattr(args, "column", None)
+    groups = {"tabs": ([header_metrics(f, args.scale, "tab", column_pt=col) for f in list(args.frames) + list(args.hero or [])], hero)}
     for name, frames, kind in (("detail", args.detail, "tab"), ("sheet-task", (args.sheet or []) + (args.sheet_task or []), "sheet"),
                                ("sheet-item", args.sheet_item, "sheet")):
         if frames:
-            groups[name] = ([header_metrics(f, args.scale, kind) for f in frames], set())
+            groups[name] = ([header_metrics(f, args.scale, kind, column_pt=col) for f in frames], set())
     return groups
 
 
@@ -1588,6 +1594,9 @@ def main():
         p.add_argument("--scale", type=float)
         p.add_argument("--baseline-tol", type=float, default=CONSIST_BASELINE_TOL_PT)
         p.add_argument("--gap-tol", type=float, default=CONSIST_GAP_TOL_PT)
+        p.add_argument("--column", type=float,
+                       help="band-B frames (iPad, standard 1.27 IP1): measure the centred content column this many "
+                            "pt wide (672), so the trailing slot and gutters sit where they do on a phone frame")
         p.add_argument("--json")
         return cmd_consistency(p.parse_args())
     return legacy_main()

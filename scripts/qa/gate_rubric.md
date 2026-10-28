@@ -95,6 +95,10 @@ python3 scripts/qa/frame_check.py consistency <every onboarding step…> --json 
 - FAIL is a BLOCKER, but measure it by hand on the frame first (the tool is a heuristic; the 2026-10-27 rule).
 - A screen the diff adds or moves joins its group: a collection root with the tabs, a detail screen with the details,
   a sheet with its kind, an onboarding step with the steps. Empty-state frames are held to S1/S2 only (an empty state carries its own padding).
+- **iPad and other band-B frames (standard §1.27 IP1):** add `--column 672 --scale 2`. The tool's trailing slot
+  and gutters assume a phone-width frame; on a full iPad frame they misread the trailing action (13" Records read
+  147.5 for the header end instead of 139.0). A form sheet (Log time on iPad) is measured on a crop to the sheet's
+  own bounds, since its title sits on the sheet, not on the page's edge column.
 - The scroll-away header: one scrolled frame per touched tab must show the compact bar (title, back, the one
   action) and no header remnant.
 

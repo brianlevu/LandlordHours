@@ -331,6 +331,9 @@ struct CraftHeroSide: Equatable, Sendable {
     let band: LayoutBand
     let windowHeight: CGFloat
     let accessibility: Bool
+    /// Band B only: the width it was resolved for. The first layout pass can report a transient width
+    /// (390 on a 13" iPad), and a width-capped side must not stick (§1.27 IP4, visual gate look 2).
+    var windowWidth: CGFloat = 0
 
     static let heightHysteresis: CGFloat = 40
     static let wideMediumSide: CGFloat = 300
@@ -338,7 +341,8 @@ struct CraftHeroSide: Equatable, Sendable {
     static func resolve(previous: CraftHeroSide?, kind: Kind, window: CGSize, band: LayoutBand,
                         accessibility: Bool) -> CraftHeroSide {
         if let previous, previous.band == band, previous.accessibility == accessibility,
-           abs(previous.windowHeight - window.height) < heightHysteresis {
+           abs(previous.windowHeight - window.height) < heightHysteresis,
+           band == .a || abs(previous.windowWidth - window.width) < 1 {
             return previous
         }
         let side: CGFloat
@@ -346,13 +350,14 @@ struct CraftHeroSide: Equatable, Sendable {
         case (.hero, .a):
             side = CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
         case (.hero, _):
-            side = min(CraftHeroSize.wideBandSide, max(0, window.width - 12))
+            side = CraftHeroSize.wideHero(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
         case (.medium, .a):
             side = CraftHeroSize.medium(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
         case (.medium, _):
             side = min(wideMediumSide, max(0, window.width - 12))
         }
-        return CraftHeroSide(side: side, band: band, windowHeight: window.height, accessibility: accessibility)
+        return CraftHeroSide(side: side, band: band, windowHeight: window.height, accessibility: accessibility,
+                             windowWidth: band == .a ? 0 : window.width)
     }
 }
 

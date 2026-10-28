@@ -167,7 +167,7 @@ struct PropertiesView: View {
                     Color.clear.frame(height: 0).id("properties.bottom")
                 }
                 .padding(.horizontal, LHMetrics.gutter(for: band))
-                .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
+                .frame(maxWidth: .infinity)   // band B: the scaffold's content column (§1.27 interim)
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)

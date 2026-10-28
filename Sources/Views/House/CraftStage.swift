@@ -131,6 +131,20 @@ enum CraftHeroSize {
         side(windowWidth: windowWidth, windowHeight: windowHeight, share: accessibility ? 0.337 : 0.446)
     }
 
+    /// Band B (a window ≥ 600 wide: iPad, wide Stage Manager windows), Today's hero (§H.1 H6, amended
+    /// 2026-10-27 for the one-column iPad layout until two-pane ships): H1's share of the height it is
+    /// given (Today passes the height under the header), clamped to 290…480 and to `W − 12`. 13" portrait
+    /// → 480, 11" portrait → 450, 13" landscape → 371, 11" landscape → 290. At AX: H3's share, 220…390.
+    static func wideHero(windowWidth: CGFloat, windowHeight: CGFloat, accessibility: Bool) -> CGFloat {
+        guard windowWidth.isFinite, windowHeight.isFinite, windowWidth > 0, windowHeight > 0 else { return 0 }
+        let share: CGFloat = accessibility ? 0.337 : 0.446
+        let range: ClosedRange<CGFloat> = accessibility ? minimumDioramaSide...wideBandSide : wideBandMinimum...wideBandMaximum
+        let raw = (share * windowHeight).rounded()
+        return max(0, min(windowWidth - 12, min(range.upperBound, max(range.lowerBound, raw))))
+    }
+    static let wideBandMinimum: CGFloat = 290
+    static let wideBandMaximum: CGFloat = 480
+
     /// The rental page's medium frame: `min(W − 12, round(0.343 × H))` (402×874 → 300), and
     /// 220 at accessibility sizes (§H.5).
     static func medium(windowWidth: CGFloat, windowHeight: CGFloat, accessibility: Bool) -> CGFloat {

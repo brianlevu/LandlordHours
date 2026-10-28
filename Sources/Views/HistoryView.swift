@@ -131,7 +131,7 @@ private struct RecordsScreen: View {
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.immediately)
         // The 20pt list gutter (shared lane): rows, header, search and summary sit on it.
-        .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
+        .lhListGutter()
         .background { LHCanvas() }
         .onAppear {
             guard !appliedInitialFilter else { return }
