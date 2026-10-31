@@ -74,7 +74,10 @@ struct LandlordHoursApp: App {
         WindowGroup {
             #if DEBUG
             // House capture hook (-LHHousePreview <hours> <goal> <scheme>); see HousePreviewLaunchHook.swift.
-            if let board = SurfaceBoardLaunch.current {
+            if let d23 = D23BoardLaunch.current {
+                // 2.3 design sandbox boards (-LHD23Board lock); see Views/Debug/Design23.
+                D23BoardRoot(launch: d23)
+            } else if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
             } else if let craft = CraftLaunch.current {

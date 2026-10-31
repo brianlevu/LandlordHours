@@ -106,6 +106,7 @@ enum TodayDebugSeed {
                     ("Harbor View Loft", 30), ("Maple Row", 88), ("Cedar Court", 20), ("The Arroyo Seco Schoolhouse Lofts", 8)]
             goal = .mp100
         case "goal750": plan = [("Santa Ray Ave", 300), ("Delaney Ct", 200), ("Pine Cabin", 250)]; goal = .reps750
+        case "d23": plan = [("Pine Cabin", 420), ("Oak Street Duplex", 46)]; goal = .reps750   // 2.3 design sandbox
         default: plan = [("Santa Ray Ave", 46), ("Delaney Ct", 4), ("Pine Cabin", 62)]; goal = .mp100
         }
         if value("-LHGoalChoice") == nil { GoalManager.shared.setGoalChoice(goal) }

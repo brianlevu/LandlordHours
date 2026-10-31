@@ -492,6 +492,11 @@ struct DashboardView: View {
                           })
             .padding(.top, LHMetrics.sectionGap)
             .padding(.horizontal, LHMetrics.gutter)
+        #if DEBUG
+        if D23.scene != nil {
+            D23TodaySlot(rentalName: focus?.name ?? "", hours: shownHours, goal: focus?.goal ?? houseGoal.targetHours)   // 2.3 design sandbox
+        }
+        #endif
         if showsRecordSlot {
             TodayRecordSlot(year: currentYear, confirmedHours: countedHours) { showRecordExport = true }
                 .padding(.horizontal, LHMetrics.gutter)

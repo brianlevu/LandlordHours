@@ -108,6 +108,9 @@ struct PropertyDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     RentalHero(property: property, side: side, windowHeight: window.height)
+                    #if DEBUG
+                    D23RentalSlot(property: property)   // 2.3 design sandbox
+                    #endif
                     RentalBody(property: property)
                         .padding(.horizontal, LHMetrics.gutter)
                         .padding(.top, LHMetrics.sectionGap)

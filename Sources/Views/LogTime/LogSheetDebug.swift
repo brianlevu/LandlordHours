@@ -173,6 +173,8 @@ enum LogSheetDebug {
             read("fixed the sink at Pine Cabin, about 2 hours yesterday", model: .confirm)
         case "nfPartialHours":
             read("met the plumber at Oak St", model: .confirm)
+        case "nfCare":   // 2.3 design sandbox: a care plan item opens Log time with the item filled, hours empty
+            read("Cleared the gutters at Pine Cabin", model: .confirm)
         case "nfPartialKind":
             read("walked Oak St with Mike")
         case "nfTwoRentals":
