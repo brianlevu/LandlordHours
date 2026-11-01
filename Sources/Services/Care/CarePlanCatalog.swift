@@ -239,7 +239,8 @@ struct CarePlan: Equatable {
     var basis: String {
         let stays = type == .str ? CareText.shortStays : CareText.longStays
         guard let climate = climate.label else { return stays }
-        return "\(stays) \u{00B7}\u{00A0}\(climate)"
+        // The dot stays at the end of a line when the subtitle wraps ("Long stays ·" / "Wet winters").
+        return "\(stays)\u{00A0}\u{00B7} \(climate)"
     }
 
     /// "Picked for long stays in a place with wet winters. Log it when it's done. You set the hours."
@@ -374,7 +375,7 @@ enum CareText {
     static var planTitle: String { String(localized: "care.plan.title", defaultValue: "Care plan", table: "CarePlan") }
     static var back: String { String(localized: "care.plan.back", defaultValue: "Back", table: "CarePlan") }
     static func planSubtitle(_ rental: String, _ basis: String) -> String {
-        String(localized: "care.plan.subtitle", defaultValue: "\(rental) · \(basis)", table: "CarePlan")
+        String(localized: "care.plan.subtitle", defaultValue: "\(rental)\u{00A0}· \(basis)", table: "CarePlan")
     }
     static var openHint: String { String(localized: "care.row.hint", defaultValue: "Opens Log time with this filled in", table: "CarePlan") }
     static var doneHint: String { String(localized: "care.row.doneHint", defaultValue: "Opens what you logged", table: "CarePlan") }

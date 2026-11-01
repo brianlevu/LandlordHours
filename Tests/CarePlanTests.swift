@@ -173,8 +173,14 @@ final class CarePlanTests: XCTestCase {
         XCTAssertEqual(log.records, [CareRecord(taskID: "gutters", entryID: id)])
         XCTAssertEqual(CareDoneLog(defaults: defaults, key: { "careDone.v1.a" }).records.count, 1, "persists")
         profile = "b"
-        XCTAssertTrue(log.logs(entries: []).isEmpty)
-        XCTAssertTrue(log.records.isEmpty, "another profile has its own records")
+        let entry = TimeEntry(propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 1, date: Date(), notes: "")
+        let other = CareDoneLog(defaults: defaults, key: { "careDone.v1.a" })
+        other.record(task: "alarms", entry: entry.id)
+        XCTAssertTrue(log.logs(entries: [entry]).isEmpty, "another profile has its own records, even before a reload")
+        log.reload()
+        XCTAssertTrue(log.records.isEmpty, "a reload publishes the new profile's records")
+        profile = "a"
+        XCTAssertEqual(log.logs(entries: [entry]).map(\.taskID), ["alarms"], "profile a reads its own records back")
     }
 
     // MARK: Chips
