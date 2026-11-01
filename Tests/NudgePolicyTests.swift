@@ -346,6 +346,7 @@ final class NudgeSchedulerTests: XCTestCase {
     private var proUnlocked = true
     private var careUntil: Date?
     private var careReady = true
+    private var rentals: [NudgeRental] = [pine, lake]
 
     override func setUp() async throws {
         suiteName = "nudge-tests-\(UUID().uuidString)"
@@ -357,6 +358,7 @@ final class NudgeSchedulerTests: XCTestCase {
         proUnlocked = true
         careUntil = nil
         careReady = true
+        rentals = [pine, lake]
     }
 
     override func tearDown() async throws {
@@ -371,7 +373,7 @@ final class NudgeSchedulerTests: XCTestCase {
     private func makeScheduler(store: NudgeSettingsStore? = nil) -> NudgeScheduler {
         NudgeScheduler(center: center, store: store ?? makeStore(), now: { [unowned self] in self.clock }, calendar: { utc },
                        facts: { [unowned self] now, cal in
-                           NudgeFacts(now: now, calendar: cal, rentals: [pine, lake], yearHours: 500, targetHours: 750,
+                           NudgeFacts(now: now, calendar: cal, rentals: self.rentals, yearHours: 500, targetHours: 750,
                                       careItems: self.care, carePlanUnlocked: self.proUnlocked, carePlanUntil: self.careUntil,
                                       careSourceReady: self.careReady)
                        },
@@ -492,6 +494,41 @@ final class NudgeSchedulerTests: XCTestCase {
         care = []; careReady = true                       // ready and really nothing due: now it goes
         await scheduler.rebuild(reason: "foreground")
         XCTAssertTrue(center.pending.keys.filter { $0.hasPrefix("nudge.carePlan.") }.isEmpty)
+    }
+
+    /// Verifier finding: a kept care nudge must still take its day, so a pace nudge can never land beside it.
+    func testAKeptCareNudgeTakesItsDayAndItsMonthSlot() {
+        var s = NudgeSettings(); s.behindPace = true
+        let fri = date(2026, 11, 6, 10)
+        let held = [NudgeLedgerEntry(kind: .carePlan, itemID: "x", fireDate: fri)]
+        // Friday 07:00, behind and in reach: the behind nudge wants Friday 10:00 but care holds it.
+        let out = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 11, 6, 7), hours: 300), ledger: [], held: held)
+        XCTAssertFalse(out.plans.contains { utc.isDate($0.fireDate, inSameDayAs: fri) })
+    }
+
+    func testNoSecondCareNudgeIsPlannedWhileOneIsHeld() {
+        var s = NudgeSettings(); s.carePlan = true
+        let held = [NudgeLedgerEntry(kind: .carePlan, itemID: "x", fireDate: date(2026, 11, 6, 10))]
+        let out = NudgePolicy.plan(settings: s, facts: facts(care: [gutters()]), ledger: [], held: held)
+        XCTAssertTrue(out.plans.isEmpty)
+    }
+
+    func testAHeldCareNudgePastTheEndOfAccessOrForADeletedRentalIsDropped() async {
+        care = [gutters()]
+        turnOn(.carePlan)
+        let scheduler = makeScheduler()
+        await scheduler.rebuild(reason: "foreground")
+        XCTAssertEqual(center.pending.count, 1)
+        careReady = false; care = []; careUntil = date(2026, 11, 5, 9)     // access ends before the 10:00 slot
+        await scheduler.rebuild(reason: "plan")
+        XCTAssertTrue(center.pending.isEmpty, "not kept past the end of access")
+
+        careUntil = nil; careReady = true; care = [gutters()]
+        await scheduler.rebuild(reason: "foreground")
+        XCTAssertEqual(center.pending.count, 1)
+        careReady = false; care = []; rentals = [lake]                     // the care rental is gone
+        await scheduler.rebuild(reason: "launch")
+        XCTAssertTrue(center.pending.isEmpty, "not kept for a rental that no longer exists")
     }
 
     func testAnUnreadyCareSourceDoesNotKeepCareForSomeoneWhoTurnedItOffOrLostPro() async {

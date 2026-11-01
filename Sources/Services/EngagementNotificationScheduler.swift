@@ -162,6 +162,7 @@ enum NudgeNotification {
     static let rentalIDKey = "nudgeRentalID"
     static let paceThread = "landlordhours.nudge.pace"
     static let careThread = "landlordhours.nudge.care"
+    static let itemIDKey = "nudgeItemID"
     /// Today reads this once on opening: the rental a care nudge was about. Package E's focus
     /// route consumes it; until then the tap opens Today.
     static let pendingRentalKey = "LandlordHours.nudge.pendingRentalID"
@@ -227,15 +228,29 @@ final class NudgeScheduler {
         // No permission, no profile or no data: nothing is scheduled.
         guard await center.canDeliver(), let facts = facts(moment, cal), let profile = profileID() else { clearAll(); return }
 
-        let output = NudgePolicy.plan(settings: settings, facts: facts, ledger: store.loadLedger())
+        // Care comes from a source that is empty until Today has appeared in this launch. While it
+        // is unready its silence must not cancel a care nudge that is already pending. A held nudge
+        // still has to be one for a rental that exists, before access ends, and it takes its day and
+        // month slot, so nothing else can land beside it.
+        var held: [NudgeLedgerEntry] = []
+        var keptCareIDs: Set<String> = []
+        if settings.carePlan, facts.carePlanUnlocked, !facts.careSourceReady {
+            for request in pending where request.identifier.hasPrefix("\(NudgePolicy.idPrefix)\(NudgeKind.carePlan.rawValue).") {
+                guard let trigger = request.trigger as? UNCalendarNotificationTrigger,
+                      let fire = cal.date(from: trigger.dateComponents), fire > moment,
+                      let rental = request.content.userInfo[NudgeNotification.rentalIDKey] as? String,
+                      facts.rentals.contains(where: { $0.id.uuidString == rental }),
+                      facts.carePlanUntil.map({ fire < $0 }) ?? true else { continue }
+                keptCareIDs.insert(request.identifier)
+                let item = request.content.userInfo[NudgeNotification.itemIDKey] as? String ?? request.identifier
+                held.append(NudgeLedgerEntry(kind: .carePlan, itemID: item, fireDate: fire))
+            }
+        }
+        let output = NudgePolicy.plan(settings: settings, facts: facts, ledger: store.loadLedger(), held: held)
         // Replace in place: a request with the same id is overwritten by `add`, so a plan that
         // stays never leaves the pending list (a nudge due while we rebuild is not lost). Only
         // requests the new plan no longer holds are removed.
         let planIDs = Set(output.plans.map(\.id))
-        // Care comes from a source that is empty until Today has appeared in this launch. While it
-        // is unready its silence must not cancel a care nudge that is already pending.
-        let keepCare = settings.carePlan && facts.carePlanUnlocked && !facts.careSourceReady
-        let keptCareIDs = keepCare ? pendingIDs.filter { $0.hasPrefix("\(NudgePolicy.idPrefix)\(NudgeKind.carePlan.rawValue).") } : []
         center.removePending(identifiers: Array(pendingIDs.subtracting(planIDs).subtracting(keptCareIDs)))
         var added: [NudgePlan] = []
         for plan in output.plans {
@@ -251,9 +266,7 @@ final class NudgeScheduler {
         var kept = output.ledger.filter { entry in
             entry.fireDate <= moment || addedKeys.contains("\(entry.kind.rawValue)|\(entry.itemID)|\(entry.fireDate.timeIntervalSince1970)")
         }
-        if !keptCareIDs.isEmpty {
-            kept += store.loadLedger().filter { $0.kind == .carePlan && $0.fireDate > moment }
-        }
+        kept += held
         store.saveLedger(kept)
         for plan in added where !pendingIDs.contains(plan.id) {
             Analytics.capture("nudge_scheduled", properties: ["kind": plan.kind.rawValue])
@@ -273,6 +286,7 @@ final class NudgeScheduler {
         ]
         if let profileID { info[NotificationPayload.profileIdKey] = profileID }
         if let rental = plan.rentalID { info[NudgeNotification.rentalIDKey] = rental.uuidString }
+        info[NudgeNotification.itemIDKey] = plan.itemID
         content.userInfo = info
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: plan.fireDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
@@ -309,8 +323,16 @@ final class NudgeScheduler {
             careItems: care,
             carePlanUnlocked: EntitlementStore.shared.plan.allows(.carePlan),
             carePlanUntil: careAccessEnd(EntitlementStore.shared.plan),
-            careSourceReady: !CareDue.snapshot.rentals.isEmpty
+            // Unready only while the person has rentals and the care source has none yet.
+            careSourceReady: careSourceReady(rentals: rentals)
         )
+    }
+
+    private static func careSourceReady(rentals: [NudgeRental]) -> Bool {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "LHNudgeCareStub") { return true }
+        #endif
+        return rentals.isEmpty || !CareDue.snapshot.rentals.isEmpty
     }
 
     /// A trial or Pro that will not renew ends at its expiry: care nudges stop before then.

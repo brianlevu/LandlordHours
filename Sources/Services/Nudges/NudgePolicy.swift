@@ -71,7 +71,10 @@ enum NudgePolicy {
     static let weeklyHour = 18
     static let morningHour = 10
 
-    static func plan(settings: NudgeSettings, facts: NudgeFacts, ledger: [NudgeLedgerEntry]) -> NudgeOutput {
+    /// `held`: future nudges that stay pending as they are (a care nudge kept while its source is
+    /// not ready). They take their day and month slot but are not planned again.
+    static func plan(settings: NudgeSettings, facts: NudgeFacts, ledger: [NudgeLedgerEntry],
+                     held: [NudgeLedgerEntry] = []) -> NudgeOutput {
         let cal = facts.calendar
         let now = facts.now
 
@@ -139,7 +142,7 @@ enum NudgePolicy {
             }
         }
 
-        if settings.carePlan, facts.carePlanUnlocked,
+        if settings.carePlan, facts.carePlanUnlocked, !held.contains(where: { $0.kind == .carePlan }),
            let item = nextCareItem(facts, sent: sent),
            let rental = facts.rentals.first(where: { $0.id == item.rentalID }) {
             let today = cal.startOfDay(for: now)
@@ -149,9 +152,9 @@ enum NudgePolicy {
         }
 
         // Take them in priority order, one a day, under the monthly cap.
-        var takenDays = Set(sent.map { cal.startOfDay(for: $0.fireDate) })
+        var takenDays = Set((sent + held).map { cal.startOfDay(for: $0.fireDate) })
         var monthCounts: [String: Int] = [:]
-        for entry in sent { monthCounts[monthKey(entry.fireDate, cal), default: 0] += 1 }
+        for entry in sent + held { monthCounts[monthKey(entry.fireDate, cal), default: 0] += 1 }
 
         var plans: [NudgePlan] = []
         for candidate in candidates.sorted(by: { ($0.priority, $0.preferred) < ($1.priority, $1.preferred) }) {
