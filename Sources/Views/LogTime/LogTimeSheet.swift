@@ -230,6 +230,12 @@ struct LogTimeSheet: View {
             } else {
                 mode = viewModel.isTimerRunning ? .timerRunning : .log
             }
+        case .care(let prefill):
+            // A care row: rental and kind filled, How long empty, the rows already open (the chips
+            // sit under How long), and no keyboard over them.
+            mode = .log
+            form = LogForm.care(prefill, properties: properties, now: openedAt)
+            unfolded = true
         case .recovery(let id):
             if let recovery = viewModel.staleTimerRecoveries.first(where: { $0.id == id }) {
                 mode = .recovery(recovery)
@@ -271,7 +277,8 @@ struct LogTimeSheet: View {
         if LogSheetDebug.state != nil && !preset.focusNote { return }
         #endif
         // Keyboard up, note focused: the note is the one thing the user has in their head.
-        guard mode == .log else { return }
+        // Not for a care row: the note is already there and How long is what's left.
+        guard mode == .log, form.careTaskID == nil else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             if isFirstRun { nameFocused = true } else { noteFocused = true }
         }
@@ -290,7 +297,7 @@ struct LogTimeSheet: View {
 
     var analyticsMode: String {
         switch mode {
-        case .log: return "log"
+        case .log: return form.careTaskID == nil ? "log" : "care"
         case .timerIdle, .timerRunning: return "timer"
         case .review: return "timer_review"
         case .recovery: return "recovery"
@@ -777,6 +784,13 @@ struct LogTimeSheet: View {
         edited(.hours)
     }
 
+    /// A care chip: one tap sets the hours it names.
+    func set(chip: CareHourChip) {
+        withMotion { form.setChipHours(chip.hours); expanded = nil }
+        stepTick += 1
+        edited(.hours)
+    }
+
     func set(date: Date) {
         withMotion { form.setDate(date); expanded = nil }
         edited(.date)
@@ -917,6 +931,8 @@ struct LogTimeSheet: View {
             switch result {
             case .failed(let message): fail(message)
             case .saved(let id):
+                // A care entry is linked to its task (the done row and the chips read it back).
+                if let task = form.careTaskID { CareDoneLog.shared.record(task: task, entry: id) }
                 succeed(LogTimeFormat.loggedToast(hours: hours, propertyName: propertyName)) { [weak viewModel = viewModel] in
                     if let entry = viewModel?.timeEntries.first(where: { $0.id == id }) { viewModel?.deleteTimeEntry(entry) }
                 }

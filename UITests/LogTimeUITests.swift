@@ -364,6 +364,30 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
+    /// 2.3 care plan: a care row opens Log time with the rental and kind filled and How long EMPTY;
+    /// the Log button asks for the hours instead of logging a guess; one chip tap sets them.
+    func testCarePrefillLeavesHowLongEmptyUntilAChipIsTapped() {
+        launch(seed: "four", extra: ["-LHFixedNow", "2026-10-31T09:41", "-LHCareOpen", "log"])
+        XCTAssertTrue(element("log.sheet").waitForExistence(timeout: 10))
+        let hours = app.buttons["log.hours"]
+        XCTAssertTrue(hours.waitForExistence(timeout: 4))
+        XCTAssertTrue(hours.label.contains("not chosen"), hours.label)
+        XCTAssertFalse(app.buttons["log.property"].label.contains("not chosen"), app.buttons["log.property"].label)
+        XCTAssertFalse(app.buttons["log.category"].label.contains("not chosen"), app.buttons["log.category"].label)
+        XCTAssertFalse(element("log.hoursDefault").exists, "no made-up 1h with a caution line")
+        let before = app.buttons["log.save"].label
+        app.buttons["log.save"].tap()
+        XCTAssertFalse(element("shell.toast").waitForExistence(timeout: 1.5), "a gap never logs")
+        XCTAssertEqual(app.buttons["log.save"].label, before)
+        app.buttons["log.hours"].tap()
+        let chip = app.buttons["log.careChip.fixed-60"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 4))
+        chip.tap()
+        XCTAssertNotEqual(app.buttons["log.save"].label, before, "the button now names what it will log")
+        app.buttons["log.save"].tap()
+        XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 5))
+    }
+
     func testPlusRouteFromOtherSurfacesOpensTheSheet() {
         launch(seed: "four", extra: [], tab: "2")
         XCTAssertTrue(app.buttons["sheet.close"].waitForExistence(timeout: 8), "the old Track tab index opens the sheet")

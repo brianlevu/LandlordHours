@@ -1,0 +1,1194 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "care.chip.lastTime": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last time %@"
+          }
+        }
+      }
+    },
+    "care.chip.range": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@–%@"
+          }
+        }
+      }
+    },
+    "care.chip.rangeHours": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld–%lldh"
+          }
+        }
+      }
+    },
+    "care.chip.typical": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Typical %@"
+          }
+        }
+      }
+    },
+    "care.climate.hotDry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hot, dry summers"
+          }
+        }
+      }
+    },
+    "care.climate.humid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Humid summers"
+          }
+        }
+      }
+    },
+    "care.climate.snowy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Snowy winters"
+          }
+        }
+      }
+    },
+    "care.climate.wet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wet winters"
+          }
+        }
+      }
+    },
+    "care.lock.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logging stays free."
+          }
+        }
+      }
+    },
+    "care.lock.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The care plan is part of Pro."
+          }
+        }
+      }
+    },
+    "care.log.chipsLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How long, from your own logs"
+          }
+        }
+      }
+    },
+    "care.log.noteAt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ at %@"
+          }
+        }
+      }
+    },
+    "care.log.setHowLong": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set how long"
+          }
+        }
+      }
+    },
+    "care.meta.dueNow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · due now"
+          }
+        }
+      }
+    },
+    "care.meta.logged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logged %@ · %@"
+          }
+        }
+      }
+    },
+    "care.picked.ltr.general": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for long stays."
+          }
+        }
+      }
+    },
+    "care.picked.ltr.hotDry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for long stays in a place with hot, dry summers."
+          }
+        }
+      }
+    },
+    "care.picked.ltr.humid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for long stays in a place with humid summers."
+          }
+        }
+      }
+    },
+    "care.picked.ltr.snowy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for long stays in a place with snowy winters."
+          }
+        }
+      }
+    },
+    "care.picked.ltr.wet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for long stays in a place with wet winters."
+          }
+        }
+      }
+    },
+    "care.picked.str.general": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for short stays."
+          }
+        }
+      }
+    },
+    "care.picked.str.hotDry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for short stays in a place with hot, dry summers."
+          }
+        }
+      }
+    },
+    "care.picked.str.humid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for short stays in a place with humid summers."
+          }
+        }
+      }
+    },
+    "care.picked.str.snowy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for short stays in a place with snowy winters."
+          }
+        }
+      }
+    },
+    "care.picked.str.wet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picked for short stays in a place with wet winters."
+          }
+        }
+      }
+    },
+    "care.plan.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    },
+    "care.plan.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@"
+          }
+        }
+      }
+    },
+    "care.plan.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Care plan"
+          }
+        }
+      }
+    },
+    "care.row.doneHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens what you logged"
+          }
+        }
+      }
+    },
+    "care.row.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Log time with this filled in"
+          }
+        }
+      }
+    },
+    "care.rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log it when it’s done. You set the hours."
+          }
+        }
+      }
+    },
+    "care.season.fall": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fall"
+          }
+        }
+      }
+    },
+    "care.season.spring": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spring"
+          }
+        }
+      }
+    },
+    "care.season.summer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summer"
+          }
+        }
+      }
+    },
+    "care.season.winter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Winter"
+          }
+        }
+      }
+    },
+    "care.section.betweenStays": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Between stays"
+          }
+        }
+      }
+    },
+    "care.section.thisSeason": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This season · %@"
+          }
+        }
+      }
+    },
+    "care.stays.long": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long stays"
+          }
+        }
+      }
+    },
+    "care.stays.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short stays"
+          }
+        }
+      }
+    },
+    "care.task.acService.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serviced the air conditioning"
+          }
+        }
+      }
+    },
+    "care.task.acService.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Service the air conditioning"
+          }
+        }
+      }
+    },
+    "care.task.acService.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the heat"
+          }
+        }
+      }
+    },
+    "care.task.alarms.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tested the smoke and CO alarms"
+          }
+        }
+      }
+    },
+    "care.task.alarms.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test smoke and CO alarms"
+          }
+        }
+      }
+    },
+    "care.task.alarms.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Twice a year"
+          }
+        }
+      }
+    },
+    "care.task.alarms.when.str": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Between stays"
+          }
+        }
+      }
+    },
+    "care.task.atticDamp.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked the attic for damp"
+          }
+        }
+      }
+    },
+    "care.task.atticDamp.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Look in the attic for damp"
+          }
+        }
+      }
+    },
+    "care.task.atticDamp.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After a big storm"
+          }
+        }
+      }
+    },
+    "care.task.dryerVent.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleaned the dryer vent"
+          }
+        }
+      }
+    },
+    "care.task.dryerVent.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean the dryer vent"
+          }
+        }
+      }
+    },
+    "care.task.dryerVent.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a year"
+          }
+        }
+      }
+    },
+    "care.task.firstAid.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restocked the first aid kit"
+          }
+        }
+      }
+    },
+    "care.task.firstAid.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restock the first aid kit"
+          }
+        }
+      }
+    },
+    "care.task.firstAid.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every few stays"
+          }
+        }
+      }
+    },
+    "care.task.furnaceFilter.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swapped the furnace filter"
+          }
+        }
+      }
+    },
+    "care.task.furnaceFilter.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swap the furnace filter"
+          }
+        }
+      }
+    },
+    "care.task.furnaceFilter.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the heat goes on"
+          }
+        }
+      }
+    },
+    "care.task.furnaceService.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serviced the furnace"
+          }
+        }
+      }
+    },
+    "care.task.furnaceService.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Service the furnace"
+          }
+        }
+      }
+    },
+    "care.task.furnaceService.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a year"
+          }
+        }
+      }
+    },
+    "care.task.gutters.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleared the gutters"
+          }
+        }
+      }
+    },
+    "care.task.gutters.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear the gutters"
+          }
+        }
+      }
+    },
+    "care.task.gutters.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the rains"
+          }
+        }
+      }
+    },
+    "care.task.heatTape.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked the heat tape on the pipes"
+          }
+        }
+      }
+    },
+    "care.task.heatTape.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the heat tape on pipes"
+          }
+        }
+      }
+    },
+    "care.task.heatTape.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the first freeze"
+          }
+        }
+      }
+    },
+    "care.task.hotTub.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Winterized the hot tub"
+          }
+        }
+      }
+    },
+    "care.task.hotTub.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Winterize the hot tub"
+          }
+        }
+      }
+    },
+    "care.task.hotTub.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When guests stop using it"
+          }
+        }
+      }
+    },
+    "care.task.iceMelt.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stocked ice melt and shovels"
+          }
+        }
+      }
+    },
+    "care.task.iceMelt.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stock ice melt and shovels"
+          }
+        }
+      }
+    },
+    "care.task.iceMelt.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the first snow"
+          }
+        }
+      }
+    },
+    "care.task.irrigation.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked the sprinklers for leaks"
+          }
+        }
+      }
+    },
+    "care.task.irrigation.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the sprinklers for leaks"
+          }
+        }
+      }
+    },
+    "care.task.irrigation.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the dry months"
+          }
+        }
+      }
+    },
+    "care.task.outdoorTaps.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shut off the outdoor taps"
+          }
+        }
+      }
+    },
+    "care.task.outdoorTaps.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shut off the outdoor taps"
+          }
+        }
+      }
+    },
+    "care.task.outdoorTaps.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the first frost"
+          }
+        }
+      }
+    },
+    "care.task.pests.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looked for signs of pests"
+          }
+        }
+      }
+    },
+    "care.task.pests.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Look for signs of pests"
+          }
+        }
+      }
+    },
+    "care.task.pests.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a year"
+          }
+        }
+      }
+    },
+    "care.task.reseal.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resealed the tub and windows"
+          }
+        }
+      }
+    },
+    "care.task.reseal.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reseal the tub and windows"
+          }
+        }
+      }
+    },
+    "care.task.reseal.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the caulk cracks"
+          }
+        }
+      }
+    },
+    "care.task.roofCheck.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked the roof after winter"
+          }
+        }
+      }
+    },
+    "care.task.roofCheck.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the roof after winter"
+          }
+        }
+      }
+    },
+    "care.task.roofCheck.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After the thaw"
+          }
+        }
+      }
+    },
+    "care.task.roofSnow.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleared snow from the roof edge"
+          }
+        }
+      }
+    },
+    "care.task.roofSnow.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear snow from the roof edge"
+          }
+        }
+      }
+    },
+    "care.task.roofSnow.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After heavy snow"
+          }
+        }
+      }
+    },
+    "care.task.sinkLeaks.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked under the sinks for leaks"
+          }
+        }
+      }
+    },
+    "care.task.sinkLeaks.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check under sinks for leaks"
+          }
+        }
+      }
+    },
+    "care.task.sinkLeaks.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After a hard freeze"
+          }
+        }
+      }
+    },
+    "care.task.stormPrep.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Got ready for storm season"
+          }
+        }
+      }
+    },
+    "care.task.stormPrep.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get ready for storm season"
+          }
+        }
+      }
+    },
+    "care.task.stormPrep.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the storms"
+          }
+        }
+      }
+    },
+    "care.task.trimTrees.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trimmed branches off the roof"
+          }
+        }
+      }
+    },
+    "care.task.trimTrees.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trim branches off the roof"
+          }
+        }
+      }
+    },
+    "care.task.trimTrees.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a year"
+          }
+        }
+      }
+    },
+    "care.task.walkThrough.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Walked through after checkout"
+          }
+        }
+      }
+    },
+    "care.task.walkThrough.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Walk through after checkout"
+          }
+        }
+      }
+    },
+    "care.task.walkThrough.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every stay"
+          }
+        }
+      }
+    },
+    "care.task.waterHeater.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serviced the water heater"
+          }
+        }
+      }
+    },
+    "care.task.waterHeater.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Service the water heater"
+          }
+        }
+      }
+    },
+    "care.task.waterHeater.when": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a year"
+          }
+        }
+      }
+    },
+    "care.today.seePlan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See plan"
+          }
+        }
+      }
+    },
+    "care.today.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This season · %@"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
