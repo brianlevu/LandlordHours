@@ -15,6 +15,7 @@ struct InboxQuietCalendarsRow: View {
     @State private var showSheet = false
     @State private var summary = InboxQuietCalendarsRow.Summary(total: 0, checked: 0)
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     struct Summary: Equatable {
         var total: Int
@@ -25,10 +26,20 @@ struct InboxQuietCalendarsRow: View {
         Group {
             // Without calendar access there is nothing to list; the Calendar toggle above says why.
             if summary.total > 0 {
-                LHRow.Browse(title: InboxQuietText.rowTitle,
-                             meta: InboxQuietText.rowMeta(checked: summary.checked, total: summary.total),
-                             systemImage: "calendar", tint: .neutral,
-                             action: { showSheet = true })
+                // At AX sizes the 36pt tile grows to ~77pt and broke "Calen-/dars" mid-word (visual gate
+                // 2026-11-01): the row drops its tile there, so the title keeps the width.
+                Group {
+                    if typeSize.isAccessibilitySize {
+                        LHRow.Browse(title: InboxQuietText.rowTitle,
+                                     meta: InboxQuietText.rowMeta(checked: summary.checked, total: summary.total),
+                                     action: { showSheet = true }) { EmptyView() }
+                    } else {
+                        LHRow.Browse(title: InboxQuietText.rowTitle,
+                                     meta: InboxQuietText.rowMeta(checked: summary.checked, total: summary.total),
+                                     systemImage: "calendar", tint: .neutral,
+                                     action: { showSheet = true })
+                    }
+                }
                     .longTailRow()
                     .accessibilityHint(InboxQuietText.rowHint)
                     .accessibilityIdentifier("settings.capture.calendars")

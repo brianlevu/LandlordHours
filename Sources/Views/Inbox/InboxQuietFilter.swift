@@ -7,8 +7,8 @@ import Foundation
 // and are never notified. `InboxViewModel.visible` reads the main list through `mainList`
 // (package A's seam line); `InboxLogic.visible` applies the same filter, so every caller agrees.
 //
-// Synthetic office set (200 office events, 60 rental): main-list noise 42 → 1 of 200, rental
-// still reachable (main list or Not sure) 59 of 60. See the package F hand-off.
+// Synthetic office set (200 office events, 60 rental): main-list noise 42 → 0–1 of 200, rental
+// still reachable (main list or Not sure) 60 of 60. See the package F hand-off.
 extension InboxLogic {
     /// A "Not sure" item: below the likely line. It goes behind the collapsed row.
     static func isMaybe(_ suggestion: Suggestion) -> Bool {

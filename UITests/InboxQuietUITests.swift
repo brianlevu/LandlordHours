@@ -172,6 +172,8 @@ final class InboxQuietUITests: XCTestCase {
                 _ = settle(element("inbox.quiet.prompt"))
                 capture("f1-inbox-prompt-\(suffix)")
                 _ = scrollTo(element("inbox.maybe.row"))
+                // Settle at the end of the list so the row sits clear of the fade and the tab bar.
+                for _ in 0..<3 { app.swipeUp(velocity: .slow) }
                 capture("f2-inbox-maybe-row-\(suffix)")
                 element("inbox.maybe.row").tap()
                 _ = settle(row("call-sam"))

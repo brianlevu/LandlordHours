@@ -273,13 +273,14 @@ final class CalibrationTests: XCTestCase {
         }
         let heldAccuracy = Double(heldCategory) / Double(max(heldLandlord, 1))
         print(String(format: "CALIBRATION model-only holdout category=%.3f", heldAccuracy))
-        XCTAssertGreaterThanOrEqual(heldAccuracy, ClassifierThresholds.targetModelCategoryHoldout)
         // The model must not make shipped calendar suggestions worse than rules alone.
         let rulesHoldout = await score(fixture, split: "holdout") { c, props in
             var cal = c
             cal.kind = .calendar
             return await RulesClassifier().classify(cal, properties: props)
         }
+        // Every assertion after the last `await` (Xcode 27 drops post-await failures once a test failed).
+        XCTAssertGreaterThanOrEqual(heldAccuracy, ClassifierThresholds.targetModelCategoryHoldout)
         XCTAssertGreaterThanOrEqual(chainHoldout.precision, rulesHoldout.precision, "chain precision vs rules, held-out")
         XCTAssertGreaterThanOrEqual(chainHoldout.propertyAccuracy, rulesHoldout.propertyAccuracy - 0.05, "chain property vs rules, held-out")
         XCTAssertGreaterThanOrEqual(chainHoldout.visibleRecall, ClassifierThresholds.targetVisibleRecall)
