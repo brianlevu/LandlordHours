@@ -130,6 +130,28 @@ struct LogForm: Equatable {
     /// A note was read and never named the kind of work, so the remembered "last used" kind was
     /// taken off rather than logged silently. Undo puts it back.
     private(set) var droppedRemembered = false
+    /// The care task this entry is for (2.3 care plan): set when a care row opened Log time. How long
+    /// starts empty and the Log button reads "Set how long" until a chip or a value is set.
+    private(set) var careTaskID: String?
+    /// The note the care row started with. While the note is still exactly this text the app wrote
+    /// it, so nothing is read from it: a rental named "Apt 4H" must never become 4 hours.
+    private(set) var carePrefillNote: String?
+
+    /// The note is still the text a care row wrote (not the person's words).
+    var noteIsCarePrefill: Bool { carePrefillNote != nil && trimmedNote == carePrefillNote }
+
+    /// What the note reader may read. Normally the whole note. On a care entry only the words the
+    /// person typed: the care row's own text is taken out first, so nothing the app wrote (a task,
+    /// a rental's name) can ever turn into hours. A note rewritten from scratch is all theirs.
+    var readableNote: String {
+        let note = trimmedNote
+        guard let prefill = carePrefillNote, !prefill.isEmpty else { return note }
+        var typed = note
+        if let range = note.range(of: prefill, options: [.caseInsensitive]) {
+            typed.removeSubrange(range)
+        }
+        return typed.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+    }
 
     static let step = 0.25
     static let maxHours = 24.0
@@ -157,7 +179,33 @@ struct LogForm: Equatable {
         return form
     }
 
+    /// A care row opened Log time (2.3): the rental and the kind are the person's own pick (they
+    /// tapped that item at that rental), the note starts with what the item says was done, and How
+    /// long is EMPTY. The app never prefills a guessed number; the chips under How long set it in
+    /// one tap from the person's own history or a fixed short option (`CareHourChips`).
+    static func care(_ prefill: CarePrefill, properties: [RentalProperty], now: Date = Date()) -> LogForm {
+        var form = LogForm()
+        form.date = now
+        form.hours = 0
+        form.hoursIsDefault = false
+        form.careTaskID = prefill.taskID
+        form.note = prefill.note
+        form.carePrefillNote = prefill.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if properties.contains(where: { $0.id == prefill.rentalID }) { form.setProperty(prefill.rentalID) }
+        form.setCategory(prefill.kind)
+        return form
+    }
+
     // MARK: User edits
+
+    /// A one-tap hours chip (care): the exact minutes it names ("Last time 1h 20m" sets 1h 20m), not
+    /// snapped to the stepper's quarter hours. It is the person's pick, like any hand edit.
+    mutating func setChipHours(_ value: Double) {
+        hours = min(max(0, (value * 60).rounded() / 60), Self.maxHours)
+        hoursIsDefault = false
+        userSet.insert(.hours)
+        markUser(.hours)
+    }
 
     mutating func setProperty(_ id: UUID?) {
         propertyId = id
@@ -267,6 +315,8 @@ struct LogForm: Equatable {
     mutating func apply(_ reading: NoteReading, source: LogFillSource, spouseTracking: Bool,
                         tier: LogFillTier = .rules, late: Bool = false, rulesBaseline: NoteReading? = nil,
                         calendar: Calendar = .current) -> Set<LogField> {
+        // A care row's own text is never read: no hours (or anything else) from words the app wrote.
+        if noteIsCarePrefill || (careTaskID != nil && readableNote.isEmpty) { return [] }
         let current = snapshot
         let before = beforeFill ?? current
         let priorTiers = filledBy
@@ -581,7 +631,7 @@ enum LogTimeFormat {
         case .name?: return lt("Name your rental")
         case .rental?: return lt("Pick a rental")
         case .kind?: return lt("Pick the kind of work")
-        case .hours?: return lt("Add how long it took")
+        case .hours?: return form.careTaskID != nil ? CareText.setHowLong : lt("Add how long it took")
         case nil:
             func nb(_ text: String) -> String { text.replacingOccurrences(of: " ", with: "\u{00A0}") }
             let hoursText = hours(form.hours)
@@ -679,6 +729,8 @@ enum LogSheetRoute: Identifiable, Equatable {
     case timerReview
     /// A timer draft left from a forgotten timer or a profile switch.
     case recovery(UUID)
+    /// A care plan row (2.3): the rental and the kind filled in, How long empty.
+    case care(CarePrefill)
 
     var id: String {
         switch self {
@@ -686,6 +738,7 @@ enum LogSheetRoute: Identifiable, Equatable {
         case .timer: return "timer"
         case .timerReview: return "timerReview"
         case .recovery(let id): return "recovery-\(id.uuidString)"
+        case .care(let prefill): return "care-\(prefill.taskID)-\(prefill.rentalID.uuidString)"
         }
     }
 
@@ -695,6 +748,22 @@ enum LogSheetRoute: Identifiable, Equatable {
         if isTimerRunning { return .timer }
         if stoppedDraft != nil { return .timerReview }
         return .log
+    }
+}
+
+/// What a care row hands Log time: the task, the rental, the kind of work and the note to start from.
+/// Never a number of hours.
+struct CarePrefill: Equatable {
+    let taskID: String
+    let rentalID: UUID
+    let kind: ActivityCategory
+    let note: String
+
+    /// The prefill for a task at a rental: "Cleared the gutters at Pine Cabin".
+    /// The note is the task alone ("Cleared the gutters"): the Rental row already names the rental,
+    /// and a rental's name ("Apt 4H") must never sit in text the note reader might read.
+    static func make(task: CareTask, rental: RentalProperty) -> CarePrefill {
+        CarePrefill(taskID: task.id, rentalID: rental.id, kind: task.kind, note: task.doneNote)
     }
 }
 

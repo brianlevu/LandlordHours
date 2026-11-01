@@ -501,10 +501,7 @@ struct PaywallView: View {
 
     /// After a purchase the button carries on with what the person was doing.
     private var nextStep: String {
-        switch context {
-        case .carePlan, .learning: return String(localized: "paywall.cta.done", defaultValue: "Done", table: "Pricing")
-        default: return PaywallCopy.localized(context, year: year, propertyName: propertyName, confirmedHours: confirmedHours).nextStep
-        }
+        PaywallCopy.localized(context, year: year, propertyName: propertyName, confirmedHours: confirmedHours).nextStep
     }
 
     private var foot: some View {
@@ -837,11 +834,21 @@ extension PaywallCopy {
                     return String(localized: "Turn \(whole) confirmed hours into a clean record.", table: "ConversionPath")
                 } ?? String(localized: "Turn your confirmed hours into a clean record.", table: "ConversionPath"),
                 nextStep: String(localized: "See your record", table: "ConversionPath"))
-        case .settings, .carePlan, .learning:
+        case .settings:
             return PaywallCopy(
                 headline: String(localized: "Dormer Pro", table: "ConversionPath"),
                 planLine: String(localized: "Every rental, the PDF and spreadsheet, and the record of where each hour came from.", table: "ConversionPath"),
                 nextStep: String(localized: "Done", table: "ConversionPath"))
+        case .carePlan:
+            return PaywallCopy(
+                headline: String(localized: "paywall.care.headline", defaultValue: "A care plan for each rental", table: "Pricing"),
+                planLine: String(localized: "paywall.care.line", defaultValue: "The upkeep each season brings, per rental. You log it and set the hours.", table: "Pricing"),
+                nextStep: String(localized: "paywall.care.next", defaultValue: "See the care plan", table: "Pricing"))
+        case .learning:
+            return PaywallCopy(
+                headline: String(localized: "paywall.learn.headline", defaultValue: "Short lessons in plain words", table: "Pricing"),
+                planLine: String(localized: "paywall.learn.line", defaultValue: "What counts toward your hours, one card at a time. Each ends with what to ask your CPA.", table: "Pricing"),
+                nextStep: String(localized: "paywall.learn.next", defaultValue: "Keep reading", table: "Pricing"))
         }
     }
 }

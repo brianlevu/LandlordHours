@@ -59,10 +59,16 @@ struct ExportPDFView: View {
         .task(id: year) { await renderPreview() }
         .onAppear { job.isSheetVisible = true }
         .onDisappear { job.isSheetVisible = false }
+        #if DEBUG
+        .overlay(alignment: .topLeading) { RatingProbe() }
+        #endif
         .sheet(item: $sharing) { request in
             ActivityShareSheet(items: [ExportShareFile(url: request.url)]) { completed in
                 sharing = nil
-                if completed { viewModel.exportShared(format: request.format) }
+                if completed {
+                    RatingPromptCoordinator.shared.noteSharedExport(format: request.format)
+                    viewModel.exportShared(format: request.format)
+                }
             }
             .presentationDetents([.medium, .large])
             .ignoresSafeArea()
@@ -492,3 +498,22 @@ enum ExportGate: Equatable {
         }
     }
 }
+
+#if DEBUG
+/// `-LHRatingProbe`: what the rating policy accepted, for `ExportRatingPromptUITests` (never visible).
+private struct RatingProbe: View {
+    @ObservedObject private var coordinator = RatingPromptCoordinator.shared
+
+    var body: some View {
+        if RatingPromptCoordinator.probeEnabled {
+            Text(coordinator.probeLastRequest)
+                .font(.caption2)
+                .frame(width: 1, height: 1)
+                .clipped()
+                .opacity(0.02)
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("rating.probe")
+        }
+    }
+}
+#endif

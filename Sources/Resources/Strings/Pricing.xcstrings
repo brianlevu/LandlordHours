@@ -485,6 +485,39 @@
         }
       }
     },
+    "paywall.care.headline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A care plan for each rental"
+          }
+        }
+      }
+    },
+    "paywall.care.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The upkeep each season brings, per rental. You log it and set the hours."
+          }
+        }
+      }
+    },
+    "paywall.care.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See the care plan"
+          }
+        }
+      }
+    },
     "paywall.cta.buying": {
       "extractionState": "manual",
       "localizations": {
@@ -624,6 +657,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Every rental"
+          }
+        }
+      }
+    },
+    "paywall.learn.headline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short lessons in plain words"
+          }
+        }
+      }
+    },
+    "paywall.learn.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What counts toward your hours, one card at a time. Each ends with what to ask your CPA."
+          }
+        }
+      }
+    },
+    "paywall.learn.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep reading"
           }
         }
       }

@@ -139,6 +139,15 @@ struct LogTimeSheet: View {
             } footer: {
                 footerContent
             }
+            .task {
+                // A care row at accessibility sizes: How long and its chips would sit below the fold,
+                // so bring them up (what's left to fill is the hours).
+                guard case .care = route, isAX else { return }
+                try? await Task.sleep(for: .milliseconds(450))
+                withAnimation(reduceMotion ? AppAnimation.reduced : AppAnimation.reveal) {
+                    proxy.scrollTo(LogField.hours.rowID, anchor: .center)
+                }
+            }
             .onChange(of: expanded) { _, field in
                 guard let field else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -230,6 +239,12 @@ struct LogTimeSheet: View {
             } else {
                 mode = viewModel.isTimerRunning ? .timerRunning : .log
             }
+        case .care(let prefill):
+            // A care row: rental and kind filled, How long empty, the rows already open (the chips
+            // sit under How long), and no keyboard over them.
+            mode = .log
+            form = LogForm.care(prefill, properties: properties, now: openedAt)
+            unfolded = true
         case .recovery(let id):
             if let recovery = viewModel.staleTimerRecoveries.first(where: { $0.id == id }) {
                 mode = .recovery(recovery)
@@ -271,7 +286,8 @@ struct LogTimeSheet: View {
         if LogSheetDebug.state != nil && !preset.focusNote { return }
         #endif
         // Keyboard up, note focused: the note is the one thing the user has in their head.
-        guard mode == .log else { return }
+        // Not for a care row: the note is already there and How long is what's left.
+        guard mode == .log, form.careTaskID == nil else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             if isFirstRun { nameFocused = true } else { noteFocused = true }
         }
@@ -290,7 +306,7 @@ struct LogTimeSheet: View {
 
     var analyticsMode: String {
         switch mode {
-        case .log: return "log"
+        case .log: return form.careTaskID == nil ? "log" : "care"
         case .timerIdle, .timerRunning: return "timer"
         case .review: return "timer_review"
         case .recovery: return "recovery"
@@ -467,7 +483,10 @@ struct LogTimeSheet: View {
         case .name: nameFocused = true
         case .rental: open(.property)
         case .kind: open(.category)
-        case .hours: open(.hours)
+        case .hours:
+            // A care entry keeps the person's own chips under How long (the generic editor would
+            // hide "Last time" and "Typical"); the line under the button says what's missing.
+            if form.careTaskID != nil { UIAccessibility.post(notification: .layoutChanged, argument: nil) } else { open(.hours) }
         }
     }
 
@@ -595,6 +614,8 @@ struct LogTimeSheet: View {
 
     func noteChanged(_ text: String) {
         guard mode == .log, !manual else { return }
+        // A care row's prefilled note is the app's words: read only once the person changes it.
+        if form.noteIsCarePrefill { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { usedVoice = false }
         // Editing the note after a fill starts a new fill; the old caption goes away until it lands.
@@ -617,12 +638,14 @@ struct LogTimeSheet: View {
     func readNote(delay: Double, source: LogFillSource, rulesOnly: Bool = false) {
         readTask?.cancel()
         let text = form.trimmedNote
-        guard text.count >= 6, mode == .log, !manual, !LogSheetDebug.holdsReading else {
+        // A care entry reads only what the person typed (`readableNote`), never the app's own words.
+        let readable = form.readableNote
+        guard text.count >= 6, !readable.isEmpty, mode == .log, !manual, !LogSheetDebug.holdsReading else {
             if !LogSheetDebug.holdsReading { isReading = false }
             noteDirty = false
             return
         }
-        let request = NoteReadRequest(text: text, properties: properties, spouseTracking: spouseTracking)
+        let request = NoteReadRequest(text: readable, properties: properties, spouseTracking: spouseTracking)
         let chain = noteReader
         readTask = Task { @MainActor in
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
@@ -777,6 +800,13 @@ struct LogTimeSheet: View {
         edited(.hours)
     }
 
+    /// A care chip: one tap sets the hours it names.
+    func set(chip: CareHourChip) {
+        withMotion { form.setChipHours(chip.hours); expanded = nil }
+        stepTick += 1
+        edited(.hours)
+    }
+
     func set(date: Date) {
         withMotion { form.setDate(date); expanded = nil }
         edited(.date)
@@ -917,6 +947,8 @@ struct LogTimeSheet: View {
             switch result {
             case .failed(let message): fail(message)
             case .saved(let id):
+                // A care entry is linked to its task (the done row and the chips read it back).
+                if let task = form.careTaskID { CareDoneLog.shared.record(task: task, entry: id) }
                 succeed(LogTimeFormat.loggedToast(hours: hours, propertyName: propertyName)) { [weak viewModel = viewModel] in
                     if let entry = viewModel?.timeEntries.first(where: { $0.id == id }) { viewModel?.deleteTimeEntry(entry) }
                 }

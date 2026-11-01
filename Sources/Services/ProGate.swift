@@ -212,10 +212,18 @@ struct PaywallCopy: Equatable {
             return PaywallCopy(headline: "Your hours, on paper",
                                planLine: "Turn \(hours.map { "\($0) confirmed" } ?? "your confirmed") hours into a clean record.",
                                nextStep: "See your record")
-        case .settings, .carePlan, .learning:
+        case .settings:
             return PaywallCopy(headline: "Dormer Pro",
                                planLine: "Every rental, the PDF and spreadsheet, care plans and lessons.",
                                nextStep: "Done")
+        case .carePlan:
+            return PaywallCopy(headline: "A care plan for each rental",
+                               planLine: "The upkeep each season brings, per rental. You log it and set the hours.",
+                               nextStep: "See the care plan")
+        case .learning:
+            return PaywallCopy(headline: "Short lessons in plain words",
+                               planLine: "What counts toward your hours, one card at a time. Each ends with what to ask your CPA.",
+                               nextStep: "Keep reading")
         }
     }
 
