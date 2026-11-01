@@ -108,6 +108,12 @@ final class LessonsUITests: XCTestCase {
         XCTAssertTrue(element("today.learn").waitForNonExistence(timeout: 5), "Every lesson read: no card")
     }
 
+    func testFigureCardsSayExample() {
+        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings", "-LHLearnReset", "-LHOpenLesson", "spouse-1"])
+        XCTAssertTrue(element("lesson.card.1").waitForExistence(timeout: 20))
+        XCTAssertTrue(element("lesson.card.example").exists, "A card of made-up figures says Example")
+    }
+
     func testFreeUserGetsCardOneThenThePaywall() {
         launchToday(scenario: "frequent", extra: ["-LHLearnFree"])
         XCTAssertTrue(scrollTo(element("today.learn")), "The card shows on the free plan too")

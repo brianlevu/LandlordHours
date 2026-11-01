@@ -68,23 +68,32 @@ struct LessonCardView: View {
                 list(LearnLibrary.line("lesson.usuallyDoesnt"), items: no, symbol: "xmark", tint: .neutral)
             }
         case .lines(let lines):
-            LHRowGroup {
-                ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                    if index > 0 { LHDivider(leadingInset: 16) }
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) {
-                            label(line.label)
-                            Spacer(minLength: 8)
-                            value(line.value).multilineTextAlignment(.trailing)
+            VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                if card.isExample {
+                    Text(LearnLibrary.line("lesson.example"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(colors.textSecondary)
+                        .padding(.horizontal, 4)
+                        .accessibilityIdentifier("lesson.card.example")
+                }
+                LHRowGroup {
+                    ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                        if index > 0 { LHDivider(leadingInset: 16) }
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 12) {
+                                label(line.label)
+                                Spacer(minLength: 8)
+                                value(line.value).multilineTextAlignment(.trailing)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                label(line.label)
+                                value(line.value)
+                            }
                         }
-                        VStack(alignment: .leading, spacing: 2) {
-                            label(line.label)
-                            value(line.value)
-                        }
+                        .padding(LHRow.insets)
+                        .frame(minHeight: LHMetrics.rowMinHeight)
+                        .accessibilityElement(children: .combine)
                     }
-                    .padding(LHRow.insets)
-                    .frame(minHeight: LHMetrics.rowMinHeight)
-                    .accessibilityElement(children: .combine)
                 }
             }
         case .questions(let questions):

@@ -104,6 +104,8 @@ struct LessonCard: Identifiable, Equatable {
     let noteSymbol: String
     /// The note is a template filled from the person's own log (`%1$lld` hours, `%2$@` work).
     let notePersonal: Bool
+    /// The body's figures are made up (a worked example), so the card says "Example" over them.
+    let isExample: Bool
 
     var id: Int { index }
 }
@@ -127,6 +129,7 @@ extension LearnLibrary {
             let lines: Int?
             let questions: Int?
             let personalNote: Bool?
+            let example: Bool?
         }
         struct Entry: Decodable {
             let id: String
@@ -173,7 +176,8 @@ extension LearnLibrary {
                 let note = card.noteSymbol == nil ? nil : try text("\(key).note", bundle: bundle)
                 return LessonCard(index: offset, title: try text("\(key).title", bundle: bundle),
                                   text: try text("\(key).text", bundle: bundle), body: body, note: note,
-                                  noteSymbol: card.noteSymbol ?? "chart.bar", notePersonal: card.personalNote ?? false)
+                                  noteSymbol: card.noteSymbol ?? "chart.bar", notePersonal: card.personalNote ?? false,
+                                  isExample: card.example ?? false)
             }
             return Lesson(id: entry.id, title: try text("lesson.\(entry.id).title", bundle: bundle),
                           minutes: entry.minutes, cards: cards)

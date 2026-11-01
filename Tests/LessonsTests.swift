@@ -63,6 +63,16 @@ final class LessonsContentTests: XCTestCase {
         XCTAssertEqual(rows.last?.value, "530h together")
     }
 
+    /// Figures that are made up say so: every value-line card is labelled "Example"; lists and questions aren't.
+    func testMadeUpFigureCardsAreLabelledExample() throws {
+        let cards = try loaded().flatMap(\.cards)
+        for card in cards {
+            if case .lines = card.body { XCTAssertTrue(card.isExample, "\(card.title)") } else { XCTAssertFalse(card.isExample, "\(card.title)") }
+        }
+        XCTAssertEqual(cards.filter(\.isExample).count, 4)
+        XCTAssertEqual(LearnLibrary.line("lesson.example"), "Example")
+    }
+
     func testEveryLessonCarriesTheNotAdviceKey() {
         let line = LearnLibrary.notAdvice
         XCTAssertEqual(line, "General learning, not tax advice.")
@@ -201,5 +211,68 @@ final class LessonProgressStoreTests: XCTestCase {
         store.handleMilestone(100)
         XCTAssertEqual(count, 2, "One change per real change")
         token.cancel()
+    }
+}
+
+// MARK: - The card counts the person across every rental
+
+/// The 750-hour test is per person over all rentals, never per rental: the card reads the REPS
+/// participant's total, the same figure Reports and the PDF use.
+@MainActor
+final class LessonMilestoneHoursTests: XCTestCase {
+    private var saved: (RealEstatePro?, GoalChoice)!
+
+    override func setUp() {
+        super.setUp()
+        let goals = GoalManager.shared
+        saved = (goals.realEstatePro, goals.goalChoice)
+        goals.setGoalChoice(.reps750)
+        goals.setGoalSetup(rental: goals.rentalMix, pro: .me)
+    }
+
+    override func tearDown() {
+        let goals = GoalManager.shared
+        goals.setGoalSetup(rental: goals.rentalMix, pro: saved.0)
+        goals.setGoalChoice(saved.1)
+        super.tearDown()
+    }
+
+    private func entry(_ rental: UUID, _ who: Participant, _ hours: Double) -> TimeEntry {
+        TimeEntry(propertyId: rental, participant: who, category: .repairs, hours: hours,
+                  date: Date(), notes: "")
+    }
+
+    func testTwoRentalsAddUpAndFireTheFiveHundredMilestone() throws {
+        let app = AppViewModel()
+        app.suppressCelebrations = true
+        let pine = RentalProperty(id: UUID(), name: "Pine Cabin", address: "", propertyType: .ltr)
+        let oak = RentalProperty(id: UUID(), name: "Oak Street", address: "", propertyType: .ltr)
+        app.properties = [pine, oak]
+        app.timeEntries = [entry(pine.id, .selfParticipant, 300), entry(oak.id, .selfParticipant, 200),
+                           entry(pine.id, .spouse, 90)]   // a spouse's hours never join the 750
+        XCTAssertEqual(GoalManager.shared.repsParticipant, .selfParticipant)
+
+        let hours = LearnMilestone.countedHours(app: app)
+        XCTAssertEqual(hours, 500, accuracy: 0.0001, "300 + 200 across both rentals, not one rental's 300")
+        XCTAssertEqual(hours, app.repsStatus(participant: GoalManager.shared.repsParticipant,
+                                             year: Calendar.current.component(.year, from: Date())).realEstateHours,
+                       accuracy: 0.0001, "The same figure Reports uses")
+
+        let card = try XCTUnwrap(LearnMilestone.card(hours: hours, goal: 750, wantsGoal750: true, handled: 400,
+                                                     read: [], lessonIDs: ["counts", "spouse", "log"]))
+        XCTAssertEqual(card.hours, 500)
+        XCTAssertEqual(card.milestone, 500, "The 500 milestone fires at 300 + 200")
+        XCTAssertEqual(LearnLibrary.format("lesson.card.title", card.hours, card.goal), "You’re at 500 of 750. Here’s what usually counts.")
+    }
+
+    func testTheSpouseIsCountedWhenTheSpouseIsTheRealEstatePro() {
+        let goals = GoalManager.shared
+        goals.setGoalSetup(rental: goals.rentalMix, pro: .spouse)
+        let app = AppViewModel()
+        app.suppressCelebrations = true
+        let pine = RentalProperty(id: UUID(), name: "Pine Cabin", address: "", propertyType: .ltr)
+        app.properties = [pine]
+        app.timeEntries = [entry(pine.id, .selfParticipant, 300), entry(pine.id, .spouse, 120)]
+        XCTAssertEqual(LearnMilestone.countedHours(app: app), 120, accuracy: 0.0001, "One person's hours, never combined")
     }
 }

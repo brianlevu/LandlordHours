@@ -969,6 +969,18 @@
         }
       }
     },
+    "lesson.example": {
+      "comment": "Small label over a card of made-up figures",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Example"
+          }
+        }
+      }
+    },
     "lesson.log.c1.line1.label": {
       "extractionState": "manual",
       "localizations": {

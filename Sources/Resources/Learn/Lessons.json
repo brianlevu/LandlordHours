@@ -15,7 +15,8 @@
         {
           "body": "lines",
           "noteSymbol": "briefcase",
-          "lines": 2
+          "lines": 2,
+          "example": true
         },
         {
           "body": "questions",
@@ -30,12 +31,14 @@
         {
           "body": "lines",
           "noteSymbol": "person.2",
-          "lines": 3
+          "lines": 3,
+          "example": true
         },
         {
           "body": "lines",
           "noteSymbol": "person.2",
-          "lines": 3
+          "lines": 3,
+          "example": true
         },
         {
           "body": "questions",
@@ -50,7 +53,8 @@
         {
           "body": "lines",
           "noteSymbol": "text.cursor",
-          "lines": 4
+          "lines": 4,
+          "example": true
         },
         {
           "body": "none",

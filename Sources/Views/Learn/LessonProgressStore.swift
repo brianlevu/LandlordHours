@@ -71,6 +71,14 @@ enum LearnMilestone {
         return hours.last { Double($0) <= current }
     }
 
+    /// The hours the card and its milestones read. The 750-hour test is per person across every rental,
+    /// never per rental: this is the REPS participant's countable hours over all rentals, the same engine
+    /// value Reports and the PDF use, whichever rental Today is focused on.
+    @MainActor
+    static func countedHours(app: AppViewModel, year: Int = Calendar.current.component(.year, from: Date())) -> Double {
+        app.houseCountableHours(goal: .reps750, year: year)
+    }
+
     /// What the Today card shows.
     struct Card: Equatable {
         let milestone: Int

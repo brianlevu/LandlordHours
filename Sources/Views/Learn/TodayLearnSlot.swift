@@ -23,9 +23,8 @@ struct TodayLearnSlot: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private var card: LearnMilestone.Card? {
-        // The number the hero shows: this rental's hours when Today is on one rental, else the house total.
-        let hours = Self.debugHours ?? (rentalID.map { viewModel.propertyCountableHours($0, goal: goalManager.houseGoal) }
-                                        ?? viewModel.houseCountableHours())
+        // The REPS person's hours across all rentals, whatever rental Today is focused on (the 750 is per person).
+        let hours = Self.debugHours ?? LearnMilestone.countedHours(app: viewModel)
         return LearnMilestone.card(hours: hours, goal: Int(goalManager.houseGoal.targetHours),
                                    wantsGoal750: goalManager.goalChoice == .reps750,
                                    handled: progress.handledMilestone, read: progress.readIDs,
