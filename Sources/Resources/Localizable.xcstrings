@@ -25,6 +25,18 @@
         }
       }
     },
+    "learn.notAdvice": {
+      "comment": "Canonical line under every lesson and the lesson list (standard C.5, 2.3 amendment 11)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General learning, not tax advice."
+          }
+        }
+      }
+    },
     "pdf.title": {
       "comment": "Canonical: the PDF title, the CSV file name and the paywall preview; the number is the tax year",
       "extractionState": "manual",

@@ -86,6 +86,9 @@ struct SurfaceCaptureRoot: View {
             .onAppear { LaunchStatusBarWindow.show() }
         case "siri": SiriBoard().preferredColorScheme(launch.scheme)
         case "toast-board": ToastBoard().preferredColorScheme(launch.scheme)
+        // 2.3 foundation components (Components23Board.swift).
+        case "components23-a": Components23BoardA().preferredColorScheme(launch.scheme)
+        case "components23-b": Components23BoardB().preferredColorScheme(launch.scheme)
         default: Text("Unknown board \(launch.name)")
         }
     }

@@ -192,5 +192,39 @@ class ScreenAnatomy(unittest.TestCase):
         f = scan_text('x.padding(.top, 8)\n', name="Sources/Views/Components/LHRow.swift")
         self.assertNotIn("tab-top-padding", rules(f))
 
+class Amendments23(unittest.TestCase):
+    def test_hand_made_foot_fade_counts(self):
+        f = scan_text("LinearGradient(colors: [c.opacity(0), c], startPoint: .top, endPoint: .bottom)\n")
+        self.assertEqual(rules(f).count("foot-fade"), 1)
+
+    def test_foot_fade_home_is_exempt(self):
+        f = scan_text("LinearGradient(colors: [c.opacity(0), c], startPoint: .top, endPoint: .bottom)\n",
+                      name="Sources/Views/Components/LHFootFade.swift")
+        self.assertNotIn("foot-fade", rules(f))
+
+    def test_canonical_line_without_its_key_counts(self):
+        f = scan_text('LHFootnote("General learning, not tax advice.")\n')
+        self.assertEqual(rules(f).count("canonical-literal"), 1)
+        f = scan_text('Text("Your CPA decides what the numbers mean.")\n')
+        self.assertEqual(rules(f).count("canonical-literal"), 1)
+
+    def test_canonical_line_with_its_key_is_fine(self):
+        f = scan_text('String(localized: "learn.notAdvice", defaultValue: "General learning, not tax advice.")\n')
+        self.assertNotIn("canonical-literal", rules(f))
+
+    def test_done_tile_in_a_browse_row_is_fine(self):
+        f = scan_text("LHRow.Browse(title: t, meta: m, action: {}) {\n    LHRow.DoneTile()\n}\n")
+        self.assertNotIn("done-tile-row", rules(f))
+
+    def test_done_tile_outside_a_browse_row_counts(self):
+        f = scan_text("HStack {\n    LHRow.DoneTile()\n    Text(t)\n}\n")
+        self.assertEqual(rules(f).count("done-tile-row"), 1)
+
+    def test_done_tile_definition_is_exempt(self):
+        f = scan_text("struct DoneTile: View { var body: some View { LHRowGlyph(systemImage: x) } }\nlet a = DoneTile()\n",
+                      name="Sources/Views/Components/LHRowDoneTile.swift")
+        self.assertNotIn("done-tile-row", rules(f))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
