@@ -26,6 +26,65 @@ private func day(_ d: Int, month: Int = 10) -> Date {
     testCalendar.date(from: DateComponents(year: 2026, month: month, day: d))!
 }
 
+/// Hours never come from a rental's name, alias or address ("Apt 4H" is not 4 hours).
+final class NoteRentalNameHoursTests: XCTestCase {
+    private let names = ["Apt 4H", "Suite 12h", "Unit 2M", "9 to 5 Lofts", "Pier 39"]
+
+    private func rental(_ name: String) -> RentalProperty {
+        RentalProperty(name: name, address: "500 Harbor Way, Oakland", propertyType: .ltr)
+    }
+
+    func testNameAloneGivesNoDuration() {
+        for name in names {
+            let p = rental(name)
+            for text in ["fixed the sink at \(name)", "fixed the sink at \(name.lowercased())", name] {
+                XCTAssertNil(NoteRules.read(request(text, properties: [p, pine])).hours, text)
+            }
+        }
+    }
+
+    func testNamePlusTypedDurationGivesTheTypedDuration() {
+        for name in names {
+            let p = rental(name)
+            XCTAssertEqual(NoteRules.read(request("fixed the sink at \(name) took 2h", properties: [p, pine])).hours ?? -1, 2, accuracy: 0.01, name)
+            XCTAssertEqual(NoteRules.read(request("\(name) took 2h", properties: [p])).hours ?? -1, 2, accuracy: 0.01, name)
+        }
+    }
+
+    func testAliasNeverBecomesHours() {
+        let p = RentalProperty(name: "Harbor Flat", address: "500 Harbor Way, Oakland", propertyType: .ltr, aliases: ["Apt 4H", "9 to 5 Lofts"])
+        XCTAssertNil(NoteRules.read(request("fixed the sink at apt 4h", properties: [p])).hours)
+        XCTAssertNil(NoteRules.read(request("from 9 to 5 Lofts cleaned up", properties: [p])).hours)
+        XCTAssertEqual(NoteRules.read(request("apt 4h, from 9 to 11", properties: [p])).hours ?? -1, 2, accuracy: 0.01)
+    }
+
+    func testAddressDigitsNeverBecomeHours() {
+        let p = RentalProperty(name: "Harbor Flat", address: "9 to 5 Way, 12h Town", propertyType: .ltr)
+        let q = RentalProperty(name: "Lake House", address: "4H Lake Rd, Reno", propertyType: .ltr)
+        XCTAssertNil(NoteRules.read(request("fixed the gate at 9 to 5 Way", properties: [p])).hours)
+        XCTAssertNil(NoteRules.read(request("painted at 4H Lake Rd", properties: [q])).hours)
+        XCTAssertEqual(NoteRules.read(request("painted at 4H Lake Rd for 3 hours", properties: [q])).hours ?? -1, 3, accuracy: 0.01)
+    }
+
+    func testRealTypedDurationsStillWork() {
+        let p = rental("Apt 4H")
+        let cases: [(String, Double)] = [("took 2h", 2), ("2 hours", 2), ("from 9 to 11", 2), ("90 min", 1.5)]
+        for (text, expected) in cases {
+            XCTAssertEqual(NoteRules.read(request("Apt 4H \(text)", properties: [p])).hours ?? -1, expected, accuracy: 0.01, text)
+        }
+    }
+
+    /// The merge guard (a model's number needs evidence in the note) masks names too.
+    func testMergeDropsModelHoursWhenOnlyTheNameLooksLikeHours() {
+        let p = rental("Apt 4H")
+        let req = request("fixed the sink at Apt 4H", properties: [p])
+        let prompt = NoteModelPrompt(req)
+        let draft = NoteModelDraft(propertyOption: nil, category: nil, hours: 4, datePhrase: nil, doneBySpouse: false, description: nil)
+        let rules = NoteRules.read(req)
+        XCTAssertNil(NoteReadMerge.merge(rules: rules, draft: draft, prompt: prompt, tier: .onDevice).hours)
+    }
+}
+
 final class NoteDurationTests: XCTestCase {
     func testStatedDurations() {
         let cases: [(String, Double)] = [

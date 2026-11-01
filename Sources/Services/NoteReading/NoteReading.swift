@@ -76,7 +76,7 @@ enum NoteRules {
         reading.mentionedPropertyCount = mentioned.count
         reading.propertyId = mentioned.count >= 2 ? nil : property(normalized: normalized, properties: request.properties)?.id
         reading.category = category(normalized: normalized)
-        reading.hours = NoteDuration.hours(in: text)
+        reading.hours = NoteDuration.hours(in: text, properties: request.properties)
         // "20 min each" is a per-item time, not the total, and not 20 min for one of two rentals.
         if NoteDuration.isPerItem(text) { reading.hours = nil }
         reading.date = NoteDateResolver.resolve(text, now: request.now, calendar: request.calendar)
@@ -230,8 +230,8 @@ enum NoteDuration {
 
     /// The duration the note states, in hours (0 < h ≤ 24), or nil. Never a guess: "the
     /// afternoon", "a few hours", "all day" and bare numbers ("3 tenants") give nil.
-    static func hours(in text: String) -> Double? {
-        let t = " " + text.lowercased()
+    static func hours(in text: String, properties: [RentalProperty] = []) -> Double? {
+        let t = " " + maskingRentalNames(in: text, properties: properties).lowercased()
             .replacingOccurrences(of: "\u{2013}", with: "-")
             .replacingOccurrences(of: "\u{2014}", with: "-") + " "
         let candidates: [Double?] = [
@@ -247,8 +247,33 @@ enum NoteDuration {
         return value
     }
 
+    /// Replaces every rental name, alias and street address in the note with a neutral mark, so
+    /// "Apt 4H", "Suite 12h" or "9 to 5 Lofts" are never read as hours. Whole-token,
+    /// case-insensitive; the longest phrase goes first.
+    static func maskingRentalNames(in text: String, properties: [RentalProperty]) -> String {
+        var phrases = Set<String>()
+        for p in properties {
+            for raw in [p.name, p.address, p.shortAddress] + p.aliases {
+                let phrase = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !phrase.isEmpty { phrases.insert(phrase) }
+            }
+        }
+        var out = text
+        for phrase in phrases.sorted(by: { $0.count > $1.count }) {
+            let body = phrase.split(whereSeparator: { $0.isWhitespace })
+                .map { NSRegularExpression.escapedPattern(for: String($0)) }
+                .joined(separator: #"\s+"#)
+            let pattern = #"(?<![\p{L}\p{N}])"# + body + #"(?![\p{L}\p{N}])"#
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            out = regex.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: " # ")
+        }
+        return out
+    }
+
     /// True when the note says how long, loosely (a model's hours are only kept with this).
-    static func hasEvidence(_ text: String) -> Bool { hours(in: text) != nil }
+    static func hasEvidence(_ text: String, properties: [RentalProperty] = []) -> Bool {
+        hours(in: text, properties: properties) != nil
+    }
 
     /// "20 min each", "10 minutes apiece": the time is per item, so it is never the log's total.
     /// Checked on the note itself, so every tier (rules, merge guard) agrees.
@@ -670,7 +695,7 @@ enum NoteReadMerge {
             out.hours = hours
         } else if rules.mentionedPropertyCount >= 2 {
             out.hours = nil   // split across rentals: the user says how long each took
-        } else if let hours = draft.hours, hours > 0, hours <= 24, NoteDuration.hasEvidence(request.text) {
+        } else if let hours = draft.hours, hours > 0, hours <= 24, NoteDuration.hasEvidence(request.text, properties: request.properties) {
             out.hours = hours
         }
 
