@@ -442,6 +442,9 @@ private struct InboxDecisionRow: View {
     let suggestion: Suggestion
     let isLastOfDay: Bool
     let confirming: Bool
+    /// The Not sure screen's title already says it: there the row keeps its category tag
+    /// (visual gate 2026-11-01).
+    var showsNotSureTag = true
     let onConfirm: (Suggestion, Bool) -> Void
     let onSwipeLog: (Suggestion) -> Void
     let onDismiss: (Suggestion) -> Void
@@ -449,13 +452,20 @@ private struct InboxDecisionRow: View {
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
+    private var shownBadges: SuggestionBadges {
+        var badges = model.badges(for: suggestion)
+        if !showsNotSureTag { badges.notSure = false }
+        return badges
+    }
+
     var body: some View {
         let quick = model.canQuickLog(suggestion)
         let limit: InboxRowLimit = model.isWaitingOnPro(suggestion) ? .waiting : (model.needsNewRental(suggestion) ? .newPlace : .none)
+        let badges = shownBadges
         SuggestionRowView(
             suggestion: suggestion,
             propertyName: model.propertyName(for: suggestion),
-            badges: model.badges(for: suggestion),
+            badges: badges,
             limit: limit,
             quick: quick,
             confirmed: confirming,
@@ -549,7 +559,7 @@ private struct InboxMaybeScreen: View {
                             .listRowSeparator(.hidden)
                         ForEach(Array(day.items.enumerated()), id: \.element.sourceKey) { index, suggestion in
                             InboxDecisionRow(model: model, suggestion: suggestion, isLastOfDay: index == day.items.count - 1,
-                                             confirming: false,
+                                             confirming: false, showsNotSureTag: false,
                                              onConfirm: { s, _ in model.sheetSuggestion = s },
                                              onSwipeLog: onSwipeLog, onDismiss: onDismiss)
                         }

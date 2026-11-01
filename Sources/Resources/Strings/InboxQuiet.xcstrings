@@ -29,7 +29,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "We look for rental work only in the calendars you turn on. Turn off a day-job calendar to keep its meetings out of your Inbox."
+            "value": "We look for rental work only in the calendars you turn on. Turn off the calendar for your day job to keep its meetings out of your Inbox."
           }
         }
       }
@@ -74,7 +74,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Work account"
+            "value": "Work calendar"
           }
         }
       }
@@ -96,7 +96,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "These aren’t counted in To confirm, and we never send an alert for them."
+            "value": "These aren’t counted in To confirm. We never send an alert for them."
           }
         }
       }
@@ -129,7 +129,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Check when you have time"
+            "value": "Yours to decide"
           }
         }
       }
@@ -151,7 +151,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You said %lld events from this calendar aren’t rental work. You can change this in Settings."
+            "value": "You said %lld events from this calendar aren’t rental work."
           }
         }
       },

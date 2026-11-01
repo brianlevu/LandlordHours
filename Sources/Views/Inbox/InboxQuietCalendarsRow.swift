@@ -59,9 +59,14 @@ struct InboxQuietCalendarsSheet: View {
     var onClose: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var calendars: [CalendarInfo] = []
-    @State private var off: Set<String> = []
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var calendars: [CalendarInfo] = InboxQuietCalendars.list()
+    @State private var off: Set<String> = InboxQuietCalendars.excluded()
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    /// The medium detent cut the last calendar at XXL (visual gate 2026-11-01): open large from XXL
+    /// up, or when more than three calendars won't fit half a screen.
+    private var opensLarge: Bool { typeSize >= .xxLarge || calendars.count > 3 }
 
     /// Accounts in the order the calendars came (already sorted by account, then title).
     private var accounts: [String] {
@@ -75,6 +80,7 @@ struct InboxQuietCalendarsSheet: View {
                 Text(InboxQuietText.sheetIntro)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
+                    .lhLeadsContent(.subheadline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     // On the section headers' 16pt line, inside the row (a 0 inset clipped the first glyph).
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -103,11 +109,7 @@ struct InboxQuietCalendarsSheet: View {
         .lhListGutter()
         .lhSheetScreen(InboxQuietText.rowTitle, onClose: onClose, background: colors.background)
         .background(colors.background)
-        .lhSheetPresentation()
-        .onAppear {
-            calendars = InboxQuietCalendars.list()
-            off = InboxQuietCalendars.excluded()
-        }
+        .lhSheetPresentation(opensLarge ? .focused : .standard)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("calendars.sheet")
     }
@@ -129,7 +131,6 @@ struct InboxQuietCalendarPrompt: View {
     var onKeep: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
@@ -143,16 +144,11 @@ struct InboxQuietCalendarPrompt: View {
             Text(InboxQuietText.promptBody(dismissals))
                 .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
-            let buttons = typeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                : AnyLayout(HStackLayout(spacing: 12))
-            buttons {
-                Button(InboxQuietText.promptStop, action: onStop)
-                    .buttonStyle(LHButton.secondary)
-                    .accessibilityIdentifier("inbox.quiet.prompt.stop")
-                Button(InboxQuietText.promptKeep, action: onKeep)
-                    .buttonStyle(LHButton.tertiary)
-                    .accessibilityIdentifier("inbox.quiet.prompt.keep")
+            // Side by side at their full width when they fit; stacked when they don't (XXL cut the
+            // label to "Stop checki…" in a plain HStack, visual gate 2026-11-01). Never truncated.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { stopButton.layoutPriority(1); keepButton }
+                VStack(alignment: .leading, spacing: 4) { stopButton; keepButton }
             }
             .padding(.top, 8)
         }
@@ -162,6 +158,18 @@ struct InboxQuietCalendarPrompt: View {
         .overlay { if colorScheme == .dark { shape.strokeBorder(colors.border, lineWidth: LHMetrics.hairline) } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.quiet.prompt")
+    }
+
+    private var stopButton: some View {
+        Button(InboxQuietText.promptStop, action: onStop)
+            .buttonStyle(LHButton.secondary)
+            .accessibilityIdentifier("inbox.quiet.prompt.stop")
+    }
+
+    private var keepButton: some View {
+        Button(InboxQuietText.promptKeep, action: onKeep)
+            .buttonStyle(LHButton.tertiary)
+            .accessibilityIdentifier("inbox.quiet.prompt.keep")
     }
 }
 
@@ -213,10 +221,10 @@ enum InboxQuietText {
     static var rowHint: String { String(localized: "quiet.calendars.hint", defaultValue: "Opens the list of calendars", table: "InboxQuiet") }
 
     static var sheetIntro: String {
-        String(localized: "quiet.calendars.intro", defaultValue: "We look for rental work only in the calendars you turn on. Turn off a day-job calendar to keep its meetings out of your Inbox.", table: "InboxQuiet")
+        String(localized: "quiet.calendars.intro", defaultValue: "We look for rental work only in the calendars you turn on. Turn off the calendar for your day job to keep its meetings out of your Inbox.", table: "InboxQuiet")
     }
 
-    static var workSubtitle: String { String(localized: "quiet.calendars.work", defaultValue: "Work account", table: "InboxQuiet") }
+    static var workSubtitle: String { String(localized: "quiet.calendars.work", defaultValue: "Work calendar", table: "InboxQuiet") }
     static var otherAccount: String { String(localized: "quiet.calendars.other", defaultValue: "Other", table: "InboxQuiet") }
 
     static func promptTitle(_ calendar: String) -> String {
@@ -225,7 +233,7 @@ enum InboxQuietText {
     }
 
     static func promptBody(_ count: Int) -> String {
-        String(localized: "quiet.prompt.body", defaultValue: "You said \(count) events from this calendar aren’t rental work. You can change this in Settings.", table: "InboxQuiet",
+        String(localized: "quiet.prompt.body", defaultValue: "You said \(count) events from this calendar aren’t rental work.", table: "InboxQuiet",
                comment: "Why we ask, e.g. You said 3 events from this calendar aren’t rental work.")
     }
 
@@ -239,9 +247,9 @@ enum InboxQuietText {
     static var maybeTitle: String { String(localized: "quiet.maybe.title", defaultValue: "Not sure", table: "InboxQuiet") }
     static var maybeMeta: String { String(localized: "quiet.maybe.meta", defaultValue: "Might be rental work", table: "InboxQuiet") }
     static var maybeHint: String { String(localized: "quiet.maybe.hint", defaultValue: "Opens the items we aren’t sure about", table: "InboxQuiet") }
-    static var maybeSection: String { String(localized: "quiet.maybe.section", defaultValue: "Check when you have time", table: "InboxQuiet") }
+    static var maybeSection: String { String(localized: "quiet.maybe.section", defaultValue: "Yours to decide", table: "InboxQuiet") }
     static var maybeFooter: String {
-        String(localized: "quiet.maybe.footer", defaultValue: "These aren’t counted in To confirm, and we never send an alert for them.", table: "InboxQuiet")
+        String(localized: "quiet.maybe.footer", defaultValue: "These aren’t counted in To confirm. We never send an alert for them.", table: "InboxQuiet")
     }
     static var maybeEmpty: String { String(localized: "quiet.maybe.empty", defaultValue: "Nothing left to check.", table: "InboxQuiet") }
 }

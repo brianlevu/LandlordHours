@@ -159,10 +159,15 @@ final class InboxQuietUITests: XCTestCase {
         guard ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"] != nil else {
             throw XCTSkip("Frames only when LH_CAPTURE_DIR is set")
         }
-        let sizes: [(String, String?)] = [("default", nil), ("xxl", "UICTContentSizeCategoryXXL")]
+        let sizes: [(String, String?)] = [("default", nil), ("xxl", "UICTContentSizeCategoryXXL"),
+                                          ("ax3", "UICTContentSizeCategoryAccessibilityXXXL")]
         for scheme in ["light", "dark"] {
             for (sizeName, size) in sizes {
                 let suffix = "\(scheme)-\(sizeName)"
+                // The Inbox without the prompt, at rest: the density baseline for f1.
+                launch(scheme: scheme, size: size)
+                _ = settle(row("plumber"))
+                capture("f0-inbox-\(suffix)")
                 launch(scheme: scheme, size: size, extra: ["-LHInboxQuietPrompt"])
                 _ = settle(element("inbox.quiet.prompt"))
                 capture("f1-inbox-prompt-\(suffix)")
