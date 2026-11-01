@@ -16,7 +16,12 @@ final class RemindersSettingsUITests: XCTestCase {
 
     // MARK: Launch helpers
 
+    private var lastExtra: [String] = []
+    private var lastScheme = "light"
+    private var lastProbe = true
+
     private func launch(_ extra: [String] = [], scheme: String = "light", probe: Bool = true, relaunch: Bool = false) {
+        (lastExtra, lastScheme, lastProbe) = (extra, scheme, probe)
         app.terminate()
         // A relaunch keeps the profile: the choices are stored per profile, as a real relaunch would find them.
         // and does not reseed the mock data (the persisted records stay).
@@ -26,7 +31,7 @@ final class RemindersSettingsUITests: XCTestCase {
         app.launchArguments = args + extra
         app.launch()
         // A freshly booted simulator sometimes opens on Today despite -LHInitialTab: launch once more.
-        if !element("settings.paceReminders").waitForExistence(timeout: 25), !element("settings.reminders").exists {
+        if !element("settings.screen").waitForExistence(timeout: 25), !element("settings.reminders").exists {
             app.terminate()
             app.launch()
         }
@@ -39,13 +44,18 @@ final class RemindersSettingsUITests: XCTestCase {
         if allow.waitForExistence(timeout: 4) { allow.tap() }
     }
 
-    /// Settings is a lazy list: scroll to the Pace reminders row and open it.
+    /// Settings is a lazy list: scroll to the Pace reminders row and open it. A launch that lands on
+    /// another tab (seen now and then on a busy simulator) is relaunched once on the same profile.
     private func openScreen() {
         if element("settings.reminders").exists { return }
         let row = element("settings.paceReminders")
-        _ = row.waitForExistence(timeout: 20)
-        var swipes = 0
-        while (!row.exists || !row.isHittable) && swipes < 8 { app.swipeUp(); swipes += 1 }
+        for attempt in 0..<2 {
+            _ = row.waitForExistence(timeout: 20)
+            var swipes = 0
+            while (!row.exists || !row.isHittable) && swipes < 8 { app.swipeUp(); swipes += 1 }
+            if row.exists { break }
+            if attempt == 0 { launch(lastExtra, scheme: lastScheme, probe: lastProbe, relaunch: true) }
+        }
         XCTAssertTrue(row.exists, "Settings has the Pace reminders row")
         row.tap()
         XCTAssertTrue(element("settings.reminders").waitForExistence(timeout: 10), "Pace reminders screen is open")
@@ -141,7 +151,7 @@ final class RemindersSettingsUITests: XCTestCase {
     /// background and foreground; force-quit and relaunch.
     func testLifecycleOfTheWeeklyNudge() {
         // 0. Fresh: nothing pending without an opt-in, even after a launch and a foreground.
-        launch(["-LHNudgeReset", "1"])
+        launch(["-LHNudgeReset", "1", "-LHNudgeYearHours", "600"])
         openScreen()
         XCTAssertEqual(pendingLines(), [], "never fires when not opted in")
         XCTAssertTrue(element("nudge.probe.settings").label.hasSuffix("on "), element("nudge.probe.settings").label)
@@ -169,13 +179,13 @@ final class RemindersSettingsUITests: XCTestCase {
         XCTAssertEqual(pendingLines().count, first.count)
 
         // 3. Force-quit and relaunch: choices and requests survive.
-        launch(relaunch: true)
+        launch(["-LHNudgeYearHours", "600"], relaunch: true)
         openScreen()
         XCTAssertEqual(toggle("reminders.weekly").value as? String, "1", "the choice survives a force-quit")
         XCTAssertEqual(Set(pendingLines().map { fields($0)[0] }), ids, "the requests survive a force-quit")
 
         // 4. Quiet hours: 4 PM – 9 AM pushes the 6 PM note to 9 AM the next morning.
-        launch(["-LHNudgeQuietStart", "16", "-LHNudgeQuietEnd", "9"], relaunch: true)
+        launch(["-LHNudgeQuietStart", "16", "-LHNudgeQuietEnd", "9", "-LHNudgeYearHours", "600"], relaunch: true)
         openScreen()
         Thread.sleep(forTimeInterval: 1.5)
         let quietLines = pendingLines()
@@ -189,7 +199,7 @@ final class RemindersSettingsUITests: XCTestCase {
         // 5. Cancel when turned off, and it stays cancelled after a relaunch.
         setToggle("reminders.weekly", on: false)
         XCTAssertEqual(pendingLines(), [], "turning it off cancels the pending nudges")
-        launch(relaunch: true)
+        launch(["-LHNudgeYearHours", "600"], relaunch: true)
         openScreen()
         XCTAssertEqual(toggle("reminders.weekly").value as? String, "0")
         XCTAssertEqual(pendingLines(), [], "still cancelled after a relaunch")
@@ -197,7 +207,7 @@ final class RemindersSettingsUITests: XCTestCase {
 
     /// Care goes out as its own notification, about one rental, and never alongside pace.
     func testCareNudgeIsSeparateFromPace() {
-        launch(["-LHNudgeReset", "1", "-LHNudgeCareStub", "1"])
+        launch(["-LHNudgeReset", "1", "-LHNudgeCareStub", "1", "-LHNudgeYearHours", "600"])
         openScreen()
         setToggle("reminders.weekly", on: true)
         setToggle("reminders.care", on: true)
@@ -218,13 +228,24 @@ final class RemindersSettingsUITests: XCTestCase {
         setToggle("reminders.weekly", on: false)
     }
 
+    /// A pace nobody could keep sends nothing: 165h a week would be needed, so no weekly nudge is pending.
+    func testOutOfReachPaceSchedulesNoPaceNudge() {
+        launch(["-LHNudgeReset", "1", "-LHNudgeYearHours", "100"])
+        openScreen()
+        setToggle("reminders.weekly", on: true)
+        setToggle("reminders.behind", on: true)
+        XCTAssertEqual(pendingLines(), [], "out of reach: no weekly or behind nudge")
+        setToggle("reminders.weekly", on: false)
+        setToggle("reminders.behind", on: false)
+    }
+
     // MARK: Frames for the visual gate (TEST_RUNNER_LH_SHOT_DIR)
 
     func testCaptureRemindersFrames() throws {
         guard let dir = ProcessInfo.processInfo.environment["LH_SHOT_DIR"] else { throw XCTSkip("LH_SHOT_DIR not set") }
         let scheme = ProcessInfo.processInfo.environment["LH_SCHEME"] ?? "light"
         let size = ProcessInfo.processInfo.environment["LH_SIZE"] ?? "default"
-        var extra = ["-LHNudgeReset", "1", "-LHNudgeSeed", "weekly,yearEnd,care"]
+        var extra = ["-LHNudgeReset", "1", "-LHNudgeSeed", "weekly,yearEnd,care", "-LHNudgeYearHours", ProcessInfo.processInfo.environment["LH_YEAR_HOURS"] ?? "420"]
         if size == "xxl" { extra += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] }
         launch(extra, scheme: scheme, probe: false)
         openScreen()
@@ -233,7 +254,8 @@ final class RemindersSettingsUITests: XCTestCase {
             try XCUIScreen.main.screenshot().pngRepresentation
                 .write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name)-\(size)-\(scheme).png"))
         }
-        try save("n1-reminders")
+        try save(ProcessInfo.processInfo.environment["LH_YEAR_HOURS"] == nil ? "n1-reminders" : "n1-reminders-outofreach")
+        if ProcessInfo.processInfo.environment["LH_YEAR_HOURS"] != nil { return }
         app.swipeUp()
         Thread.sleep(forTimeInterval: 1)
         try save("n1-reminders-scrolled")

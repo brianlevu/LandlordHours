@@ -276,9 +276,16 @@ final class NudgeScheduler {
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context, calendar: calendar)
         let rentals = viewModel.properties.map { NudgeRental(id: $0.id, name: $0.name) }
         let care = viewModel.properties.flatMap { CareDue.source.dueItems(for: $0.id, on: now) }
+        var yearHours = snapshot.yearHours
+        #if DEBUG
+        // QA: pin the year's hours so a lifecycle test can put the pace within reach (or not).
+        if UserDefaults.standard.object(forKey: "LHNudgeYearHours") != nil {
+            yearHours = UserDefaults.standard.double(forKey: "LHNudgeYearHours")
+        }
+        #endif
         return NudgeFacts(
             now: now, calendar: calendar, rentals: rentals,
-            yearHours: snapshot.yearHours, targetHours: context.targetHours,
+            yearHours: yearHours, targetHours: context.targetHours,
             careItems: care,
             carePlanUnlocked: EntitlementStore.shared.plan.allows(.carePlan)
         )
@@ -308,6 +315,7 @@ final class NudgeScheduler {
 //   -LHNudgeCareStub 1                         one care item due for every rental
 //   -LHNudgeSeed weekly,behind,yearEnd,care    turn those kinds on at launch
 //   -LHNudgeReset 1                            clear the choices and the send history first
+//   -LHNudgeYearHours 600                     pin the year's hours the nudges and the preview read
 //   -LHNudgeFireSamples 1                      post the two example notifications (frame n2) a few seconds apart
 enum NudgeDebug {
     static var probeOn: Bool { ProcessInfo.processInfo.arguments.contains("-LHNudgeProbe") }
