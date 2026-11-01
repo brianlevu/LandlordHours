@@ -147,6 +147,29 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         }
     }
 
+    /// 2.3: Settings' plan rows follow the plan. Free with two rentals: the Pro card names the
+    /// yearly price, Free rental names the rental you log at and opens its page; no Manage
+    /// subscriptions (nothing to manage).
+    func testSettingsPlanRowsFollowThePlan() {
+        launch(tab: 4, scenario: "emptyMainTabs",
+               extra: ["-LHPlanSeed", "d23", "-LHFreeRentalPick", "Pine Cabin", "-LHFreeRentalPickedDaysAgo", "1"])
+        let card = app.buttons["settings.proCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 20), "Free: the Pro card")
+        let line = app.staticTexts["settings.proCard.line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 12))
+        XCTAssertTrue(line.label.contains("$"), "StoreKit's price: \(line.label)")
+        XCTAssertTrue(element("settings.planTag").exists, "The plan tag under the name")
+        let free = app.buttons["settings.freeRental"]
+        var swipes = 0
+        while !free.isHittable && swipes < 4 { app.swipeUp(); swipes += 1 }
+        XCTAssertTrue(free.exists, "Free rental row")
+        XCTAssertTrue(free.label.contains("Pine Cabin"), free.label)
+        XCTAssertFalse(app.buttons["settings.manageSubscriptions"].exists, "Nothing to manage on the free plan")
+        free.tap()
+        XCTAssertTrue(element("plan.freeRental").waitForExistence(timeout: 8), "Settings › Free rental")
+        XCTAssertTrue(app.buttons["freeRental.back"].exists)
+    }
+
     // MARK: Frames
 
     /// The record detail at rest and in edit, in the capture seed's world (`LH_CAPTURE_SCHEME`,

@@ -296,7 +296,7 @@ struct SettingsView: View {
         }
     }
 
-    /// "$49.99 a year · 14 days free" (StoreKit's price and trial); "Every rental, the PDF…" before it loads.
+    /// "<price> a year · 14 days free" (StoreKit's price and trial); "Every rental, the PDF…" before it loads.
     private var proCardLine: String {
         guard let price = subscriptionManager.proDisplayPrice else {
             return String(localized: "settings.proCard.noPrice", defaultValue: "Every rental, the PDF, care plans", table: "Pricing")

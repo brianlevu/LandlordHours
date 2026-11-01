@@ -156,6 +156,7 @@ struct PickFreeRentalSheet: View {
         .background(colors.background)
         .presentationBackground(colors.background)
         .sensoryFeedback(.selection, trigger: selected)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plan.pickFree")
     }
 
@@ -169,7 +170,7 @@ struct PickFreeRentalSheet: View {
     }
 }
 
-/// "See Pro · $49.99 a year" with StoreKit's price; "See Pro" before it loads.
+/// "See Pro · <price> a year" with StoreKit's price; "See Pro" before it loads.
 func seeProTitle(_ price: String?) -> String {
     if let price {
         return String(localized: "seePro.price", defaultValue: "See Pro · \(price) a year", table: "Pricing")

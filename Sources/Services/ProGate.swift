@@ -226,7 +226,7 @@ struct PaywallCopy: Equatable {
 
 /// Every price the 2.3 paywall shows, with its size, so a test can prove the billed amount
 /// (StoreKit's `displayPrice`, never a literal) is first and strictly the largest. The trial is
-/// always worded below it and smaller ("Free for 14 days, then $49.99 a year").
+/// always worded below it and smaller ("Free for 14 days, then <price> a year").
 struct PriceDisplay: Equatable {
     enum Role: String, Equatable { case billed, period, planLine, timeline, button, tag }
 
@@ -237,7 +237,7 @@ struct PriceDisplay: Equatable {
         let pointSize: CGFloat
     }
 
-    /// The App Store's localized price, e.g. "$49.99". Never hardcoded.
+    /// The App Store's localized price, e.g. "<price>". Never hardcoded.
     let billed: String
     /// Days of Apple's free trial, nil when the person can't get one (then the button subscribes).
     let trialDays: Int?
@@ -262,8 +262,8 @@ struct PriceDisplay: Equatable {
 
     var period: String { String(localized: "paywall.price.period", defaultValue: "a year", table: "Pricing") }
 
-    /// "Free for 14 days, then $49.99 a year. Renews each year until you cancel." or, without a
-    /// trial, "$49.99 a year. Renews each year until you cancel."
+    /// "Free for 14 days, then <price> a year. Renews each year until you cancel." or, without a
+    /// trial, "<price> a year. Renews each year until you cancel."
     var planLine: String {
         if let days = trialDays, days > 0 {
             return String(localized: "paywall.price.lineTrial",
@@ -295,7 +295,7 @@ struct PriceDisplay: Equatable {
         return all.dropFirst().allSatisfy { $0.pointSize < first.pointSize }
     }
 
-    /// VoiceOver: "$49.99 a year".
+    /// VoiceOver: "<price> a year".
     var accessibilityLabel: String {
         String(localized: "paywall.price.a11y", defaultValue: "\(billed) a year", table: "Pricing")
     }

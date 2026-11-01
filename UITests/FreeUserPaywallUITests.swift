@@ -187,7 +187,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["paywall.timeline"].exists, "A trial offer leads with the timeline")
         XCTAssertTrue(app.descendants(matching: .any)["paywall.trialTag"].exists)
         buyWhenReady()
-        let start = app.descendants(matching: .any)["trial.start"]
+        let start = app.staticTexts["trial.title"]
         XCTAssertTrue(start.waitForExistence(timeout: 30), "The trial-start moment")
         XCTAssertTrue(app.descendants(matching: .any)["trial.addRentals"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["trial.makePDF"].exists)
@@ -200,7 +200,7 @@ final class FreeUserPaywallUITests: XCTestCase {
     /// Pro ended with two rentals and no pick: the pick sheet. Picking Oak makes Pine view-only.
     func testPickYourFreeRentalAfterTheTrial() {
         launchFree(extra: ["-LHPlanSeed", "d23", "-LHPlanLastKind", "trial"])
-        let sheet = app.descendants(matching: .any)["plan.pickFree"]
+        let sheet = app.descendants(matching: .any)["plan.pickFree"].firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 10), "The pick sheet shows when Pro ends")
         XCTAssertTrue(app.buttons["pickFree.seePro"].exists, "Pro stays one tap away")
         tap(app.buttons["freeRental.row.Oak Street Duplex"])
@@ -216,7 +216,7 @@ final class FreeUserPaywallUITests: XCTestCase {
     /// A swipe-down keeps the most-used rental (Pine Cabin, 420h).
     func testSwipingThePickSheetAwayKeepsTheMostUsedRental() {
         launchFree(extra: ["-LHPlanSeed", "d23", "-LHPlanLastKind", "trial"])
-        let sheet = app.descendants(matching: .any)["plan.pickFree"]
+        let sheet = app.descendants(matching: .any)["plan.pickFree"].firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 10))
         sheet.swipeDown(velocity: .fast)
         if sheet.exists { app.swipeDown(velocity: .fast) }

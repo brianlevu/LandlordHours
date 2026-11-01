@@ -81,6 +81,7 @@ struct Day12ReminderSheet: View {
         .presentationBackground(colors.backgroundSecondary)
         .manageSubscriptionsSheet(isPresented: $showManage)
         .onDisappear { onAnswered() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("trial.day12")
     }
 

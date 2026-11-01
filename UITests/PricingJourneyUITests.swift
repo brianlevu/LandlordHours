@@ -66,7 +66,7 @@ final class PricingJourneyUITests: XCTestCase {
 
     func testPickSheetSeeProToPurchase() {
         launch(extra: ["-LHPlanSeed", "d23", "-LHPlanLastKind", "trial"])
-        let sheet = app.descendants(matching: .any)["plan.pickFree"]
+        let sheet = app.descendants(matching: .any)["plan.pickFree"].firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 10))
         taps = 0
         tap(app.buttons["pickFree.seePro"])
@@ -176,7 +176,7 @@ final class PricingJourneyUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 15), .completed, "Start free trial is ready")
         buy.tap()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let start = app.descendants(matching: .any)["trial.start"]
+        let start = app.staticTexts["trial.title"]
         let deadline = Date().addingTimeInterval(30)
         var sheetSeen = false
         while Date() < deadline && !start.exists {

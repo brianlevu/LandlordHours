@@ -242,7 +242,8 @@ struct PaywallView: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        Group {
+        // A real container (not a Group), so the trial start keeps its own identifier inside it.
+        ZStack {
             if model.startedTrial, let renewal = model.plan.subscription?.expiresAt {
                 TrialStartView(renewal: renewal, price: model.price,
                                onAddRentals: { finish(then: { Self.openAddRental() }) },
@@ -622,7 +623,7 @@ struct PaywallView: View {
     }
 }
 
-/// "$49.99 a year" on one baseline; stacked when it doesn't fit. The billed amount is
+/// "<price> a year" on one baseline; stacked when it doesn't fit. The billed amount is
 /// `.largeTitle` bold rounded, the largest price text on the page (App Review, `PriceDisplay`).
 struct PaywallPriceRow: View {
     let display: PriceDisplay
@@ -846,7 +847,7 @@ extension PaywallCopy {
 }
 
 extension PaywallCopy {
-    /// Retired: the 2.2 "Unlock for $29.99" button. 2.3's primary is "Start free trial" or
+    /// Retired: the 2.2 "Unlock for <price>" button. 2.3's primary is "Start free trial" or
     /// "Subscribe" (`PriceDisplay.buttonTitle`) and never carries a price. Kept only for the frozen
     /// ConversionPathTests; nothing in the app calls it.
     @available(*, deprecated, message: "2.2 paywall; use PriceDisplay.buttonTitle")
