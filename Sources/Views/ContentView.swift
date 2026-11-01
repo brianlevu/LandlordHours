@@ -174,7 +174,10 @@ struct ContentView: View {
                             .padding(.bottom, 12)
                     }
             } else {
-                mainContent
+                // §1.27: compact, two-pane or stacked. In compact on iPhone this is the shell as it
+                // was; the Duo lane's seams are `TwoPaneHooks.installed` (none on iPad).
+                TwoPaneLayout { mainContent }
+                    .twoPaneHooks(TwoPaneHooks.installed)
                     .identitySheets(viewModel)
             }
         }
@@ -388,17 +391,16 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .openLogSheet)) { note in
                 openLog((note.object as? LogSheetRoute) ?? .log)
             }
-            .sheet(item: $logRoute, onDismiss: {
+            // Log time: a `.large` sheet in compact, in the right pane in two-pane and stacked,
+            // naming the rental the house pane shows (§1.27 create action).
+            .paneAwareLogTime(route: $logRoute, background: colors.background, onDismiss: {
                 logSheetUp = false
                 #if DEBUG
                 HouseRevealDebugLog.shared.record("logSheetDismissed")
                 #endif
-            }) { route in
-                LogTimeSheet(route: route) { logRoute = nil }
+            }) { route, placement, rentalShown in
+                LogTimeSheet(route: route, placement: placement, rentalShown: rentalShown) { logRoute = nil }
                     .environmentObject(viewModel)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.hidden)
-                    .presentationBackground(colors.background)
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { inboxModel.reload() }
@@ -488,7 +490,8 @@ struct ContentView: View {
     @ViewBuilder
     private var todayContent: some View {
         switch todayRoute {
-        case .dashboard: DashboardView(inbox: inboxModel)
+        // DashboardView in compact; the work pane in two-pane and stacked (§1.27).
+        case .dashboard: AdaptiveToday(inbox: inboxModel)
             .environment(\.todayShellUncovered, todayUncovered)
         case .reports: ReportsView()
         case .settings: SettingsView()

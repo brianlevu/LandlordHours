@@ -1,0 +1,138 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "twoPane.detail.back": {
+      "comment": "Back link from a detail opened in the work pane.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To confirm"
+          }
+        }
+      }
+    },
+    "twoPane.list.filterA11y": {
+      "comment": "Accessibility label of the rental filter chip in the work pane.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing %@. Show all rentals"
+          }
+        }
+      }
+    },
+    "twoPane.list.moreElsewhere": {
+      "comment": "Foot of the filtered To confirm list; tapping shows every rental.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld more at other rentals"
+          }
+        }
+      }
+    },
+    "twoPane.record.earlier": {
+      "comment": "Sub-heading inside \"On the record today\" in the iPad and open-Duo work pane: the rental's most recent earlier entries, as many as fit above the tab bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier"
+          }
+        }
+      }
+    },
+    "twoPane.record.earlierElsewhere": {
+      "comment": "Sub-heading inside \"On the record today\" in the iPad and open-Duo work pane, after the shown rental's own earlier entries run out: other rentals' recent entries, each with its rental's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier at other rentals"
+          }
+        }
+      }
+    },
+    "twoPane.record.empty": {
+      "comment": "On the record today, when nothing is logged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing logged yet today."
+          }
+        }
+      }
+    },
+    "twoPane.record.title": {
+      "comment": "Card title: entries logged today at the selected rental.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the record today"
+          }
+        }
+      }
+    },
+    "twoPane.shelf.count": {
+      "comment": "Shelf count line above the plank when some rentals are out of view: rentals in view at rest of all rentals (the honest scroll cue), e.g. 2 of 8 rentals.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld rentals"
+          }
+        }
+      }
+    },
+    "twoPane.shelf.progress": {
+      "comment": "Shelf: one rental's hours of its goal, e.g. 46 of 100h.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lldh"
+          }
+        }
+      }
+    },
+    "twoPane.shelf.total": {
+      "comment": "Shelf count line above the plank when every rental is in view (or only the All rentals slot fits): the number of rentals.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rental"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rentals"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

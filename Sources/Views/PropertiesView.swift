@@ -43,6 +43,11 @@ struct PropertiesView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutBand) private var band
+    /// §1.27 two-pane: the work pane shows the shelf's rental (its page body); "All rentals" shows
+    /// the list, and a row picks the rental on the shelf instead of pushing.
+    @Environment(\.paneContext) private var paneContext
+    @Environment(\.paneLogRental) private var paneRental
+    @Environment(\.paneSelection) private var paneSelection
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var path = NavigationPath()
@@ -133,10 +138,25 @@ struct PropertiesView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openAddProperty)) { _ in
             openAddProperty()
         }
+        // A new pick on the shelf replaces the pane's page: nothing pushed stays over it.
+        .onChange(of: paneRental) { _, _ in if paneContext == .pane { path = NavigationPath() } }
+    }
+
+    /// The shelf's rental, shown as the pane's page (two-pane and stacked only).
+    private var paneRentalID: UUID? {
+        guard paneContext == .pane, !isLoading, let id = paneRental,
+              viewModel.properties.contains(where: { $0.id == id }) else { return nil }
+        return id
     }
 
     @ViewBuilder private var rootContent: some View {
-        if let id = singleRentalID {
+        if let id = paneRentalID {
+            // The page body of the rental the house pane shows; its hero is the house pane's.
+            PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) },
+                               onUnlockAtLimit: atLimit ? { openPaywall() } : nil,
+                               onAddRental: openAddProperty)
+                .id(id)
+        } else if let id = singleRentalID {
             // The page is the tab: Edit is its one header action and Add rental ends the page.
             PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) },
                                onUnlockAtLimit: atLimit ? { openPaywall() } : nil,
@@ -217,7 +237,13 @@ struct PropertiesView: View {
         let shown = tiles
         return VStack(alignment: .leading, spacing: RentalGallery.spacing) {
             RentalGallery(tiles: shown,
-                          open: { path.append(PropertyRoute.detail($0)) },
+                          open: { id in
+                              if paneContext == .pane, let paneSelection {
+                                  paneSelection.select(id.uuidString)   // the shelf and this pane follow
+                              } else {
+                                  path.append(PropertyRoute.detail(id))
+                              }
+                          },
                           edit: { edit($0) },
                           delete: { delete($0) })
             if shown.isEmpty {

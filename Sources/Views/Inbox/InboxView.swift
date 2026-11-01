@@ -24,6 +24,8 @@ struct InboxView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// §1.27: in a work pane the confirm view pushes in the pane with a back link; a sheet otherwise.
+    @Environment(\.paneContext) private var paneContext
     @State private var showSetup = false
     @State private var setupStartsAtBackfill = false
     @State private var logTick = 0
@@ -53,6 +55,16 @@ struct InboxView: View {
     /// 2.3 F: "Not sure" items, behind one collapsed row; never in the main list or its count.
     private var maybe: [Suggestion] { InboxLogic.maybeList(model.suggestions, now: InboxClock.now()) }
 
+    /// The confirm view as a sheet (compact) or a push in the work pane (two-pane, stacked).
+    private var sheetSuggestion: Binding<Suggestion?> {
+        Binding(get: { paneContext == .sheet ? model.sheetSuggestion : nil }, set: { model.sheetSuggestion = $0 })
+    }
+
+    private var paneSuggestionKey: Binding<String?> {
+        Binding(get: { paneContext == .pane ? model.sheetSuggestion?.sourceKey : nil },
+                set: { key in model.sheetSuggestion = key.flatMap { k in model.suggestions.first { $0.sourceKey == k } } })
+    }
+
     /// Nothing at all to show: no main list, no "Not sure" row, no prompt.
     private var nothingWaiting: Bool { model.visible.isEmpty && maybe.isEmpty && quietPrompt == nil }
 
@@ -71,8 +83,15 @@ struct InboxView: View {
             .navigationDestination(isPresented: $showMaybe) {
                 InboxMaybeScreen(model: model, onSwipeLog: swipeLog, onDismiss: dismiss)
             }
+            .navigationDestination(item: paneSuggestionKey) { key in
+                if let suggestion = model.suggestions.first(where: { $0.sourceKey == key }) {
+                    PaneDetail(backTitle: String(localized: "twoPane.detail.back", defaultValue: "To confirm", table: "Adaptive")) {
+                        SuggestionConfirmSheet(suggestion: suggestion, model: model)
+                    }
+                }
+            }
         }
-        .sheet(item: $model.sheetSuggestion) { suggestion in
+        .sheet(item: sheetSuggestion) { suggestion in
             SuggestionConfirmSheet(suggestion: suggestion, model: model)
         }
         .proPaywall($model.paywallRequest)

@@ -2,7 +2,9 @@ import XCTest
 
 /// The band-B content column (standard §1.27 interim, 2026-10-27): on a window at least 600 wide the
 /// scaffold puts every tab's header and content in one centred 672pt column, in portrait and landscape.
-/// iPad only; skipped on iPhone, where band A is unchanged.
+/// iPad only; skipped on iPhone, where band A is unchanged. Since two-pane landed (§1.27: "IP1–IP4
+/// apply only to compact band B windows"), a window that opens in two-pane (at least 800 × 645, e.g.
+/// every 11" and 13" iPad) is skipped too; the iPad mini in portrait is where these run.
 final class IPadColumnUITests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -28,6 +30,13 @@ final class IPadColumnUITests: XCTestCase {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("band B needs an iPad-width window") }
     }
 
+    /// The launched window is two-pane (§1.27): the band-B column rules do not apply there.
+    private var isTwoPane: Bool {
+        app.descendants(matching: .any)["pane.house"].waitForExistence(timeout: 4)
+    }
+
+    private var ranOne = false
+
     /// The header sits in the centred column: the screen title's leading edge is the column inset plus the
     /// 20 gutter. The title is the tallest text with the tab's name (the tab bar carries a smaller copy).
     private func assertTitleInColumn(_ title: String, _ label: String, afterBack: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
@@ -48,10 +57,13 @@ final class IPadColumnUITests: XCTestCase {
             XCUIDevice.shared.orientation = orientation
             for (tab, name) in [(0, "Today"), (5, "Inbox"), (6, "Records"), (1, "Rentals"), (4, "Settings")] {
                 launch(tab: tab)
+                if isTwoPane { app.terminate(); continue }
+                ranOne = true
                 assertTitleInColumn(name, "\(name) \(orientation == .portrait ? "portrait" : "landscape")", afterBack: name == "Settings")
                 app.terminate()
             }
         }
+        if !ranOne { throw XCTSkip("two-pane in both orientations: no band-B window here") }
     }
 
     /// §1.27 IP4: Today's hero side is H1's share of the scene height under the 200pt header allowance,
@@ -61,6 +73,8 @@ final class IPadColumnUITests: XCTestCase {
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
             launch(tab: 0)
+            if isTwoPane { app.terminate(); continue }
+            ranOne = true
             let hero = app.descendants(matching: .any)["today.hero"].firstMatch
             XCTAssertTrue(hero.waitForExistence(timeout: 15))
             sleep(2)
@@ -70,11 +84,13 @@ final class IPadColumnUITests: XCTestCase {
                            "hero side at \(Int(window.width))×\(Int(window.height))")
             app.terminate()
         }
+        if !ranOne { throw XCTSkip("two-pane in both orientations: no band-B window here") }
     }
 
     func testInboxRowsSitInTheColumn() throws {
         try requireIPad()
         launch(tab: 5)
+        if isTwoPane { throw XCTSkip("two-pane window: no band-B column") }
         let cell = app.cells.element(boundBy: 1)
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         let window = app.windows.firstMatch.frame

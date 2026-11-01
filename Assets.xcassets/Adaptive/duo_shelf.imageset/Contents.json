@@ -1,0 +1,7 @@
+{
+  "images" : [
+    { "filename" : "duo_shelf_light.png", "idiom" : "universal", "scale" : "3x" },
+    { "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ], "filename" : "duo_shelf_dark.png", "idiom" : "universal", "scale" : "3x" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

@@ -356,6 +356,27 @@ def tab_shell(rel, lines):
     return sorted(set(out))
 
 
+# Sanctioned sites named by the standard itself (§1.27 two-pane): (rule, file, exact stripped line) -> why.
+# Each is one exact line, so a second site in the same file is still a NEW violation.
+SANCTIONED = {
+    ("color-hex", "Sources/Views/Adaptive/DoorArt.swift", 'static let glowDusk = Color(hex: "FFE6C2")'):
+        "§1.27 [grep]: no hex literal in Views/Adaptive/ outside DoorArt (the art constants)",
+    ("color-hex", "Sources/Views/Adaptive/DoorArt.swift", 'static let warmNight = Color(hex: "FFC877")'):
+        "§1.27 [grep]: DoorArt art constants",
+    ("color-hex", "Sources/Views/Adaptive/DoorArt.swift",
+     'static func shelfPillEdge(dark: Bool) -> Color { Color(hex: dark ? "5D6AA0" : "7A6F58") }'):
+        "§1.27 [grep]: DoorArt art constants (DU15 shelf pill edge)",
+    ("fixed-size", "Sources/Views/Adaptive/OnTheRecordCard.swift", "fixedSize(horizontal: false, vertical: true)"):
+        "§1.27 two-pane: the off-screen measure (hidden, never read aloud); nothing shown is fixed",
+    ("hand-header", "Sources/Views/Adaptive/TodayWorkPane.swift", ".toolbar(.hidden, for: .navigationBar)"):
+        "§1.27 work pane: the in-pane push has its own back link (twoPane.detail.back), no bar title",
+    ("hand-header", "Sources/Views/Adaptive/TodayWorkPane.swift", "detail(suggestion).toolbar(.hidden, for: .navigationBar)"):
+        "§1.27 work pane: the in-pane detail, same back link",
+    ("hand-header", "Sources/Views/Adaptive/PaneDetail.swift", ".toolbar(.hidden, for: .navigationBar)"):
+        "§1.27 work pane: PaneDetail draws its own back link (twoPane.detail.back)",
+}
+
+
 def scan(root=None):
     root = root or ROOT
     out = []
@@ -386,6 +407,8 @@ def scan(root=None):
                         clamp_sites += 1
                         if clamp_sites <= CLAMP_MAX:
                             continue  # an allowed site within the quota of three
+                    if fn_(rel, line) and (rule, rel, line.strip()) in SANCTIONED:
+                        continue
                     if fn_(rel, line):
                         out.append(dict(rule=rule, file=rel, line=i, text=re.sub(r"\s+", " ", line.strip())[:160]))
     out.sort(key=lambda v: (v["rule"], v["file"], v["line"]))
