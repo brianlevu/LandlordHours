@@ -163,7 +163,10 @@ final class InboxUITests: XCTestCase {
     }
 
     func testSwipeLogThenUndoThenCommit() {
-        launch("inbox")
+        // The Showing is at Oak Street Duplex, the second rental: on the 2.3 free plan that rental
+        // is view-only (logging there needs Pro, PricingJourneyUITests), so this swipe journey
+        // runs as a Pro owner.
+        launch("inbox", extra: ["-LHPlanFounding"])
         let showing = row("showing")
         XCTAssertTrue(settle(showing))
         swipeLog(showing)

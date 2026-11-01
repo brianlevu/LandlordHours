@@ -385,6 +385,7 @@ final class PropertiesUITests: XCTestCase {
             UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", "occasional",
             "-LHPropertiesSeed", seed,
+            "-LHPlanMoments", "on",   // 2.3: the plan sheets show as they do for real users
             "-LHInitialTab", "1",
             "-LHColorScheme", scheme,
             "-AppleLanguages", "(en)",

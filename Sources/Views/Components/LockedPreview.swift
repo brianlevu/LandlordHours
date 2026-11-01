@@ -343,6 +343,9 @@ struct PlanMomentsHost: View {
         guard presenter.request == nil, moment == nil, viewModel.isSignedIn else { return }
         #if DEBUG
         if let forced = PricingDebugLaunch.forcedMoment() { moment = forced; return }
+        // Seeded DEBUG launches (UI tests, captures) show the plan sheets only when they ask
+        // for them, so a seed with two free rentals doesn't cover every other screen's test.
+        guard PricingDebugLaunch.allowsAutomaticMoments else { return }
         #endif
         moment = PlanMoment.next(plan: plan, shouldShowDay12: store.shouldShowDay12Reminder(),
                                  needsPick: store.needsFreeRentalPick(rentals: viewModel.rentalUsages),

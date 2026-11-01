@@ -73,6 +73,7 @@ enum RestoreFailureLaunch {
 ///                                  (the hi-fi frames' data); Pine Cabin logged 1.5h today.
 /// `-LHPlanLastKind trial|pro`      how Pro ended (the pick sheet's first line).
 /// `-LHFreeRentalPick <name>`       the free rental, picked `-LHFreeRentalPickedDaysAgo <n>` days ago (default 1).
+/// `-LHPlanFounding`               a founding (lifetime) buyer: Pro, every rental logs.
 /// `-LHPlanMoment day12|pickFree`   show that sheet on Today (day 12: renewal in 2 days).
 /// `-LHTrialStartPreview`           with `-LHPaywallPreview`: the trial-start moment instead of the paywall.
 @MainActor
@@ -90,6 +91,10 @@ enum PricingDebugLaunch {
         guard !didApply else { return }
         didApply = true
         if value("-LHPlanSeed") == "d23" { seedD23(app) }
+        if args.contains("-LHPlanFounding") {
+            EntitlementStore.shared.setFoundingFlag(true)
+            SubscriptionManager.shared.checkSubscriptionStatus()
+        }
         if let kind = value("-LHPlanLastKind") {
             UserDefaults.standard.set(kind, forKey: UserScope.key(PlanMomentsHost.lastPlanKey))
         }
@@ -98,6 +103,13 @@ enum PricingDebugLaunch {
             let chosenAt = Date().addingTimeInterval(-days * 86_400)
             EntitlementFreeRentalLocal().adopt(FreeRentalSelection(rentalID: rental.id, chosenAt: chosenAt, source: .picked))
         }
+    }
+
+    /// A plain launch shows the plan sheets on their own; a seeded launch (`-LHMockScenario`)
+    /// only with `-LHPlanSeed`, `-LHPlanLastKind` or `-LHPlanMoments on`.
+    static var allowsAutomaticMoments: Bool {
+        guard args.contains("-LHMockScenario") else { return true }
+        return value("-LHPlanSeed") != nil || value("-LHPlanLastKind") != nil || value("-LHPlanMoments") == "on"
     }
 
     /// The sheet a capture asks for, once.
