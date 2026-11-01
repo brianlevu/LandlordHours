@@ -8,6 +8,35 @@ import XCTest
 @MainActor
 final class AccountDeleteTests: CaptureTestCase {
 
+    /// The iCloud account the delete confirms, pinned per test. Without it the engine asks the
+    /// real container (no account on a simulator, so "unknown") and reads `v2.icloudUserRecordName`
+    /// from whatever the host app last left in `UserDefaults.standard`: an identity UI test's
+    /// `-LHFakeZone` launch leaves `_fakeUser` there, and the next run's delete is refused as
+    /// "iCloud unreachable". The fake must outlive the test (`zoneSourceOverride` is weak).
+    private var account: FakeZoneSource!
+
+    override func tearDown() async throws {
+        UserDefaults.standard.removeObject(forKey: IdentityKeys.icloudUserRecordName)
+        UserDefaults.standard.removeObject(forKey: IdentityKeys.accountChanged)
+        account = nil
+        try await super.tearDown()
+    }
+
+    /// Points the delete at a fake iCloud signed in as `current`, with `stored` as the account
+    /// this record set was read from (nil: never learned).
+    private func pinICloud(_ viewModel: AppViewModel, current: String?, stored: String?) {
+        let zone = FakeZoneSource()
+        zone.userName = current
+        account = zone
+        UserDefaults.standard.removeObject(forKey: IdentityKeys.accountChanged)
+        if let stored {
+            UserDefaults.standard.set(stored, forKey: IdentityKeys.icloudUserRecordName)
+        } else {
+            UserDefaults.standard.removeObject(forKey: IdentityKeys.icloudUserRecordName)
+        }
+        viewModel.identity.attach(source: zone, live: viewModel, sync: viewModel.syncService)
+    }
+
     private func seedLegacyGroup() -> String {
         let legacy = "email-old-\(UUID().uuidString.prefix(6))@example.com"
         UserDefaults.standard.set(Data("[]".utf8), forKey: "u.\(legacy).LandlordHours.entries")
@@ -19,6 +48,7 @@ final class AccountDeleteTests: CaptureTestCase {
         viewModel.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs,
                                hours: 2, date: Date(), notes: "Fix sink")
         let legacy = seedLegacyGroup()
+        pinICloud(viewModel, current: "_accountA", stored: "_accountA")
         var zoneDeletes = 0
         let service = viewModel.syncService
         service.accountAvailable = true
@@ -41,18 +71,46 @@ final class AccountDeleteTests: CaptureTestCase {
         let (viewModel, property) = makeViewModel()
         viewModel.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs,
                                hours: 2, date: Date(), notes: "Fix sink")
+        pinICloud(viewModel, current: "_accountA", stored: "_accountA")
         let service = viewModel.syncService
         service.accountAvailable = true
-        service.zoneDeleteOverride = { throw CloudKitSyncService.AccountDeleteICloudUnreachableError() }
+        var zoneDeleteAttempts = 0
+        service.zoneDeleteOverride = {
+            zoneDeleteAttempts += 1
+            throw CloudKitSyncService.AccountDeleteICloudUnreachableError()
+        }
         do {
             try await viewModel.deleteAllData()
             XCTFail("The delete must fail, not report success")
         } catch {
             XCTAssertTrue(error is CloudKitSyncService.AccountDeleteICloudUnreachableError, "\(error)")
         }
+        XCTAssertEqual(zoneDeleteAttempts, 1, "iCloud was lost during the zone delete, not before it")
         XCTAssertEqual(viewModel.properties.count, 1, "Nothing is wiped locally while iCloud still has a copy")
         XCTAssertEqual(viewModel.timeEntries.count, 1)
         XCTAssertFalse(service.pushesBlocked, "Syncing can resume")
+    }
+
+    /// The record set knows whose iCloud it came from, but the phone can't say who is signed in
+    /// now (offline, CloudKit busy). The delete refuses before touching the zone or this iPhone.
+    func testAnUnconfirmedICloudAccountRefusesTheDelete() async {
+        let (viewModel, property) = makeViewModel()
+        viewModel.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs,
+                               hours: 2, date: Date(), notes: "Fix sink")
+        pinICloud(viewModel, current: nil, stored: "_accountA")
+        let service = viewModel.syncService
+        service.accountAvailable = true
+        var zoneDeletes = 0
+        service.zoneDeleteOverride = { zoneDeletes += 1 }
+        do {
+            try await viewModel.deleteAllData()
+            XCTFail("An account that can't be confirmed must not be deleted")
+        } catch {
+            XCTAssertTrue(error is CloudKitSyncService.AccountDeleteICloudUnreachableError, "\(error)")
+        }
+        XCTAssertEqual(zoneDeletes, 0, "The zone is never touched")
+        XCTAssertEqual(viewModel.properties.count, 1, "Nothing is wiped locally")
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
     }
 
     func testICloudOffAsksBeforeDeletingFromThisIPhoneOnly() async throws {
