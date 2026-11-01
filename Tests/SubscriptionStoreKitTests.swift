@@ -19,8 +19,8 @@ final class SubscriptionStoreKitTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         session = try SharedStoreKitTestSession.session()
-        session.resetToDefaultState()
         session.disableDialogs = true
+        session.timeRate = .realTime
         session.clearTransactions()
         suite = "sub-storekit-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
@@ -77,7 +77,13 @@ final class SubscriptionStoreKitTests: XCTestCase {
         defer { session.timeRate = .realTime }
         let fact = try await buy(ProductIDs.yearly)
         try session.disableAutoRenewForTransaction(identifier: UInt(fact.transactionID))
-        let cancelled = await client.renewalState(for: ProductIDs.yearly)
+        // The cancel reaches the app's renewal info a moment later, as the purchase does.
+        var cancelled = await client.renewalState(for: ProductIDs.yearly)
+        let deadline = Date().addingTimeInterval(5)
+        while cancelled?.willAutoRenew != false && Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            cancelled = await client.renewalState(for: ProductIDs.yearly)
+        }
         XCTAssertEqual(cancelled?.willAutoRenew, false, "a cancelled trial maps to willAutoRenew false")
         let plan = await waitForPlan(makeStore(), seconds: 15) { $0 == .free }
         let renewal = await client.renewalState(for: ProductIDs.yearly)
@@ -108,7 +114,7 @@ final class SubscriptionStoreKitTests: XCTestCase {
     }
 
     private func buy(_ id: String) async throws -> EntitlementFact {
-        StoreKit2Client.fact(try await session.buyProduct(identifier: id))
+        StoreKit2Client.fact(try await SharedStoreKitTestSession.buyAndWaitForApp(session, id))
     }
 
     /// StoreKit test actions land asynchronously; poll briefly.

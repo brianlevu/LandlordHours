@@ -389,11 +389,45 @@ final class ToastQueueTests: XCTestCase {
     }
 
     func testTimesOutAndShowsTheNext() async {
-        let center = LHToastCenter(sleep: { _ in await Task.yield() }, announce: { _ in })
+        // The first toast's wait ends at once; the second's lasts until `clear()`. The test waits
+        // for the second wait to start (the first toast has timed out and the next is on screen)
+        // instead of counting yields: the runtime doesn't order the two timers against the test's
+        // yields, and the second toast timed out too in 73 of 3,000 runs. A broken queue fails
+        // after 5 s instead of hanging.
+        let gate = SecondWaitGate()
+        let center = LHToastCenter(sleep: { _ in
+            gate.waits += 1
+            guard gate.waits > 1 else { return }
+            gate.open(timedOut: false)
+            try? await Task.sleep(for: .seconds(3600))
+        }, announce: { _ in })
         center.show(.success, "a")
         center.show(.success, "b")
-        for _ in 0..<50 where center.current?.message == "a" { await Task.yield() }
+        let limit = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            gate.open(timedOut: true)
+        }
+        await withCheckedContinuation { gate.continuation = $0 }
+        limit.cancel()
+        XCTAssertFalse(gate.timedOut, "the first toast didn't time out into the next one within 5 s")
         XCTAssertEqual(center.current?.message, "b")
+        XCTAssertTrue(center.queue.isEmpty)
+        center.clear()
+    }
+
+    /// Resumes the test once: when the second toast's wait starts, or at the time limit.
+    @MainActor
+    private final class SecondWaitGate {
+        var waits = 0
+        var continuation: CheckedContinuation<Void, Never>?
+        private(set) var timedOut = false
+        func open(timedOut: Bool) {
+            guard let continuation else { return }
+            self.continuation = nil
+            self.timedOut = timedOut
+            continuation.resume()
+        }
     }
 
     func testDurations() {

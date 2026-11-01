@@ -658,8 +658,13 @@ final class CloudKitSyncService: ObservableObject {
             remoteUpdateDepth += 1
             defer { remoteUpdateDepth -= 1 }
             if let engine {
-                engine.applyPull(delta)
+                let applied = engine.applyPull(delta)
                 onIdentityChange?()
+                if applied.saveFailed {
+                    // Nothing applied: keep the token, so the next pull brings the delta again.
+                    syncError = RecordSetMigration.saveFailureProblem
+                    return false
+                }
             }
             // The token moves only after the changes are applied (a crash in between re-pulls
             // them; applying a delta twice changes nothing), and only past a complete delta: a
@@ -711,8 +716,14 @@ final class CloudKitSyncService: ObservableObject {
         _ = absent
         remoteUpdateDepth += 1
         defer { remoteUpdateDepth -= 1 }
-        engine.applyPull(ZoneDelta(changed: snapshot.records, deleted: deleted, tokenData: snapshot.tokenData, incomplete: false),
-                         deleteReason: .inferredAbsent)
+        let applied = engine.applyPull(ZoneDelta(changed: snapshot.records, deleted: deleted, tokenData: snapshot.tokenData, incomplete: false),
+                                       deleteReason: .inferredAbsent)
+        guard !applied.saveFailed else {
+            // Nothing applied: the old token stays and the next pull recovers again.
+            syncError = RecordSetMigration.saveFailureProblem
+            onIdentityChange?()
+            return false
+        }
         saveZoneToken(snapshot.tokenData)   // after the read is applied, never before
         onIdentityChange?()
         lastSyncDate = Date()
