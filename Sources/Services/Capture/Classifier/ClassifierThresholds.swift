@@ -42,10 +42,43 @@ enum ClassifierThresholds {
     static let skipModelBelow = 0.02
 
     /// Calibration targets the committed thresholds must keep meeting (checked by tests).
+    ///
+    /// Retargeted 2026-10-31 for `likely` 0.60 -> 0.70 (the owner chose fewer false suggestions).
+    /// The 980-event Jev-labelled tuning set (2026-10-27, `inbox-tune/report.md`) is why: at 0.70
+    /// its held-out precision rose .862 -> .879 and recall .704 -> .817. This hand-labelled
+    /// fixture (310 titles, shaped around the old table with 0.60 as its best point) moves the
+    /// other way: all-data accuracy .955 -> .923 and recall .933 -> .882, while precision holds
+    /// (.995 -> .994) and held-out precision is .958. Accuracy and recall therefore drop; precision
+    /// does not, and its target is unchanged. The new floors sit about one item under what the
+    /// committed rules score today, so a further slip still fails: all-data accuracy .9226 vs
+    /// 0.92 (286 of 310 needed; 1 item of slack), recall .882 vs 0.87. Held-out is 40 titles, so
+    /// one item is 0.025; its floor (0.90) is two items under .925.
     static let targetPrecisionAtLikely = 0.95
-    static let targetAccuracyAtLikely = 0.93
+    static let targetAccuracyAtLikely = 0.92
+    static let targetAccuracyHoldoutAtLikely = 0.90
+    /// Share of real landlord items that clear `likely` (was .933 at 0.60).
+    static let targetRecallAtLikely = 0.87
+    /// Most accuracy the committed `likely` may give up against the best point on the sweep
+    /// (0.968 at 0.25) in exchange for precision. Today the gap is 0.045.
+    static let maxAccuracyGivenUpForPrecision = 0.05
     /// Share of real landlord items that must stay visible (≥ notSure).
     static let targetVisibleRecall = 0.95
+    /// 2.3 F: the same share for the fixture's titles as calendar events, through the positive-
+    /// signal gate and the scan's visibility (main list or the Not sure row).
+    ///
+    /// Re-baseline, 2026-11-01 (package F owns this file and CalibrationTests from package E):
+    /// - The email path (the targets above) does not change under F: the gate, D2 and the rescue
+    ///   are calendar-only, and the new cue words (sublet, inquilino, arrendatario, lockbox, work
+    ///   order, WO, GC, escrow) touch no fixture title. Measured at 0.70 after F: all-data accuracy
+    ///   .923, precision .994, recall .882, visible .954; held-out .925 / .958; real-world 1.0. E's
+    ///   retarget (2026-10-31) is kept as written.
+    /// - New, the calendar path: all-data precision .972, visible recall .990 (held-out .958 /
+    ///   1.0). The landlord titles the gate hides have no rental cue of their own; the rescue keeps
+    ///   weak words that passed the gate. 193 of 195 are visible; the floor (192) leaves one item of slack.
+    /// - Measured outside this test: the synthetic office set and the 980-event hard set
+    ///   (package F hand-off): main-list noise 1 of 200 / 1.5%, rental reachable
+    ///   100% / 94%.
+    static let targetCalendarVisibleRecall = 0.98
     /// Category accuracy floors (landlord items). Rules on the held-out set are honest-low.
     /// Model floor: the first real run (2026-10-21, slim sim with Siri & Intelligence kept on,
     /// and the host Mac's model via scripts/clf-eval-host) scored 0.44 with the old prompt; the
@@ -83,13 +116,19 @@ extension ClassifierThresholds {
     /// Evidence marker the rules add when a landlord keyword or property matched and noise
     /// words don't outweigh it.
     static let landlordSignalEvidence = "signal: landlord"
+
+    /// Evidence marker on a calendar item that passed the positive-signal gate (2.3 F, "G2"): it
+    /// names a rental, an address, a rental word of 0.6 or more, or a hardware store. Only these
+    /// items are shown to the on-device model, and only on these can a model "yes" keep an item
+    /// visible. The model may move an item that has a cue; it can never create one.
+    static let rentalCueEvidence = "signal: rental cue"
 }
 
 extension CaptureClassification {
     /// Band for display. Anything with landlord evidence (a keyword or property the rules
-    /// matched, or a model "yes") is never hidden: at worst it is "Not sure", whatever its
-    /// score — a model "no" or a low score cannot push it out of the inbox. Only items with
-    /// no landlord signal at all are dropped.
+    /// matched, or a model "yes" on an item with a rental cue) is never hidden: at worst it is
+    /// "Not sure", whatever its score. "Not sure" items sit behind the Inbox's collapsed "Not
+    /// sure" row (2.3 F), never in the main list, never counted, never notified.
     var band: ConfidenceBand {
         if confidence >= ClassifierThresholds.likely { return .likely }
         if hasLandlordEvidence { return .notSure }
@@ -98,6 +137,9 @@ extension CaptureClassification {
 
     var hasLandlordEvidence: Bool {
         if evidence.contains(ClassifierThresholds.notRentalEvidence) { return false }
-        return isLandlordWork || evidence.contains { $0 == ClassifierThresholds.landlordSignalEvidence || $0.hasPrefix("model: yes") }
+        if isLandlordWork || evidence.contains(ClassifierThresholds.landlordSignalEvidence) { return true }
+        // 2.3 F: a model "yes" counts only on an item the rules gave a rental cue. On v2.2 a "yes"
+        // alone surfaced 15 of 42 office look-alikes (1:1s, writing blocks) as "Not sure".
+        return evidence.contains(ClassifierThresholds.rentalCueEvidence) && evidence.contains { $0.hasPrefix("model: yes") }
     }
 }

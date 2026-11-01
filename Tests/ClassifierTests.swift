@@ -417,14 +417,22 @@ final class ClassifierTests: XCTestCase {
 
     // MARK: Chain with the model
 
-    func testModelRescuesAnUnknownTitleIntoNotSure() async {
+    /// 2.3 F: the model moves an event that has a rental cue; it never creates one. A title with no
+    /// cue is not even shown to it (on v2.2 its "yes" surfaced 1:1s and writing blocks).
+    func testModelRescuesOnlyATitleWithARentalCue() async {
         let backend = FakeOnDeviceBackend(answer: answer(true, 0.85, category: .investing))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
-        let result = await chain.classify(candidate("Prep paperwork for Friday"), properties: properties)
-        XCTAssertEqual(result.tier, .onDevice)
-        XCTAssertEqual(result.band, .notSure)
-        XCTAssertFalse(result.isLandlordWork)
-        XCTAssertTrue(result.evidence.contains { $0.hasPrefix("model: yes") })
+        let noCue = await chain.classify(candidate("Prep paperwork for Friday"), properties: properties)
+        XCTAssertEqual(noCue.tier, .rules)
+        XCTAssertEqual(noCue.band, .unlikely)
+        XCTAssertTrue(backend.requests.isEmpty, "No rental cue, no model call")
+
+        let cue = await chain.classify(candidate("Install shelves for Friday"), properties: properties)
+        XCTAssertEqual(cue.tier, .onDevice)
+        XCTAssertEqual(cue.band, .notSure)
+        XCTAssertFalse(cue.isLandlordWork)
+        XCTAssertTrue(cue.evidence.contains { $0.hasPrefix("model: yes") })
+        XCTAssertEqual(backend.requests.count, 1)
     }
 
     func testDecisiveRulesSkipTheModel() async {

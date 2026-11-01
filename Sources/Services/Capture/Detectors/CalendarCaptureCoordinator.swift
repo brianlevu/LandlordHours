@@ -30,32 +30,6 @@ struct PlaceholderCalendarClassifier: CaptureClassifier {
     }
 }
 
-/// Whether a classifier outcome is shown in the Inbox. One answer for the live scan, the backfill
-/// and the one-time cleanup, so they can never disagree about the same event.
-enum CalendarVisibility {
-    /// The classification to show, or nil to hide. A hidden item with a landlord word in its title
-    /// is kept as "Not sure" (confidence at least 0.30), unless the rules marked it as clearly
-    /// not rental work (a personal appointment, a remote place). Muted items are nil: a mute is
-    /// the user's rule, handled by the caller.
-    ///
-    /// `keepKeywordTitles`: the cleanup of items already in the Inbox. It never deletes one with a
-    /// landlord word in its title, even when the rules marked it not rental; it drops to "Not sure".
-    static func shown(_ outcome: ClassifierOutcome, title: String, keepKeywordTitles: Bool = false) -> CaptureClassification? {
-        switch outcome {
-        case .suggest(let classification):
-            return classification
-        case .skip(var classification):
-            guard keepKeywordTitles || !classification.evidence.contains(ClassifierThresholds.notRentalEvidence),
-                  RulesEngine.titleHasLandlordKeyword(title) else { return nil }
-            classification.confidence = max(classification.confidence, ClassifierThresholds.notSure)
-            classification.evidence.append(ClassifierThresholds.landlordSignalEvidence)
-            return classification
-        case .muted:
-            return nil
-        }
-    }
-}
-
 /// What the one-time pending cleanup did.
 struct InboxCleanupResult: Equatable {
     var removed = 0
@@ -233,11 +207,17 @@ final class CalendarCaptureCoordinator {
     /// whose event can't be found is left as it is. Returns nil when it already ran, or when it
     /// couldn't run yet (no calendar access, cancelled): the flag stays unset then, so it runs
     /// later. Idempotent: once the flag is set a second call does nothing.
+    ///
+    /// 2.3 F adds a second one-time pass (`hasRunPendingCleanupV2`): the same re-check under the
+    /// positive-signal gate, so items the 2.2 rules let in (1:1s, check-ins, deck reviews) leave,
+    /// and items that are now "Not sure" move behind the collapsed row. It never removes an item
+    /// whose title carries a rental word of 1.0 or more (`CalendarVisibility`, keepKeywordTitles).
+    /// An install that never ran the first pass runs only this one. The caller is unchanged.
     func cleanUpPendingOnce(chain: ClassifierChain, properties: [RentalProperty], entries: [TimeEntry]) async -> InboxCleanupResult? {
-        guard !store.hasRunPendingCleanup, detector.access.canReadEvents else { return nil }
+        guard !(store.hasRunPendingCleanup && store.hasRunPendingCleanupV2), detector.access.canReadEvents else { return nil }
         let pending = store.pending.filter { $0.kind == .calendar }
         guard let first = pending.map(\.start).min(), let last = pending.map(\.start).max() else {
-            store.markPendingCleanupDone()
+            store.markPendingCleanupV2Done()
             return InboxCleanupResult()
         }
         let keys = Set(pending.map(\.sourceKey))
@@ -259,7 +239,7 @@ final class CalendarCaptureCoordinator {
             }
         }
         result.removed = store.removeHiddenBySystem(keys: hidden)
-        store.markPendingCleanupDone()
+        store.markPendingCleanupV2Done()
         return result
     }
 

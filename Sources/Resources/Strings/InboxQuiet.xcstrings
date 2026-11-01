@@ -1,0 +1,207 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "quiet.calendars.all": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All turned on"
+          }
+        }
+      }
+    },
+    "quiet.calendars.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the list of calendars"
+          }
+        }
+      }
+    },
+    "quiet.calendars.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We look for rental work only in the calendars you turn on. Turn off the calendar for your day job to keep its meetings out of your Inbox."
+          }
+        }
+      }
+    },
+    "quiet.calendars.other": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other"
+          }
+        }
+      }
+    },
+    "quiet.calendars.some": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lld turned on"
+          }
+        }
+      },
+      "comment": "How many calendars the Inbox reads, e.g. 2 of 3 turned on"
+    },
+    "quiet.calendars.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendars"
+          }
+        }
+      }
+    },
+    "quiet.calendars.work": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work calendar"
+          }
+        }
+      }
+    },
+    "quiet.maybe.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing left to check."
+          }
+        }
+      }
+    },
+    "quiet.maybe.footer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These aren’t counted in To confirm. We never send an alert for them."
+          }
+        }
+      }
+    },
+    "quiet.maybe.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the items we aren’t sure about"
+          }
+        }
+      }
+    },
+    "quiet.maybe.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Might be rental work"
+          }
+        }
+      }
+    },
+    "quiet.maybe.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yours to decide"
+          }
+        }
+      }
+    },
+    "quiet.maybe.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure"
+          }
+        }
+      }
+    },
+    "quiet.prompt.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You said %lld events from this calendar aren’t rental work."
+          }
+        }
+      },
+      "comment": "Why we ask, e.g. You said 3 events from this calendar aren’t rental work."
+    },
+    "quiet.prompt.keep": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep checking"
+          }
+        }
+      }
+    },
+    "quiet.prompt.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop checking"
+          }
+        }
+      }
+    },
+    "quiet.prompt.stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We stopped checking that calendar."
+          }
+        }
+      }
+    },
+    "quiet.prompt.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop checking “%@”?"
+          }
+        }
+      },
+      "comment": "One-time question about a calendar, e.g. Stop checking “Work”?"
+    }
+  },
+  "version": "1.0"
+}

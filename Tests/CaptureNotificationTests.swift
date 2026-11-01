@@ -307,6 +307,20 @@ final class EndOfEventSchedulerTests: XCTestCase {
         XCTAssertFalse(keys.contains(SuggestionKey.calendar(externalId: "DONE")))
     }
 
+    /// 2.3 F: a "Not sure" item (under the 0.70 likely line) is never notified, including the
+    /// 0.60–0.70 band the old 0.60 copy let through.
+    func testANotSureItemGetsNoEndOfEventNotification() async {
+        let items = [
+            suggestion("SURE", end: date(2026, 3, 2, 12), confidence: ClassifierThresholds.likely),
+            suggestion("MAYBE", end: date(2026, 3, 3, 12), confidence: 0.65),
+        ]
+        await makeScheduler().schedule(items, profileId: "p1")
+        let keys = Set(center.captureRequests.compactMap { $0.content.userInfo[NotificationPayload.sourceKeyKey] as? String })
+        XCTAssertTrue(keys.contains(SuggestionKey.calendar(externalId: "SURE")))
+        XCTAssertFalse(keys.contains(SuggestionKey.calendar(externalId: "MAYBE")), "0.65 is Not sure: no notification")
+        XCTAssertEqual(EndOfEventScheduler.Policy().likelyThreshold, ClassifierThresholds.likely)
+    }
+
     func testEventThatAlreadyEndedIsNotAnnounced() async {
         now = date(2026, 3, 2, 13)
         await makeScheduler().schedule([suggestion("OLD", end: date(2026, 3, 2, 12))], profileId: "p1")
