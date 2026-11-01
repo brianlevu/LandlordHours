@@ -135,7 +135,8 @@ private struct UnfoldHingeModifier: ViewModifier {
             .modifier(HingeListener { old, new in
                 clock.hingeChanged(from: old, to: new, reduceMotion: reduceMotion)
             })
-            .simultaneousGesture(TapGesture().onEnded { clock.finish() }, including: clock.isRunning ? .all : .none)
+            // At rest only the subviews' own gestures run (`.none` would switch off every tap in the app).
+            .simultaneousGesture(TapGesture().onEnded { clock.finish() }, including: clock.isRunning ? .all : .subviews)
             .task(id: posture) {
                 // Must-prove 3: if the open event is missed while the window changes display, the door
                 // must not stay shut over a lit fold. Checked a few times after the posture lands.
