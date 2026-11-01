@@ -1,6 +1,18 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "shell.key.timer": {
+      "comment": "Hidden keyboard command (Command-Shift-N) that opens Log time on its timer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start timer"
+          }
+        }
+      }
+    },
     "twoPane.detail.back": {
       "comment": "Back link from a detail opened in the work pane.",
       "extractionState": "manual",

@@ -342,10 +342,17 @@ struct ContentView: View {
             .modifier(TabBarMinimizeOnScroll())
             .background {
                 // ⌘N logs time from anywhere (§1.27 keyboard).
-                Button(ShellItem.logTime.title) { openLog(.log) }
-                    .keyboardShortcut("n", modifiers: .command)
-                    .opacity(0)
-                    .accessibilityHidden(true)
+                ZStack {
+                    Button(ShellItem.logTime.title) { openLog(.log) }
+                        .keyboardShortcut("n", modifiers: .command)
+                    // ⌘⇧N starts the timer (§1.27 keyboard): the Log time sheet on its timer.
+                    Button(String(localized: "shell.key.timer", defaultValue: "Start timer", table: "Adaptive")) {
+                        openLog(.timer)
+                    }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                }
+                .opacity(0)
+                .accessibilityHidden(true)
             }
             .onReceive(NotificationCenter.default.publisher(for: .switchToTab)) { notification in
                 if let index = notification.object as? Int { route(toLegacy: index) }
