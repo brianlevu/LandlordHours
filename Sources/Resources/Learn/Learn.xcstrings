@@ -649,6 +649,1051 @@
           }
         }
       }
+    },
+    "learn.today.header": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Learn"
+          }
+        }
+      }
+    },
+    "learn.today.seeAll": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See all"
+          }
+        }
+      }
+    },
+    "lesson.card.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up next: %@"
+          }
+        }
+      }
+    },
+    "lesson.card.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You’re at %1$lld of %2$lld. Here’s what usually counts."
+          }
+        }
+      }
+    },
+    "lesson.cardOf": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "lesson.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.no1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading statements as an investor"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.no2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Learning about real estate in general"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.no3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours a manager puts in for you"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Most of your %1$lld hours are %2$@."
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours count when you do the work yourself. Owning the rental isn’t enough."
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work you do yourself usually counts"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.yes1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repairs and upkeep you do"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.yes2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showings, leases and tenant calls"
+          }
+        }
+      }
+    },
+    "lesson.counts.c1.yes3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiring and managing contractors"
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.line1.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Day job"
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.line1.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1,800h"
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.line2.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rental work"
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.line2.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "more than 1,800h"
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A full-time job makes this part hard to reach."
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The 750 has a second part. Your rental hours need to be more than half of all the hours you work. Your day job counts in that total."
+          }
+        }
+      }
+    },
+    "lesson.counts.c2.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It has to be more than half your work"
+          }
+        }
+      }
+    },
+    "lesson.counts.c3.q1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which of my hours count toward the 750?"
+          }
+        }
+      }
+    },
+    "lesson.counts.c3.q2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do I pass the more-than-half part?"
+          }
+        }
+      }
+    },
+    "lesson.counts.c3.q3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Should I count my rentals together?"
+          }
+        }
+      }
+    },
+    "lesson.counts.c3.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your CPA decides what the numbers mean. Take these questions:"
+          }
+        }
+      }
+    },
+    "lesson.counts.c3.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to your CPA"
+          }
+        }
+      }
+    },
+    "lesson.counts.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What counts toward the 750"
+          }
+        }
+      }
+    },
+    "lesson.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line1.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line1.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oct 12"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line2.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line2.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pine Cabin"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line3.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line3.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleared the gutters"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line4.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How long"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.line4.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2h"
+          }
+        }
+      }
+    },
+    "lesson.log.c1.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer fills most of this when you type a note."
+          }
+        }
+      }
+    },
+    "lesson.log.c1.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A good line says when, where, what you did and for how long."
+          }
+        }
+      }
+    },
+    "lesson.log.c1.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Four things in every line"
+          }
+        }
+      }
+    },
+    "lesson.log.c2.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar suggestions help you catch the days you missed."
+          }
+        }
+      }
+    },
+    "lesson.log.c2.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes from the same week are easier to stand behind than a guess in December. Log the hours you worked, not a round number."
+          }
+        }
+      }
+    },
+    "lesson.log.c2.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log it the same week"
+          }
+        }
+      }
+    },
+    "lesson.log.c3.q1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Is the PDF of my hours enough?"
+          }
+        }
+      }
+    },
+    "lesson.log.c3.q2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do you want my receipts too?"
+          }
+        }
+      }
+    },
+    "lesson.log.c3.q3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How long should I keep these records?"
+          }
+        }
+      }
+    },
+    "lesson.log.c3.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask what your CPA wants to see. Take these questions:"
+          }
+        }
+      }
+    },
+    "lesson.log.c3.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to your CPA"
+          }
+        }
+      }
+    },
+    "lesson.log.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What a good log looks like"
+          }
+        }
+      }
+    },
+    "lesson.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        }
+      }
+    },
+    "lesson.notNow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        }
+      }
+    },
+    "lesson.readButton": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read · %lld min"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.line1.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.line1.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "520h"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.line2.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your spouse’s"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.line2.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "310h"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.line3.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For the 750"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.line3.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "520h, not 830h"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer keeps your hours and your spouse’s apart."
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One spouse has to pass both parts alone. Your hours don’t add together for the 750."
+          }
+        }
+      }
+    },
+    "lesson.spouse.c1.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For the 750, one of you gets there alone"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.line1.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.line1.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "320h"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.line2.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your spouse’s"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.line2.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "210h"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.line3.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For the 500"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.line3.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "530h together"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say who did the work each time you log."
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Here your hours and your spouse’s add up, on each rental."
+          }
+        }
+      }
+    },
+    "lesson.spouse.c2.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For the 500-hour test, your hours add up"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c3.q1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which test matters for us, the 750 or the 500?"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c3.q2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whose hours should we count?"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c3.q3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Does my spouse’s job change anything?"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c3.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask which test fits your return. Take these questions:"
+          }
+        }
+      }
+    },
+    "lesson.spouse.c3.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to your CPA"
+          }
+        }
+      }
+    },
+    "lesson.spouse.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You and your spouse"
+          }
+        }
+      }
+    },
+    "lesson.usuallyCounts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usually counts"
+          }
+        }
+      }
+    },
+    "lesson.usuallyDoesnt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usually doesn’t"
+          }
+        }
+      }
+    },
+    "lesson.work.and": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "and"
+          }
+        }
+      }
+    },
+    "lesson.work.bookkeeping": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bookkeeping"
+          }
+        }
+      }
+    },
+    "lesson.work.driving": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "driving to the rental"
+          }
+        }
+      }
+    },
+    "lesson.work.insurance": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "insurance claims"
+          }
+        }
+      }
+    },
+    "lesson.work.legal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "legal work"
+          }
+        }
+      }
+    },
+    "lesson.work.management": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "management"
+          }
+        }
+      }
+    },
+    "lesson.work.renovations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "renovations"
+          }
+        }
+      }
+    },
+    "lesson.work.repairs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "repairs"
+          }
+        }
+      }
+    },
+    "lesson.work.showings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "showings"
+          }
+        }
+      }
+    },
+    "lessons.a11y.progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lld lessons read"
+          }
+        }
+      }
+    },
+    "lessons.caption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lessons read · about 2 minutes each"
+          }
+        }
+      }
+    },
+    "lessons.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "lessons.meta.cards": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld cards · %2$lld min"
+          }
+        }
+      }
+    },
+    "lessons.meta.read": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read"
+          }
+        }
+      }
+    },
+    "lessons.meta.upNext": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up next · %@"
+          }
+        }
+      }
+    },
+    "lessons.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lessons"
+          }
+        }
+      }
+    },
+    "lessons.shortReads": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short reads"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

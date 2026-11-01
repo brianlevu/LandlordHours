@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "lessons": [
+    {
+      "id": "counts",
+      "minutes": 2,
+      "cards": [
+        {
+          "body": "counts",
+          "noteSymbol": "chart.bar",
+          "yes": 3,
+          "no": 3,
+          "personalNote": true
+        },
+        {
+          "body": "lines",
+          "noteSymbol": "briefcase",
+          "lines": 2
+        },
+        {
+          "body": "questions",
+          "questions": 3
+        }
+      ]
+    },
+    {
+      "id": "spouse",
+      "minutes": 2,
+      "cards": [
+        {
+          "body": "lines",
+          "noteSymbol": "person.2",
+          "lines": 3
+        },
+        {
+          "body": "lines",
+          "noteSymbol": "person.2",
+          "lines": 3
+        },
+        {
+          "body": "questions",
+          "questions": 3
+        }
+      ]
+    },
+    {
+      "id": "log",
+      "minutes": 2,
+      "cards": [
+        {
+          "body": "lines",
+          "noteSymbol": "text.cursor",
+          "lines": 4
+        },
+        {
+          "body": "none",
+          "noteSymbol": "calendar"
+        },
+        {
+          "body": "questions",
+          "questions": 3
+        }
+      ]
+    }
+  ]
+}

@@ -20,14 +20,17 @@ final class LearnDeleteRestoreUITests: XCTestCase {
 
     // MARK: Behaviour
 
-    func testLearningCenterListsTheReadsAndOpensAnArticle() {
+    func testLearningCenterListsTheLessonsAndTheReadsAndOpensAnArticle() {
         launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings"])
         XCTAssertTrue(element("learn.screen").waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Learning center"].exists)
-        XCTAssertTrue(element("learn.row.goal-750").exists)
-        XCTAssertTrue(element("learn.row.stays").exists)
+        XCTAssertTrue(element("learn.progress").exists, "The progress card is on the list")
+        for id in ["counts", "spouse", "log"] { XCTAssertTrue(element("lesson.row.\(id)").exists, "Lesson row \(id)") }
         XCTAssertFalse(app.images["LearningHero"].exists, "No stock photos")
-        element("learn.row.goal-750").tap()
+        let row = element("learn.row.goal-750")
+        XCTAssertTrue(scrollTo(row), "The short reads follow the lessons")
+        XCTAssertTrue(element("learn.row.stays").exists)
+        row.tap()
         XCTAssertTrue(element("learn.article.goal-750").waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["What the 750-hour goal means"].exists)
         let disclaimer = app.staticTexts["General information, not tax advice. Your tax pro has the final word."]
@@ -77,6 +80,13 @@ final class LearnDeleteRestoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 150), "After deleting, the app is back at Welcome")
     }
 
+    func testDeleteFailureShowsAnInlineLineNotAnAlert() {
+        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData", "-LHDeleteFailurePreview"])
+        XCTAssertTrue(element("delete.screen").waitForExistence(timeout: 20))
+        assertInlineDeleteError()
+        XCTAssertTrue(element("delete.screen").exists, "Still on the delete page: nothing was deleted")
+    }
+
     // Restore (2.0 profiles) is gone in 2.2: Earlier records replace it (IdentityJourneyUITests).
 
     // MARK: Capture
@@ -101,6 +111,8 @@ final class LearnDeleteRestoreUITests: XCTestCase {
         if wants("learn") {
             launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings"], scheme: scheme, size: size)
             XCTAssertTrue(element("learn.screen").waitForExistence(timeout: 20))
+            XCTAssertTrue(element("learn.progress").exists)
+            XCTAssertTrue(element("lesson.row.counts").exists)
             settleAndCapture("learn-\(suffix)")
             app.swipeUp()
             app.swipeUp()
@@ -137,12 +149,12 @@ final class LearnDeleteRestoreUITests: XCTestCase {
         }
 
         if wants("deletefail"), size != "xxl" {
-            // iCloud lost mid-delete: the honest failure, with nothing deleted.
+            // iCloud lost mid-delete: the honest failure is an inline line on the page (it replaced the
+            // old alert), with nothing deleted and the hold button still there.
             launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData", "-LHDeleteFailurePreview"],
                    scheme: scheme, size: size)
-            let alert = app.alerts["Couldn’t delete"]
-            XCTAssertTrue(alert.waitForExistence(timeout: 20))
-            XCTAssertTrue(alert.staticTexts["Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online."].exists)
+            XCTAssertTrue(element("delete.screen").waitForExistence(timeout: 20))
+            assertInlineDeleteError()
             settleAndCapture("delete-failed-\(suffix)")
         }
 
@@ -162,6 +174,18 @@ final class LearnDeleteRestoreUITests: XCTestCase {
     }
 
     // MARK: Helpers
+
+    /// The failure is an inline `delete.error` line, not an alert: its text says nothing was deleted
+    /// and what to do, no alert is up, and the delete controls are still on the page.
+    private func assertInlineDeleteError(file: StaticString = #filePath, line: UInt = #line) {
+        let error = element("delete.error")
+        XCTAssertTrue(error.waitForExistence(timeout: 10), "The failure shows as the inline delete.error line", file: file, line: line)
+        XCTAssertEqual(error.label, "Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online.",
+                       "The inline line carries the honest message", file: file, line: line)
+        XCTAssertFalse(app.alerts.firstMatch.exists, "No alert: the old Couldn’t delete alert is gone", file: file, line: line)
+        XCTAssertTrue(element("delete.hold").exists, "Delete is still there to try again", file: file, line: line)
+        XCTAssertTrue(app.buttons["delete.cancel"].exists || scrollTo(app.buttons["delete.cancel"]), "Cancel is still there", file: file, line: line)
+    }
 
     private func launch(_ extra: [String], scheme: String = "light", size: String? = nil) {
         app.terminate()
