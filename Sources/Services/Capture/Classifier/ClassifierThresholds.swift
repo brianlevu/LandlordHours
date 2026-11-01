@@ -42,8 +42,25 @@ enum ClassifierThresholds {
     static let skipModelBelow = 0.02
 
     /// Calibration targets the committed thresholds must keep meeting (checked by tests).
+    ///
+    /// Retargeted 2026-10-31 for `likely` 0.60 -> 0.70 (the owner chose fewer false suggestions).
+    /// The 980-event Jev-labelled tuning set (2026-10-27, `inbox-tune/report.md`) is why: at 0.70
+    /// its held-out precision rose .862 -> .879 and recall .704 -> .817. This hand-labelled
+    /// fixture (310 titles, shaped around the old table with 0.60 as its best point) moves the
+    /// other way: all-data accuracy .955 -> .923 and recall .933 -> .882, while precision holds
+    /// (.995 -> .994) and held-out precision is .958. Accuracy and recall therefore drop; precision
+    /// does not, and its target is unchanged. The new floors sit about one item under what the
+    /// committed rules score today, so a further slip still fails: all-data accuracy .9226 vs
+    /// 0.92 (286 of 310 needed; 1 item of slack), recall .882 vs 0.87. Held-out is 40 titles, so
+    /// one item is 0.025; its floor (0.90) is two items under .925.
     static let targetPrecisionAtLikely = 0.95
-    static let targetAccuracyAtLikely = 0.93
+    static let targetAccuracyAtLikely = 0.92
+    static let targetAccuracyHoldoutAtLikely = 0.90
+    /// Share of real landlord items that clear `likely` (was .933 at 0.60).
+    static let targetRecallAtLikely = 0.87
+    /// Most accuracy the committed `likely` may give up against the best point on the sweep
+    /// (0.968 at 0.25) in exchange for precision. Today the gap is 0.045.
+    static let maxAccuracyGivenUpForPrecision = 0.05
     /// Share of real landlord items that must stay visible (≥ notSure).
     static let targetVisibleRecall = 0.95
     /// Category accuracy floors (landlord items). Rules on the held-out set are honest-low.

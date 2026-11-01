@@ -235,4 +235,93 @@ final class TodayConfirmUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["capture.toggle.calendar"].waitForExistence(timeout: 5),
                       "Turn on opens the suggestions setup")
     }
+
+    // MARK: Show the result where it happened (DESIGN-STANDARD §E.1)
+
+    private var chip: XCUIElement { app.descendants(matching: .any)["today.chip"].firstMatch }
+    private var revealProbe: XCUIElement { app.descendants(matching: .any)["today.revealProbe"].firstMatch }
+
+    private func launchTwoRentals(extra: [String] = []) {
+        app.terminate()
+        app.launchArguments = extra + [
+            UITestIsolation.resetProfilesArgument,
+            "-LHMockScenario", "emptyMainTabs",
+            "-LHSeedSuggestions", "inbox",
+            "-LHNoSwipePeek",
+            "-LHRevealProbe",
+            "-LHFixedNow", Self.todayAt3pm,
+            "-LHInitialTab", "0",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US"
+        ]
+        app.launch()
+    }
+
+    /// Confirms the "Showing" suggestion (Oak Street Duplex) in the Inbox, the way a person does.
+    private func confirmShowingInInbox() {
+        inboxTab.tap()
+        let showing = app.descendants(matching: .any)["inbox.row.cal:debug-showing"]
+        XCTAssertTrue(showing.waitForExistence(timeout: 10))
+        showing.tap()
+        let log = app.buttons["confirm.log"]
+        XCTAssertTrue(log.waitForExistence(timeout: 8))
+        log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 8), "the confirm sheet closes")
+    }
+
+    func testTodayOpensOnTheRentalTheUserJustConfirmedThenRespectsAManualPick() {
+        launchTwoRentals()
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        XCTAssertTrue(chip.waitForExistence(timeout: 10))
+        let before = chip.label
+        XCTAssertNotEqual(before, "Rental: Oak Street Duplex", "Today starts somewhere else")
+
+        confirmShowingInInbox()
+        app.tabBars.firstMatch.buttons["Today"].tap()
+
+        XCTAssertTrue(waitFor(chip, label: "label == 'Rental: Oak Street Duplex'", timeout: 10),
+                      "Today opens on the rental that gained hours (was \(before), now \(chip.label))")
+        XCTAssertTrue(revealProbe.label.contains("arrive:confirmed"), "the switch came from the user's own confirm: \(revealProbe.label)")
+        XCTAssertEqual(revealProbe.label.components(separatedBy: "arrive:").count - 1, 1, "once")
+
+        // A manual pick sticks: leave and come back with nothing new changed.
+        chip.tap()
+        let other = app.buttons.matching(NSPredicate(format: "label == 'Pine Cabin'")).firstMatch
+        XCTAssertTrue(other.waitForExistence(timeout: 5), "the chip menu lists the other rental")
+        other.tap()
+        XCTAssertTrue(waitFor(chip, label: "label == 'Rental: Pine Cabin'", timeout: 8))
+        inboxTab.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.screen"].waitForExistence(timeout: 5))
+        app.tabBars.firstMatch.buttons["Today"].tap()
+        XCTAssertTrue(hero.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertEqual(chip.label, "Rental: Pine Cabin", "switch once, then respect the pick")
+        XCTAssertEqual(revealProbe.label.components(separatedBy: "arrive:").count - 1, 1, "no second switch")
+    }
+
+    /// Frames for the gate: Today right after the switch, light and dark, default and XXL.
+    /// Runs only with `TEST_RUNNER_LH_CAPTURE_DIR` set (the PNGs are written there too).
+    func testCaptureArrivalFrames() throws {
+        let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"] ?? ""
+        try XCTSkipIf(dir.isEmpty, "capture-only: set TEST_RUNNER_LH_CAPTURE_DIR")
+        for scheme in ["light", "dark"] {
+            for size in ["default", "xxl"] {
+                let sizeArgs = size == "xxl" ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] : []
+                launchTwoRentals(extra: ["-LHColorScheme", scheme] + sizeArgs)
+                XCTAssertTrue(hero.waitForExistence(timeout: 20))
+                let beforeShot = app.screenshot()
+                try? beforeShot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("today-before-\(scheme)-\(size).png"))
+                confirmShowingInInbox()
+                app.tabBars.firstMatch.buttons["Today"].tap()
+                XCTAssertTrue(waitFor(chip, label: "label == 'Rental: Oak Street Duplex'", timeout: 10))
+                Thread.sleep(forTimeInterval: 4.0)   // the catch-up has played
+                let shot = app.screenshot()
+                try? shot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("today-arrive-\(scheme)-\(size).png"))
+                let attachment = XCTAttachment(screenshot: shot)
+                attachment.name = "today-arrive-\(scheme)-\(size)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
+    }
 }

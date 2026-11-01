@@ -100,6 +100,9 @@ struct DashboardView: View {
     @SceneStorage("today.focus") private var rememberedFocus = ""
     @State private var focusID: String?
     @State private var slideEdge: Edge = .trailing
+    /// Bumped by the user's own page picks (the chip, the swipe). The arrival switch (§E.1) is not
+    /// a pick and gives no haptic.
+    @State private var pickTick = 0
     @State private var window: CGSize = .zero
     @State private var heroSide: CraftHeroSide?
     /// Today's view is in the window (its tab is selected). `isVisible` adds the rest.
@@ -352,7 +355,7 @@ struct DashboardView: View {
             }, trailing: {
                 accountMenu
             })
-            .sensoryFeedback(.selection, trigger: focusID)
+            .sensoryFeedback(.selection, trigger: pickTick)
             .onAppear(perform: appeared)
             .onDisappear { onScreen = false }
             .onChange(of: isVisible) { _, visible in if visible { becameVisible() } }
@@ -374,9 +377,16 @@ struct DashboardView: View {
                 if isVisible { reveal() }
             }
             .onChange(of: hoursPending) { wasPending, isPending in
-                if wasPending, !isPending, isVisible { reveal() }
+                if wasPending, !isPending, isVisible {
+                    arriveAtChangedRental()
+                    reveal()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in refreshCaptureState() }
+            .onReceive(NotificationCenter.default.publisher(for: .userChangeRecorded)) { _ in
+                // The user changed it while looking at Today: this page already shows the result.
+                if isVisible { UserChangeSignal.shared.discard() }
+            }
             .onChange(of: hoursPending) { wasPending, isPending in
                 guard wasPending, !isPending else { return }
                 UIAccessibility.post(notification: .announcement, argument: pace.spoken)
@@ -588,8 +598,9 @@ struct DashboardView: View {
 
     // MARK: Actions
 
-    private func select(_ id: String) {
+    private func select(_ id: String, byUser: Bool = true) {
         guard id != focus?.id else { return }
+        if byUser { pickTick += 1 }
         let pages = focuses
         let to = pages.firstIndex { $0.id == id } ?? 0
         slideEdge = to > focusIndex ? .trailing : .leading
@@ -663,6 +674,7 @@ struct DashboardView: View {
     /// Today just became visible: play the catch-up (if any), then any queued milestone.
     private func becameVisible() {
         houseEvents.takeConfirm()
+        arriveAtChangedRental()
         let plan = reveal()
         let delay: Double
         if let plan, plan.stageMotion == .timberDrop || plan.windowsChange {
@@ -673,6 +685,19 @@ struct DashboardView: View {
             delay = Self.afterAppear
         }
         scheduleCelebration(after: delay)
+    }
+
+    /// "Show the result where it happened" (§E.1): the first time Today is seen after the user
+    /// changed a rental themselves, it opens on that rental (the latest, when several changed) and
+    /// the catch-up below plays there. The change is taken, so this happens once and a manual pick
+    /// afterwards is left alone. Reduce Motion swaps the slide for a cross-fade inside `select`.
+    private func arriveAtChangedRental() {
+        guard !hoursPending, let change = UserChangeSignal.shared.take() else { return }
+        guard let id = TodayFocusList.arrivalFocusID(focuses, current: focus?.id, change: change) else { return }
+        select(id, byUser: false)
+        #if DEBUG
+        HouseRevealDebugLog.shared.record("arrive:\(change.kind.rawValue)")
+        #endif
     }
 
     private func coverDismissed() {
