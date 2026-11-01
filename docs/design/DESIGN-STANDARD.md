@@ -1212,6 +1212,19 @@ The project `CLAUDE.md` is stale against both documents: it still names radius 1
 
 ---
 
+## E. Navigation rules
+
+### E.1 Show the result where it happened (2.3, Brian 2026-10-28)
+
+After the person changes something, the next screen they open shows that change, in its place, once.
+
+- **Signal.** `UserChangeSignal` holds the latest change: the rental and the kind (`logged`, `confirmed`). Only the person's own actions record it: a Log time save and a confirm in the Inbox or To confirm. iCloud sync, Inbox scans, imports and widget or notification refreshes never do **[grep: `UserChangeSignal.shared.record(` appears only in `AppViewModel.logTimeEntry` and `AppViewModel+Capture.confirm`]**.
+- **Today.** The first time Today is visible after a change, it opens on that rental's page (also from "All rentals") and plays the house catch-up there (`houseReveal`, the build step). The change is taken at that moment: it switches once, and a manual pick afterwards is never overruled. If several rentals changed, the latest wins. A change older than 30 minutes is dropped. A change made while Today is already visible is dropped: the page in view already shows it.
+- **Quiet switch.** The switch is not a pick: it uses the rental slide (a 0.20 cross-fade under Reduce Motion, §B) and gives no selection haptic. A rental that is no longer a page is ignored.
+- **Other screens.** Reports, rental detail and the widget and notification deep links follow the same rule when they are built: land on the changed thing, play its motion once, then leave the person in control.
+
+---
+
 ## Appendix: rollout order (v1; superseded by `docs/design/v2-revamp-plan.md`)
 
 1. `Components/`: `LHButton`, `LHTag`, `LHChip`, `LHSectionHeader`, `LHScreenTitle`, `LHRow.Action/.Browse/.Value`, `LHField`, `LHSegmented`, `LHStepper`, `LHEmptyState`, `LHFormat.hours`, the revised `AppAnimation`; `scripts/density_gate.py`, `scripts/copy_gate.py`. **Create `Sources/Resources/Localizable.xcstrings`** with the canonical keys from §C.5 and migrate the view literals into it (today only `Learn.xcstrings` exists; the copy gate greps both catalogs, and a string that is not in a catalog is a gate fail).

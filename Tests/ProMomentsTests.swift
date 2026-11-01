@@ -146,6 +146,48 @@ final class RatingPromptCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.consider(.exportShared, entryCount: 30), "Only the first shared export counts")
     }
 
+    func testFirstSharedPDFAsksAndSystemPromptIsQueuedOnce() {
+        let coordinator = makeCoordinator()
+        coordinator.recordLaunch()
+        clock = clock.addingTimeInterval(8 * 86_400)
+        coordinator.noteSharedExport(format: .pdf)
+        XCTAssertTrue(coordinator.consider(.exportShared, entryCount: 12))
+        XCTAssertEqual(coordinator.pendingRequest, .exportShared)
+        XCTAssertEqual(events.last?.1["trigger"] as? String, "export_shared")
+
+        coordinator.pendingRequest = nil
+        coordinator.noteSharedExport(format: .pdf)
+        XCTAssertFalse(coordinator.consider(.exportShared, entryCount: 12), "At most once: the second PDF never asks")
+    }
+
+    func testCSVShareNeverAsksAndDoesNotUseUpTheFirstPDF() {
+        let coordinator = makeCoordinator()
+        coordinator.recordLaunch()
+        clock = clock.addingTimeInterval(8 * 86_400)
+        coordinator.noteSharedExport(format: .csv)
+        XCTAssertFalse(coordinator.consider(.exportShared, entryCount: 12))
+        XCTAssertNil(coordinator.pendingRequest)
+        XCTAssertNil(defaults.object(forKey: RatingPromptCoordinator.sharedExportKey), "a CSV is not the first export")
+
+        coordinator.noteSharedExport(format: .pdf)
+        XCTAssertTrue(coordinator.consider(.exportShared, entryCount: 12), "the first PDF still asks")
+    }
+
+    func testFailedExportOrPaywallInTheSessionBlocksTheExportPrompt() {
+        let failed = makeCoordinator()
+        failed.recordLaunch()
+        clock = clock.addingTimeInterval(8 * 86_400)
+        failed.noteError()   // ExportJob reports a failed export through noteError
+        failed.noteSharedExport(format: .pdf)
+        XCTAssertFalse(failed.consider(.exportShared, entryCount: 12))
+
+        defaults.removeObject(forKey: RatingPromptCoordinator.sharedExportKey)   // the failed run used up "first"
+        let paywalled = makeCoordinator(version: "1.3")
+        paywalled.notePaywallShown()
+        paywalled.noteSharedExport(format: .pdf)
+        XCTAssertFalse(paywalled.consider(.exportShared, entryCount: 12))
+    }
+
     func testDisabledCoordinatorNeverAsks() {
         let coordinator = makeCoordinator(enabled: false)
         coordinator.recordLaunch()
