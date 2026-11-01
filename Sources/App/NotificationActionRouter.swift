@@ -125,7 +125,9 @@ final class NotificationActionRouter {
             || captureCategories.contains(request.categoryIdentifier)
 
         guard isCaptureAction else {
-            let outcome = routeNavigation(request)
+            let outcome = request.categoryIdentifier == NudgeNotification.category
+                ? routeNudge(request)
+                : routeNavigation(request)
             completion()
             return outcome
         }
@@ -350,6 +352,23 @@ final class NotificationActionRouter {
     }
 
     // MARK: Navigation (1.1 behaviour, unchanged)
+
+    /// A pace or care nudge was tapped: Today opens, and a care nudge leaves its rental for Today's
+    /// focus route. A nudge made for another profile is ignored, like a capture action.
+    func routeNudge(_ request: NotificationActionRequest) -> Outcome {
+        if let profile = NotificationPayload.profileId(in: request.userInfo), profile != UserScope.userId {
+            return .rejectedWrongProfile
+        }
+        if let raw = request.userInfo[NudgeNotification.kindKey] as? String, let kind = NudgeKind(rawValue: raw) {
+            NudgeScheduler.recordOpened(kind)
+        }
+        if let rental = request.userInfo[NudgeNotification.rentalIDKey] as? String {
+            UserDefaults.standard.set(rental, forKey: NudgeNotification.pendingRentalKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: NudgeNotification.pendingRentalKey)
+        }
+        return routeNavigation(request)
+    }
 
     private func routeNavigation(_ request: NotificationActionRequest) -> Outcome {
         guard let rawDestination = request.userInfo[NotificationPayload.destinationKey] as? String,

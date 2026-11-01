@@ -62,6 +62,51 @@ final class SurfacesNotificationUITests: XCTestCase {
         shoot("list", scheme)
     }
 
+    /// 2.3: a pace note and a care note arrive as two separate notifications, never one (frame n2).
+    /// The samples are posted by the DEBUG hook `-LHNudgeFireSamples`. Matching is on the person's
+    /// data (the hours, the rental), not on wording.
+    func testNudgesArriveAsTwoSeparateNotifications() throws {
+        let scheme = ProcessInfo.processInfo.environment["LH_SCHEME"] ?? "light"
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-LHMockScenario", "occasional", "-LHNudgeFireSamples", "1", "-LHDebugNotificationDelay", "16",
+            "-LHColorScheme", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        ]
+        app.launch()
+        let allow = springboard.buttons["Allow"]
+        if allow.waitForExistence(timeout: 8) { allow.tap() }
+        XCUIDevice.shared.press(.home)
+
+        let pace = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS '420 of 750'")).firstMatch
+        let care = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'Pine Cabin'")).firstMatch
+        // Banners come and go: read each label the moment it shows.
+        if !pace.waitForExistence(timeout: 45) { shoot("nudges-missing", scheme) }
+        XCTAssertTrue(pace.exists, "The pace note arrives")
+        let paceLabel = pace.label
+        XCTAssertFalse(paceLabel.contains("Pine Cabin"), "Pace never carries a rental's care item")
+        XCTAssertTrue(care.waitForExistence(timeout: 30), "The care note arrives")
+        let careLabel = care.label
+        XCTAssertFalse(careLabel.contains("750"), "Care never carries hours")
+        XCTAssertNotEqual(paceLabel, careLabel)
+        shoot("nudges", scheme)
+
+        // Locked: both sit on the Lock Screen as their own notifications.
+        XCUIDevice.shared.perform(NSSelectorFromString("pressLockButton"))
+        Thread.sleep(forTimeInterval: 2)
+        XCUIDevice.shared.perform(NSSelectorFromString("pressLockButton"))
+        Thread.sleep(forTimeInterval: 3)
+        if !pace.waitForExistence(timeout: 5) {
+            springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+                .press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+        shoot("nudges-lock", scheme)
+        XCTAssertTrue(pace.waitForExistence(timeout: 6) && care.waitForExistence(timeout: 6), "Both on the Lock Screen")
+        XCTAssertNotEqual(pace.frame, care.frame, "Two notifications, not one")
+    }
+
     private func shoot(_ step: String, _ scheme: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)
