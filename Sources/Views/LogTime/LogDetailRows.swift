@@ -67,7 +67,10 @@ extension LogTimeSheet {
         switch field {
         case .property: return form.propertyId == nil ? .empty : .filled(fromNote: fromNote(.property))
         case .category: return form.category == nil ? .empty : .filled(fromNote: fromNote(.category))
-        case .hours: return hoursQuestionable ? .caution : .filled(fromNote: fromNote(.hours))
+        case .hours:
+            // A care entry starts with How long empty: "Choose", never a number the app made up.
+            if form.careTaskID != nil, form.hours <= 0 { return .empty }
+            return hoursQuestionable ? .caution : .filled(fromNote: fromNote(.hours))
         default: return .filled(fromNote: fromNote(field))
         }
     }
@@ -117,6 +120,7 @@ extension LogTimeSheet {
             if field == .property, form.propertyId == nil, mentioned.count >= 2, let hint = form.propertyHint { twoRentalsHint(hint) }
             if field == .category, !form.countsTowardHours, let category = form.category { notCountedNote(category) }
             if field == .hours, hoursQuestionable { hoursFootnote }
+            if field == .hours, form.careTaskID != nil, !open { careChips }
             if case .updated = look { updatedLine(field) }
             if open { editor(field).transition(rowTransition) }
         }
@@ -190,6 +194,29 @@ extension LogTimeSheet {
                 .accessibilityIdentifier("log.updated.undo")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Care chips (2.3)
+
+    /// The care task's chips: the person's own "Last time" and "Typical", then fixed short options.
+    var careChipList: [CareHourChip] {
+        guard let task = form.careTaskID else { return [] }
+        let logs = CareDoneLog.shared.logs(entries: viewModel.timeEntries)
+        return CareHourChips.chips(history: CareDoneLog.history(task: task, rental: form.propertyId, in: logs))
+    }
+
+    /// One tap sets How long. Nothing is set until a chip or the editor is used.
+    var careChips: some View {
+        LogChipFlow(spacing: 8) {
+            ForEach(careChipList) { chip in
+                LHChip(chip.title, isSelected: form.isUserSet(.hours) && abs(form.hours - chip.hours) < 0.001) { set(chip: chip) }
+                    .accessibilityIdentifier("log.careChip.\(chip.id)")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(CareText.chipsLabel)
+        .accessibilityIdentifier("log.careChips")
     }
 
     var hoursFootnote: some View {

@@ -52,6 +52,11 @@ final class TodayCaptureUITests: XCTestCase {
         ("draft", tuesday + ["-LHSeedTimerDraft", "twoPending", "-LHTodayWeekSample", "2,1",
                              "-LHTodayScrollTo", "draft"], "draft.card"),
         ("noproperty", ["-LHMockScenario", "emptyMainTabs"], "today.hero"),
+        // 2.3 care plan (package B): "This season" under To confirm (c1), and the free-plan lock.
+        ("care", hours + tuesday + ["-LHSeedSuggestions", "inbox", "-LHTodayConfirmLimit", "1", "-LHCarePro",
+                                    "-LHCareSeed", "hifi", "-LHCraftScroll"], "today.care"),
+        ("care-locked", hours + tuesday + ["-LHSeedSuggestions", "inbox", "-LHTodayConfirmLimit", "1",
+                                           "-LHCareSeed", "hifi", "-LHCraftScroll"], "today.care.locked"),
         // Goal-first hero (2.0 messaging): target in the eyebrow, whose count, and where you stand.
         ("hero-500-pace", base + tuesday + ["-LHGoalChoice", "mp500", "-LHTodayHours", "420"], "today.hero"),
         ("hero-500-behind", base + tuesday + ["-LHGoalChoice", "mp500", "-LHTodayHours", "212"], "today.hero"),
@@ -124,6 +129,8 @@ final class TodayCaptureUITests: XCTestCase {
     func testCaptureRecord() { capture("record") }
     func testCaptureDraft() { capture("draft") }
     func testCaptureNoProperty() { capture("noproperty") }
+    func testCaptureCare() { capture("care") }
+    func testCaptureCareLocked() { capture("care-locked") }
     /// The Inbox banner ("…count toward your hours") and the Properties rows ("520h this year · Long stays",
     /// "212h of 500h · A few nights"), light and dark, default and AX3.
     func testCaptureInboxAndProperties() {
