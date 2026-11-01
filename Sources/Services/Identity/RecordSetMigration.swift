@@ -505,7 +505,16 @@ final class RecordSetMigration {
 
         // S6 / S7 — cloud groups, then the merge.
         if step < .cloudMerged {
-            stats = resolveAndMergeCloud(snapshot)
+            // A groups file that can't be saved (a full disk) stops here, before the live set
+            // changes: the step stays put and the next run merges again from the saved read.
+            guard let merged = resolveAndMergeCloud(snapshot) else {
+                // The same words as AppViewModel.saveFailureMessage (one catalog key).
+                let problem = String(localized: "Couldn’t save your last change. Your iPhone may be out of space.", table: "Identity")
+                defaults.set(problem, forKey: IdentityKeys.lastSyncProblem)
+                onChange?()
+                return .incomplete(problem)
+            }
+            stats = merged
             if crashAt == "S7" { return .notReady }
             Self.setStep(.cloudMerged, defaults)
         }
@@ -597,7 +606,8 @@ final class RecordSetMigration {
 
     // MARK: S6 / S7
 
-    private func resolveAndMergeCloud(_ snapshot: ZoneSnapshot) -> CloudStats {
+    /// Nil when the groups file can't be saved: nothing in the live set has changed yet.
+    private func resolveAndMergeCloud(_ snapshot: ZoneSnapshot) -> CloudStats? {
         var stats = CloudStats()
         guard let live else { return stats }
         var groups = GroupsFile.load(root: root) ?? GroupsFile(createdAt: now(), primaryId: nil, groups: [])
@@ -774,8 +784,13 @@ final class RecordSetMigration {
             stats.bulkHeld = held.count
             Analytics.bulkPromptShown(count: held.count)
         }
+        do {
+            try groups.save(root: root)
+        } catch {
+            migrationLogger.error("S7 groups write failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
         live.replaceLive(entries: entries, properties: properties, categories: categories)
-        try? groups.save(root: root)
         defaults.set(stats.unparsed, forKey: IdentityKeys.unparsedCount)
 
         applySettingsAtMigration(snapshot, groups: groups)

@@ -538,6 +538,34 @@ final class HouseholdSyncTests: XCTestCase {
         XCTAssertTrue(h.earlier.pendingGroups.isEmpty, "never asked about")
     }
 
+    /// A full disk (ENOSPC) failed this suite's groups.json write once, and the engine still said
+    /// `.done` with no groups file, so the settings-only owner (and any held set) was gone for good.
+    /// A read-only migration folder stands in for the full disk.
+    func testAGroupsFileThatCantBeSavedNeverFinishesTheMigration() async throws {
+        let settingsOnly = "001234.only-settings.0303"
+        let zone = FakeZoneSource(records: [
+            GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(settingsOnly), owner: settingsOnly),
+            TaxProfileValues(filingStatus: FilingStatus.single.rawValue, spouseTracking: false, taxYear: 2025, groupingElection: false,
+                             nonREWorkHours: 0, displayName: nil).record(name: IdentityZone.taxProfileName(settingsOnly), owner: settingsOnly)
+        ])
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let dir = MigrationFiles.migrationDirectory(root: sandbox.root)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path)
+        let full = await h.cloud()
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+        guard case .incomplete = full else { return XCTFail("a lost groups file is not done: \(full)") }
+        XCTAssertLessThan(h.step, .cloudMerged, "the merge runs again")
+        XCTAssertNil(h.groups)
+        XCTAssertNotNil(sandbox.defaults.string(forKey: IdentityKeys.lastSyncProblem), "the status row says it failed")
+
+        let retried = await h.cloud()
+        XCTAssertEqual(retried, .done)
+        XCTAssertEqual(h.groups?.group(settingsOnly)?.settingsOnly, true, "listed once the disk has room")
+        XCTAssertTrue(h.earlier.pendingGroups.isEmpty)
+    }
+
     // MARK: Per-type push (diagnosis §7.3)
 
     func testOneFailingRecordTypeNeverBlocksTheOthers() async throws {
