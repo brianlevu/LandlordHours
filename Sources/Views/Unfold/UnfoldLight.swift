@@ -42,3 +42,15 @@ struct UnfoldLight: View {
                 .init(color: .black, location: veilFrom)]
     }
 }
+
+/// `UnfoldLight` that follows the clock itself, so only this overlay redraws on each frame of a run
+/// (the layout that owns the clock holds it without observing it).
+struct UnfoldLightOverlay: View {
+    @ObservedObject var clock: UnfoldClock
+    let edge: FoldEdge
+    let veil: Color
+
+    var body: some View {
+        UnfoldLight(pose: clock.pose, edge: edge, veil: veil)
+    }
+}

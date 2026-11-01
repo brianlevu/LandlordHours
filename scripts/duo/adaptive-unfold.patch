@@ -1,0 +1,348 @@
+diff --git a/Sources/Views/Adaptive/AdaptiveDebug.swift b/Sources/Views/Adaptive/AdaptiveDebug.swift
+index 194fde3..efdaa74 100644
+--- a/Sources/Views/Adaptive/AdaptiveDebug.swift
++++ b/Sources/Views/Adaptive/AdaptiveDebug.swift
+@@ -12,8 +12,16 @@ import UIKit
+ //                                  (951×669, a 24pt division at the centre, door at rest) and propped
+ //                                  (669×951) layouts @3x; `ipad` renders the §13 window sizes @2x.
+ //   -LHPaneSystemBar               the must-prove 12 fallback: no compact bridge in the right pane.
++//   -LHAdaptiveRender door         `duoUnfold` instants on the real shell (feat/duo-door): the clock is
++//                                  held at each t of the swing and the Reduce Motion crossfade, open
++//                                  (3 rentals, All rentals) and propped, dusk and night, L and XXL.
+ 
+ enum AdaptiveDebug {
++    #if DEBUG
++    /// Door captures only: the clock the shell's door and pane light follow while a frame renders.
++    @MainActor static var captureClock: UnfoldClock?
++    #endif
++
+     /// A division the off-screen Duo renders stand in for (the real one comes from `reservedRegions`).
+     static func capturedDivision(for size: CGSize) -> PaneDivision? {
+         #if DEBUG
+@@ -167,6 +175,11 @@ enum AdaptiveSnapshotter {
+             shots.append(Shot(name: "duo-propped", size: duoPropped, category: L, args: ["select": "3"], insets: propped, duo: true))
+             shots.append(Shot(name: "duo-propped-allrentals", size: duoPropped, category: L, args: ["select": "0"], insets: propped, duo: true))
+             shots.append(Shot(name: "duo-propped-AX3", size: duoPropped, category: AX3, args: ["select": "3"], insets: propped, duo: true))
++        } else if kind == "door" {
++            await runDoor(scene: scene, dir: dir)
++            try? "done".write(to: dir.appendingPathComponent("DONE"), atomically: true, encoding: .utf8)
++            NSLog("ADAPTIVE_RENDER_DONE %@", dir.path)
++            return
+         } else {
+             let sizes: [(String, CGSize)] = [
+                 ("sm-799x1000", CGSize(width: 799, height: 1000)), ("sm-800x1000", CGSize(width: 800, height: 1000)),
+@@ -220,6 +233,50 @@ enum AdaptiveSnapshotter {
+         NSLog("ADAPTIVE_RENDER_DONE %@", dir.path)
+     }
+ 
++    /// `duoUnfold` on the real shell: one window per pose, the clock held at each instant (the motion and
++    /// a still at any t are the same thing, `DoorPose`).
++    private static func runDoor(scene: UIWindowScene, dir: URL) async {
++        let L = UIContentSizeCategory.large, XXL = UIContentSizeCategory.extraExtraLarge
++        let openInsets = UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0)
++        let proppedInsets = UIEdgeInsets(top: 24, left: 0, bottom: 34, right: 0)
++        let poses: [(String, CGSize, UIContentSizeCategory, String, UIEdgeInsets)] = [
++            ("door-open-3rentals", duoOpen, L, "3", openInsets),
++            ("door-open-3rentals-XXL", duoOpen, XXL, "3", openInsets),
++            ("door-open-allrentals", duoOpen, L, "0", openInsets),
++            ("door-propped", duoPropped, L, "3", proppedInsets),
++            ("door-propped-XXL", duoPropped, XXL, "3", proppedInsets),
++        ]
++        let steps: [(Double, UnfoldStyle, String)] = UnfoldCapture.swingSteps.map { ($0, .swing, "swing") }
++            + UnfoldCapture.crossfadeSteps.map { ($0, .crossfade, "rm") }
++        for dark in [false, true] {
++            let tag = dark ? "dark" : "light"
++            for (name, size, category, select, insets) in poses {
++                let clock = UnfoldClock()
++                AdaptiveDebug.captureClock = clock
++                duoShot = size
++                duoShotTopInset = insets.top
++                AdaptiveSnapshotSelection.args = ["select": select]
++                let w = makeWindow(size: size, dark: dark, category: category, insets: insets, scene: scene)
++                for _ in 0..<3 {
++                    try? await Task.sleep(for: .seconds(0.4))
++                    settleInsets(w, target: insets)
++                }
++                try? await Task.sleep(for: .seconds(2.0))
++                for (t, style, kind) in steps {
++                    clock.hold(t: t, style: style)
++                    try? await Task.sleep(for: .milliseconds(250))
++                    let file = String(format: "%@-%@-%@-t%03d.png", name, tag, kind, Int((t * 100).rounded()))
++                    snap(w, size: size, scale: 3, to: dir.appendingPathComponent(file))
++                }
++                w.isHidden = true
++                windows.removeAll { $0 === w }
++                duoShot = nil
++                duoShotTopInset = nil
++                AdaptiveDebug.captureClock = nil
++            }
++        }
++    }
++
+     private static func makeWindow(size: CGSize, dark: Bool, category: UIContentSizeCategory, insets: UIEdgeInsets,
+                                    scene: UIWindowScene) -> UIWindow {
+         let app = AppModelHost.shared.viewModel
+diff --git a/Sources/Views/Adaptive/DoorArt.swift b/Sources/Views/Adaptive/DoorArt.swift
+index 2382c71..9aa8de8 100644
+--- a/Sources/Views/Adaptive/DoorArt.swift
++++ b/Sources/Views/Adaptive/DoorArt.swift
+@@ -51,26 +51,6 @@ enum DoorArt {
+     static let facadeSlope: CGFloat = -0.28
+ }
+ 
+-/// `duoDoor` (§B.2): a 0.80 s door clock t 0 → 1 (`.linear(duration: 0.80)`), 0.50 s back on fold,
+-/// a 0.20 s crossfade under Reduce Motion. Lives here until package A folds it into `AppAnimation`.
+-enum DoorMotion {
+-    static let open = Animation.linear(duration: 0.80)
+-    static let close = Animation.linear(duration: 0.50)
+-    static let reduced = Animation.easeOut(duration: 0.20)
+-
+-    /// Ease-out cubic of `t` over its own window [a, b] (every door layer is a pure function of t).
+-    static func ease(_ t: Double, _ a: Double, _ b: Double) -> Double {
+-        let u = min(max((t - a) / (b - a), 0), 1)
+-        return 1 - pow(1 - u, 3)
+-    }
+-}
+-
+-/// The door clock: 0 = door shut and the work pane dark; 1 = open and lit (at rest everywhere).
+-@MainActor
+-final class DoorClock: ObservableObject {
+-    @Published var t: Double = 1
+-    /// The running ramp (`run(to:duration:)` in HingeObserver.swift).
+-    var runner: Task<Void, Never>?
+-
+-    init(t: Double = 1) { self.t = t }
+-}
++/// `duoDoor` (§B.2) and the door clock live in `Models/Unfold/UnfoldDoor.swift` (the rules and each
++/// layer's value, `DoorPose`) and `Views/Unfold/UnfoldClock.swift` (the hinge-driven clock).
++typealias DoorClock = UnfoldClock
+diff --git a/Sources/Views/Adaptive/FrontDoor.swift b/Sources/Views/Adaptive/FrontDoor.swift
+index 46ce434..6494724 100644
+--- a/Sources/Views/Adaptive/FrontDoor.swift
++++ b/Sources/Views/Adaptive/FrontDoor.swift
+@@ -23,9 +23,9 @@ struct FrontDoor: View {
+ 
+     var body: some View {
+         if let door {
+-            let t = clock.t
+-            let open = DoorMotion.ease(t, 0.0, 0.42)
+-            let glow = DoorMotion.ease(t, 0.05, 0.5)
++            let pose = clock.pose
++            let open = pose.leafTurn
++            let glow = pose.doorLight
+             let dark = colorScheme == .dark
+             let warm = DoorArt.warm(dark: dark)
+             ZStack(alignment: .topLeading) {
+@@ -69,12 +69,14 @@ struct FrontDoor: View {
+                         DoorOpening(slope: DoorArt.facadeSlope)
+                             .frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
+                     }
+-                    .brightness(-0.12 * open)
+-                    .rotation3DEffect(.degrees(-78 * open), axis: (x: 0, y: 1, z: 0),
++                    .brightness(pose.leafDarken)
++                    .rotation3DEffect(.degrees(pose.leafAngleDegrees), axis: (x: 0, y: 1, z: 0),
+                                       anchor: UnitPoint(x: door.minX / side, y: door.midY / side), perspective: 2.2)
+-                    .shadow(color: .black.opacity(0.35 * open), radius: 1.5, x: 1, y: 0)
++                    .shadow(color: .black.opacity(pose.leafShadow), radius: 1.5, x: 1, y: 0)
+             }
+             .frame(width: side, height: side, alignment: .topLeading)
++            // Reduce Motion: the open door fades in over the house's own closed door (no leaf turn).
++            .opacity(pose.doorLayerOpacity)
+             .allowsHitTesting(false)
+             .accessibilityHidden(true)
+         }
+diff --git a/Sources/Views/Adaptive/HingeObserver.swift b/Sources/Views/Adaptive/HingeObserver.swift
+deleted file mode 100644
+index 37be575..0000000
+--- a/Sources/Views/Adaptive/HingeObserver.swift
++++ /dev/null
+@@ -1,71 +0,0 @@
+-import SwiftUI
+-
+-// MARK: - HingeObserver: `duoUnfold` is keyed to the hinge and nothing else (§1.27 Motion, §B.3)
+-//
+-// iOS 27.1 `onHingeChange(isEnabled:_:)` (SwiftUICore; `DeviceHinge.status` .closed / .partiallyOpen
+-// / .fullyOpen). Closed → open runs the door clock 0 → 1 over 0.80 s; open → closed runs it back over
+-// 0.50 s; Reduce Motion is a 0.20 s crossfade with no leaf turn. It never runs on a resize, an
+-// arrangement change, a scene change or a cold launch already open (the first report, with no
+-// previous hinge, only records the state). An iPad has no hinge, so it never runs there.
+-// `UIHingeInteraction` is the UIKit fallback named in the standard; on 27.1 the SwiftUI modifier
+-// is available wherever a hinge exists, so the fallback is not wired (must-prove 2 decides).
+-
+-extension DoorClock {
+-    /// Runs t to `target` linearly over `duration` (the clock drives every layer as a pure function).
+-    func run(to target: Double, duration: Double) {
+-        runner?.cancel()
+-        let start = t
+-        let began = Date()
+-        runner = Task { @MainActor [weak self] in
+-            while !Task.isCancelled {
+-                let u = min(1, Date().timeIntervalSince(began) / max(duration, 0.01))
+-                self?.t = start + (target - start) * u
+-                if u >= 1 { break }
+-                try? await Task.sleep(for: .milliseconds(16))
+-            }
+-        }
+-    }
+-
+-    /// A touch during the unfold jumps the door to its end (the layout is live from frame 0).
+-    func finish() {
+-        runner?.cancel()
+-        runner = nil
+-        if t > 0 && t < 1 { t = 1 }
+-    }
+-}
+-
+-struct HingeDoorModifier: ViewModifier {
+-    @ObservedObject var clock: DoorClock
+-    var isEnabled: Bool
+-
+-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+-
+-    func body(content: Content) -> some View {
+-        if #available(iOS 27.1, *) {
+-            content.onHingeChange(isEnabled: isEnabled) { old, new in
+-                guard let before = old.hinge?.status, let after = new.hinge?.status, before != after else { return }
+-                let wasClosed = before == .closed
+-                let isClosed = after == .closed
+-                if wasClosed && !isClosed {
+-                    if reduceMotion {
+-                        clock.t = 1
+-                    } else {
+-                        clock.t = 0
+-                        clock.run(to: 1, duration: 0.80)
+-                    }
+-                } else if !wasClosed && isClosed {
+-                    if reduceMotion { clock.t = 1 } else { clock.run(to: 0, duration: 0.50) }
+-                }
+-            }
+-        } else {
+-            content
+-        }
+-    }
+-}
+-
+-extension View {
+-    /// Plays `duoUnfold` on the door clock when the Duo's hinge opens or closes (never otherwise).
+-    func duoUnfold(_ clock: DoorClock, isEnabled: Bool) -> some View {
+-        modifier(HingeDoorModifier(clock: clock, isEnabled: isEnabled))
+-    }
+-}
+diff --git a/Sources/Views/Adaptive/HousePane.swift b/Sources/Views/Adaptive/HousePane.swift
+index ec2b0df..f8d0b19 100644
+--- a/Sources/Views/Adaptive/HousePane.swift
++++ b/Sources/Views/Adaptive/HousePane.swift
+@@ -18,7 +18,8 @@ struct HousePane: View {
+     /// The window's top inset when the pane runs to the window's top edge (stacked ignores the
+     /// safe area so the halves meet at the fold); 0 when the pane already sits inside it.
+     var topInset: CGFloat = 0
+-    @ObservedObject var clock: DoorClock
++    /// Held, not observed: `FrontDoor` follows it, so the pane does not re-lay out on each frame.
++    let clock: DoorClock
+ 
+     @EnvironmentObject private var viewModel: AppViewModel
+     @EnvironmentObject private var goalManager: GoalManager
+diff --git a/Sources/Views/Adaptive/InteriorWall.swift b/Sources/Views/Adaptive/InteriorWall.swift
+index 773df75..11a629a 100644
+--- a/Sources/Views/Adaptive/InteriorWall.swift
++++ b/Sources/Views/Adaptive/InteriorWall.swift
+@@ -7,8 +7,8 @@ import SwiftUI
+ // `duo_interior` dusk image), and the door's warm pool at the gap. At night the room is not drawn:
+ // the navy page with one warm pool, which gives way beside the card edge (DU11 keeps the locked
+ // `duoNightCardEdge`). `FoldWash` mirrors the same pool ~150pt into the house pane, so the two walls
+-// meet the same way on the Duo and on iPad (DU9, DU16). `InsideLight` is the veil the unfold wipes
+-// away from the fold outward (Duo hinge only).
++// meet the same way on the Duo and on iPad (DU9, DU16). The veil the unfold wipes away from the fold
++// is `UnfoldLight` (Views/Unfold), from the work pane's fold edge in both postures (Duo hinge only).
+ 
+ struct InteriorWall: View {
+     /// Where the door's light comes from, in this view's unit space (the gap edge).
+@@ -109,29 +109,3 @@ struct FoldWash: View {
+             .accessibilityHidden(true)
+     }
+ }
+-
+-/// The work pane lights from the fold outward as the door opens: a dark veil whose edge travels
+-/// away from the fold. Fully clear at t = 1 (at rest), so it draws nothing outside an unfold.
+-struct InsideLight: View {
+-    @ObservedObject var clock: DoorClock
+-
+-    @Environment(\.colorScheme) private var colorScheme
+-
+-    var body: some View {
+-        let r = DoorMotion.ease(clock.t, 0.12, 0.76)
+-        let dark = colorScheme == .dark
+-        if r < 1 {
+-            (dark ? DoorArt.veilNight : DoorArt.veilDusk)
+-                .opacity(dark ? 0.78 : 0.70)
+-                .mask {
+-                    LinearGradient(stops: [.init(color: .clear, location: 0),
+-                                           .init(color: .clear, location: max(0, r * 1.3 - 0.3)),
+-                                           .init(color: .black, location: min(1, r * 1.3))],
+-                                   startPoint: .leading, endPoint: .trailing)
+-                }
+-                .ignoresSafeArea()
+-                .allowsHitTesting(false)
+-                .accessibilityHidden(true)
+-        }
+-    }
+-}
+diff --git a/Sources/Views/Adaptive/TwoPaneLayout.swift b/Sources/Views/Adaptive/TwoPaneLayout.swift
+index 3f8b265..6efaef0 100644
+--- a/Sources/Views/Adaptive/TwoPaneLayout.swift
++++ b/Sources/Views/Adaptive/TwoPaneLayout.swift
+@@ -20,7 +20,8 @@ struct TwoPaneLayout<Work: View>: View {
+     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+     @Environment(\.layoutBand) private var band
+     @StateObject private var selection = AdaptiveSelection()
+-    @StateObject private var clock = DoorClock()
++    /// Held, not observed: only the door and the pane light follow it (no per-frame layout pass).
++    @State private var clock = DoorClock()
+     @State private var split: LayoutSplit = .compact(.zero)
+     @State private var resolvedOnce = false
+     /// True when the division came from the system (`reservedRegions`), not a DEBUG capture.
+@@ -43,8 +44,7 @@ struct TwoPaneLayout<Work: View>: View {
+             content
+         }
+             .environment(\.layoutMode, split.mode)
+-            .duoUnfold(clock, isEnabled: split.isDivision)
+-            .simultaneousGesture(TapGesture().onEnded { clock.finish() }, including: clock.t < 1 ? .all : .none)
++            .unfoldDoor(doorClock, posture: posture)
+             #if DEBUG
+             .onAppear { AdaptiveDebug.onRootAppear() }
+             #endif
+@@ -75,8 +75,19 @@ struct TwoPaneLayout<Work: View>: View {
+ 
+     // MARK: Two-pane
+ 
++    /// Where the fold is (none on iPad): the door plays and the light enters from the work pane's fold edge.
++    private var posture: FoldPosture { FoldPosture.resolve(division: split.isDivision ? split.gap : nil, in: split.size) }
++
++    private var doorClock: DoorClock {
++        #if DEBUG
++        return AdaptiveDebug.captureClock ?? clock
++        #else
++        return clock
++        #endif
++    }
++
+     private var house: some View {
+-        HousePane(split: split, showsDoor: split.isDivision, topInset: split.mode == .stacked ? topInset : 0, clock: clock)
++        HousePane(split: split, showsDoor: posture.hostsDoor, topInset: split.mode == .stacked ? topInset : 0, clock: doorClock)
+             .environmentObject(selection)
+             .clipped()   // nothing in the house pane ever crosses the gap or fold (DU2)
+     }
+@@ -89,7 +100,12 @@ struct TwoPaneLayout<Work: View>: View {
+                                                 gutter: PaneMetrics.gutter(paneWidth: split.second.width, onDuo: split.isDivision),
+                                                 windowHeight: split.size.height))
+         }
+-        .overlay { if split.isDivision { InsideLight(clock: clock) } }
++        .overlay {
++            if let edge = posture.workPaneFoldEdge {
++                UnfoldLightOverlay(clock: doorClock, edge: edge,
++                                   veil: colorScheme == .dark ? DoorArt.veilNight.opacity(0.78) : DoorArt.veilDusk.opacity(0.70))
++            }
++        }
+         .accessibilityElement(children: .contain)
+         .accessibilityIdentifier("pane.work")
+     }
