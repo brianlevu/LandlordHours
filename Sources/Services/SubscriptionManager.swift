@@ -18,8 +18,10 @@ class SubscriptionManager: ObservableObject {
     /// purchase deadline: the paywall keeps Buy off so a second purchase can't start meanwhile.
     @Published private(set) var isPurchaseInFlight = false
     
-    private let proProductID = "com.openclaw.landlordhours.pro"
-    private var isProKey: String { UserScope.key("isProUser") }
+    private let proProductID = ProductIDs.founding
+    /// StoreKit behind a protocol (2.3). Entitlement rules live in `EntitlementResolver`; this
+    /// manager only gathers, purchases and mirrors `EntitlementStore.shared.plan` into `isPro`.
+    let storeClient: StoreClient = StoreKit2Client()
     private var hasPurchasedKey: String { UserScope.key("hasPurchasedPro") }
     private var transactionListener: Task<Void, Never>?
 
@@ -106,9 +108,9 @@ class SubscriptionManager: ObservableObject {
             for await result in Transaction.updates {
                 guard let self else { return }
                 if case .verified(let transaction) = result {
-                    if self.isActiveProTransaction(transaction) {
-                        await self.unlockPro()
-                    } else if transaction.productID == self.proProductID {
+                    // Founding or yearly: purchase, renewal, lapse, refund, Ask to Buy approval.
+                    // The resolver decides; a trial counts as Pro.
+                    if ProductIDs.all.contains(transaction.productID) {
                         await self.refreshEntitlements()
                     }
                     await transaction.finish()
@@ -131,27 +133,26 @@ class SubscriptionManager: ObservableObject {
         }
     }
     
+    /// The current plan (free, trial, Pro or founding). `isPro` is its `hasProAccess`.
+    var plan: Plan { EntitlementStore.shared.plan }
+
+    /// No StoreKit: the cached plan (founding flag, last subscription answer) against today's date.
     func checkSubscriptionStatus() {
-        isPro = UserDefaults.standard.bool(forKey: isProKey)
+        EntitlementStore.shared.loadCached()
+        mirrorPlan()
     }
 
     @MainActor
     func refreshEntitlements() async {
         guard isStoreKitAttached else { return }
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result else { continue }
-            if isActiveProTransaction(transaction) {
-                unlockPro()
-                return
-            }
-        }
+        await EntitlementStore.shared.refresh(using: storeClient)
+        mirrorPlan()
+    }
 
-        if let latest = await Transaction.latest(for: proProductID),
-           case .verified(let transaction) = latest,
-           transaction.productID == proProductID,
-           !isActiveProTransaction(transaction) {
-            lockPro()
-        }
+    private func mirrorPlan() {
+        let store = EntitlementStore.shared
+        hasPurchased = store.plan.isFounding || UserDefaults.standard.bool(forKey: hasPurchasedKey)
+        isPro = store.plan.hasProAccess
     }
     
     enum PurchaseOutcome: Equatable {
@@ -296,19 +297,12 @@ class SubscriptionManager: ObservableObject {
     static let restoreFailedMessage = String(localized: "Couldn’t reach the App Store. Check your connection and try again.")
     static let restoreCancelledMessage = String(localized: "Restore was cancelled.")
 
+    /// The founding purchase (and DEBUG seeds): the founding flag, at once.
     @MainActor
     func unlockPro() {
-        UserDefaults.standard.set(true, forKey: isProKey)
-        UserDefaults.standard.set(true, forKey: hasPurchasedKey)
+        EntitlementStore.shared.setFoundingFlag(true)
         hasPurchased = true
         isPro = true
-    }
-
-    @MainActor
-    private func lockPro() {
-        UserDefaults.standard.set(false, forKey: isProKey)
-        hasPurchased = false
-        isPro = false
     }
     
     /// Reload subscription state for the current user (call after sign-in)
@@ -329,6 +323,7 @@ class SubscriptionManager: ObservableObject {
 
     /// Reset subscription state on sign-out without starting a new trial
     func resetForSignOut() {
+        EntitlementStore.shared.reset()
         isPro = false
         hasPurchased = false
         restoreFailureMessage = nil
@@ -336,12 +331,6 @@ class SubscriptionManager: ObservableObject {
 
     var proProduct: Product? {
         products.first(where: { $0.id == proProductID })
-    }
-
-    private func isActiveProTransaction(_ transaction: Transaction) -> Bool {
-        transaction.productID == proProductID &&
-        transaction.revocationDate == nil &&
-        transaction.isUpgraded == false
     }
 }
 
