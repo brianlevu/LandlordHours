@@ -80,6 +80,8 @@ struct Day12ReminderSheet: View {
         .background(colors.backgroundSecondary)
         .presentationBackground(colors.backgroundSecondary)
         .manageSubscriptionsSheet(isPresented: $showManage)
+        // The billed amount must be on the sheet: load StoreKit's price if it isn't here yet.
+        .task { if price == nil { await SubscriptionManager.shared.loadProducts() } }
         .onDisappear { onAnswered() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("trial.day12")

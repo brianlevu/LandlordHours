@@ -127,6 +127,16 @@ final class InboxUITests: XCTestCase {
         }
     }
 
+    /// 2.3 F: "Not sure" items sit behind one collapsed row under the To confirm card.
+    private func openNotSure() {
+        let maybe = app.descendants(matching: .any)["inbox.maybe.row"]
+        let tabTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : app.frame.maxY
+        for _ in 0..<8 where !(maybe.exists && maybe.isHittable && maybe.frame.maxY < tabTop - 8) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(maybe.exists, "The Not sure row is under the To confirm card")
+        maybe.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.maybe.screen"].waitForExistence(timeout: 5))
+    }
+
     private func swipeLog(_ element: XCUIElement) {
         fullSwipe(element, right: true)
         if !undo.waitForExistence(timeout: 2), !app.buttons["confirm.log"].exists {
@@ -146,20 +156,20 @@ final class InboxUITests: XCTestCase {
     func testInboxGroupsBadgesAndTabCount() {
         launch("inbox")
         XCTAssertTrue(settle(row("showing")))
-        XCTAssertTrue(waitForBadge("8 to confirm", timeout: 12))
+        // 2.3 F: 8 seeded, 2 of them "Not sure" (call-sam, hoa): the count is the 6 likely items.
+        XCTAssertTrue(waitForBadge("6 to confirm", timeout: 12))
+        XCTAssertFalse(row("call-sam").exists, "A Not sure item is not in the main list")
         // One header per day (standard §1.15a), newest first.
         XCTAssertTrue(app.staticTexts["Today"].exists)
         XCTAssertTrue(app.staticTexts["Wed Oct 14"].exists)
         // Rows carry Confirm / Not work, so they are taller: scroll to each one.
-        XCTAssertTrue(scrollTo(row("call-sam")))
-        XCTAssertTrue(row("call-sam").label.contains("Not sure"), row("call-sam").label)
         XCTAssertTrue(scrollTo(row("hardware")))
         XCTAssertTrue(row("hardware").label.contains("Might already be logged"), row("hardware").label)
         XCTAssertTrue(scrollTo(row("inspection")))
         XCTAssertTrue(app.staticTexts["Oct 4"].waitForExistence(timeout: 3), "Older days drop the weekday")
         // Scrolling down tucks the native tab bar away (§1.25); back at the top it returns.
         for _ in 0..<5 { app.swipeDown() }
-        XCTAssertTrue(waitForBadge("8 to confirm"))
+        XCTAssertTrue(waitForBadge("6 to confirm"))
     }
 
     func testSwipeLogThenUndoThenCommit() {
@@ -173,13 +183,13 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(undo.waitForExistence(timeout: 3), "Undo toast after a swipe-log")
         XCTAssertFalse(row("showing").exists, "Row leaves at once")
         undo.tap()
-        XCTAssertTrue(waitForBadge("8 to confirm"), "Undo puts it back in the count")
+        XCTAssertTrue(waitForBadge("6 to confirm"), "Undo puts it back in the count (6 likely; 2.3 F)")
         XCTAssertTrue(row("showing").waitForExistence(timeout: 6), "Undo brings the row back")
 
         Thread.sleep(forTimeInterval: 1.0)
         swipeLog(row("showing"))
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
-        XCTAssertTrue(waitForBadge("7 to confirm"))
+        XCTAssertTrue(waitForBadge("5 to confirm"))
         XCTAssertTrue(undo.waitForNonExistence(timeout: 9), "Toast times out and the log is written")
         XCTAssertFalse(row("showing").exists)
         // The confirmed entry is in Records.
@@ -239,9 +249,11 @@ final class InboxUITests: XCTestCase {
 
     func testMuteFromSheet() {
         launch("inbox")
+        XCTAssertTrue(settle(row("showing")))
+        // 2.3 F: Call with Sam is "Not sure": it sits behind the collapsed Not sure row.
+        openNotSure()
         let sam = row("call-sam")
         XCTAssertTrue(settle(sam))
-        XCTAssertTrue(scrollTo(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
         // The mute link scrolls under the pinned Log / Not rental work bar: bring it clear first.
@@ -288,7 +300,8 @@ final class InboxUITests: XCTestCase {
         app.buttons["capture.priming.continue"].tap()
         passReveal()
         XCTAssertTrue(row("bf-0").waitForExistence(timeout: 10), "The look-back's items are rows now")
-        XCTAssertTrue(waitForBadge("22 to confirm", timeout: 10))
+        // 22 found; 14 are likely (2.3 F), the other 8 sit behind the Not sure row.
+        XCTAssertTrue(waitForBadge("14 to confirm", timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["inbox.backfill.header"].exists, "Header leaves when done")
         XCTAssertFalse(app.buttons["inbox.empty.backfill"].exists, "A finished look-back is done")
     }
@@ -307,7 +320,7 @@ final class InboxUITests: XCTestCase {
         let log = app.buttons["confirm.log"]
         XCTAssertTrue(log.waitForExistence(timeout: 5))
         log.tap()
-        XCTAssertTrue(waitForBadge("21 to confirm", timeout: 6), "Count drops to 21 after a confirm")
+        XCTAssertTrue(waitForBadge("13 to confirm", timeout: 6), "Count drops to 13 of the 14 likely after a confirm")
     }
 
     /// Cancel stays available from the header; a stopped look-back is not done and runs again.
@@ -395,7 +408,8 @@ final class InboxUITests: XCTestCase {
         app.tabBars.firstMatch.buttons["Inbox"].tap()
         XCTAssertTrue(header.waitForExistence(timeout: 5), "Progress header is still there")
         XCTAssertTrue(header.label.contains("11 of 22 events"), header.label)
-        XCTAssertTrue(header.label.contains("11 found so far"), header.label)
+        // 11 events read so far; 7 of them are likely (2.3 F counts likely items only).
+        XCTAssertTrue(header.label.contains("7 found so far"), header.label)
         XCTAssertTrue(app.buttons["backfill.cancel"].exists, "Cancel is still available")
         XCTAssertTrue(row("bf-0").exists, "Streamed items are in the list")
     }
