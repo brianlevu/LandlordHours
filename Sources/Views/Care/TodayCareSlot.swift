@@ -65,8 +65,13 @@ struct TodayCareSlot: View {
 
     /// Changes whenever the rentals, the entries or the care links change (refreshes `CareDue`).
     private var snapshotKey: String {
-        let hours = viewModel.timeEntries.reduce(0) { $0 + $1.hours }
-        return "\(viewModel.properties.map(\.id.uuidString).joined())|\(viewModel.properties.map(\.address).joined())|\(viewModel.timeEntries.count)|\(hours)|\(doneLog.records.count)"
+        let rentals = viewModel.properties.map { "\($0.id.uuidString)\($0.propertyType.rawValue)\($0.address)" }.joined()
+        var hours = 0.0, dates = 0.0
+        for entry in viewModel.timeEntries {
+            hours += entry.hours
+            dates += entry.date.timeIntervalSinceReferenceDate
+        }
+        return "\(rentals)|\(viewModel.timeEntries.count)|\(hours)|\(dates)|\(doneLog.records.count)"
     }
 
     // MARK: Pro

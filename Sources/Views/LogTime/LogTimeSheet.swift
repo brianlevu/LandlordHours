@@ -483,7 +483,10 @@ struct LogTimeSheet: View {
         case .name: nameFocused = true
         case .rental: open(.property)
         case .kind: open(.category)
-        case .hours: open(.hours)
+        case .hours:
+            // A care entry keeps the person's own chips under How long (the generic editor would
+            // hide "Last time" and "Typical"); the line under the button says what's missing.
+            if form.careTaskID != nil { UIAccessibility.post(notification: .layoutChanged, argument: nil) } else { open(.hours) }
         }
     }
 
@@ -611,6 +614,8 @@ struct LogTimeSheet: View {
 
     func noteChanged(_ text: String) {
         guard mode == .log, !manual else { return }
+        // A care row's prefilled note is the app's words: read only once the person changes it.
+        if form.noteIsCarePrefill { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { usedVoice = false }
         // Editing the note after a fill starts a new fill; the old caption goes away until it lands.

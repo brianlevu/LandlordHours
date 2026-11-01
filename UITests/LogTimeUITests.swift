@@ -379,7 +379,7 @@ final class LogTimeUITests: XCTestCase {
         app.buttons["log.save"].tap()
         XCTAssertFalse(element("shell.toast").waitForExistence(timeout: 1.5), "a gap never logs")
         XCTAssertEqual(app.buttons["log.save"].label, before)
-        app.buttons["log.hours"].tap()
+        XCTAssertTrue(element("log.careChips").exists, "the chips stay; the generic editor doesn't replace them")
         let chip = app.buttons["log.careChip.fixed-60"]
         XCTAssertTrue(chip.waitForExistence(timeout: 4))
         chip.tap()

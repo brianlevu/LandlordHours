@@ -133,6 +133,12 @@ struct LogForm: Equatable {
     /// The care task this entry is for (2.3 care plan): set when a care row opened Log time. How long
     /// starts empty and the Log button reads "Set how long" until a chip or a value is set.
     private(set) var careTaskID: String?
+    /// The note the care row started with. While the note is still exactly this text the app wrote
+    /// it, so nothing is read from it: a rental named "Apt 4H" must never become 4 hours.
+    private(set) var carePrefillNote: String?
+
+    /// The note is still the text a care row wrote (not the person's words).
+    var noteIsCarePrefill: Bool { carePrefillNote != nil && trimmedNote == carePrefillNote }
 
     static let step = 0.25
     static let maxHours = 24.0
@@ -171,6 +177,7 @@ struct LogForm: Equatable {
         form.hoursIsDefault = false
         form.careTaskID = prefill.taskID
         form.note = prefill.note
+        form.carePrefillNote = prefill.note.trimmingCharacters(in: .whitespacesAndNewlines)
         if properties.contains(where: { $0.id == prefill.rentalID }) { form.setProperty(prefill.rentalID) }
         form.setCategory(prefill.kind)
         return form
@@ -295,6 +302,8 @@ struct LogForm: Equatable {
     mutating func apply(_ reading: NoteReading, source: LogFillSource, spouseTracking: Bool,
                         tier: LogFillTier = .rules, late: Bool = false, rulesBaseline: NoteReading? = nil,
                         calendar: Calendar = .current) -> Set<LogField> {
+        // A care row's own text is never read: no hours (or anything else) from words the app wrote.
+        if noteIsCarePrefill { return [] }
         let current = snapshot
         let before = beforeFill ?? current
         let priorTiers = filledBy

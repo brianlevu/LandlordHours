@@ -245,6 +245,28 @@ final class CarePlanTests: XCTestCase {
         XCTAssertEqual(LogTimeFormat.buttonTitle(form: form, properties: [pine, lakeside], now: oct31), CareText.setHowLong)
     }
 
+    /// Verifier v1 blocker: a rental named "Apt 4H" put 4 hours in How long through the note reader.
+    func testTheAppsOwnNoteIsNeverReadIntoHours() {
+        for name in ["Apt 4H", "Suite 12h", "Unit 2M", "from 9 to 5 Lofts"] {
+            let rental = RentalProperty(name: name, address: "", propertyType: .ltr)
+            var form = LogForm.care(CarePrefill.make(task: CarePlanCatalog.task(id: "gutters")!, rental: rental), properties: [rental], now: oct31)
+            XCTAssertTrue(form.noteIsCarePrefill)
+            var reading = NoteReading()
+            reading.hours = 4
+            reading.propertyId = rental.id
+            let wrote = form.apply(reading, source: .note, spouseTracking: false)
+            XCTAssertTrue(wrote.isEmpty, name)
+            XCTAssertEqual(form.hours, 0, "\(name): never hours from the app's own words")
+            XCTAssertNil(form.fillSource, "\(name): no 'filled from your note' on text the app wrote")
+            // Once the person writes, their words are read as usual.
+            form.note += ", about 2 hours"
+            XCTAssertFalse(form.noteIsCarePrefill)
+            reading.hours = 2
+            form.apply(reading, source: .note, spouseTracking: false)
+            XCTAssertEqual(form.hours, 2, name)
+        }
+    }
+
     func testEveryCarePrefillStartsEmptyForEveryTask() {
         for task in CarePlanCatalog.tasks {
             let form = LogForm.care(CarePrefill.make(task: task, rental: lakeside), properties: [lakeside], now: oct31)

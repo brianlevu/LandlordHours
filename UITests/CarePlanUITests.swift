@@ -87,8 +87,9 @@ final class CarePlanUITests: XCTestCase {
         app.buttons["log.save"].tap()
         XCTAssertFalse(element("shell.toast").waitForExistence(timeout: 1.5), "nothing was saved")
         XCTAssertTrue(element("log.sheet").exists)
-        if app.buttons["log.done"].exists { app.buttons["log.done"].tap() }
-        app.buttons["log.hours"].tap()   // close the editor the gap opened; the chips come back
+        XCTAssertTrue(element("log.missing").waitForExistence(timeout: 2), "the line under the button says what's missing")
+        XCTAssertTrue(element("log.careChips").exists, "the person's chips stay under How long")
+        XCTAssertTrue(app.buttons["log.hours"].label.contains("not chosen"))
         let chip = app.buttons["log.careChip.fixed-30"]
         XCTAssertTrue(chip.waitForExistence(timeout: 4))
         chip.tap()
@@ -99,14 +100,25 @@ final class CarePlanUITests: XCTestCase {
 
         // Today moves on to what's next; the plan shows the item done and it opens the entry.
         XCTAssertTrue(element("care.row.gutters").waitForNonExistence(timeout: 5), "a done item leaves Today's three")
+        _ = element("shell.toast").waitForNonExistence(timeout: 10)   // the toast can sit over See plan
         let header = element("today.care.header")
         reveal(header)
         header.buttons.firstMatch.tap()
-        XCTAssertTrue(element("care.screen").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("care.screen").waitForExistence(timeout: 5), app.debugDescription.prefix(3000).description)
         let done = element("care.row.gutters")
         XCTAssertTrue(done.waitForExistence(timeout: 4))
         done.tap()
         XCTAssertTrue(element("entry.detail").waitForExistence(timeout: 5), "a done row opens what was logged")
+    }
+
+    /// Verifier v1 blocker: a rental named "Apt 4H" must not turn the prefilled note into 4 hours.
+    func testARentalNameNeverBecomesHours() {
+        launch(extra: ["-LHTodayStrHours", "500", "-LHTodayStrName", "Apt 4H", "-LHCareOpen", "log"])
+        XCTAssertTrue(element("log.sheet").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Apt 4H"), app.buttons["log.property"].label)
+        Thread.sleep(forTimeInterval: 2)   // past the reader's 600 ms pause
+        XCTAssertTrue(app.buttons["log.hours"].label.contains("not chosen"), app.buttons["log.hours"].label)
+        XCTAssertFalse(element("log.fill.caption").exists, "nothing is read from the app's own words")
     }
 
     func testTheChipsComeFromTheOwnHistory() {
