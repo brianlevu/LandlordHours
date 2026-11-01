@@ -269,7 +269,9 @@ final class TodayConfirmUITests: XCTestCase {
         XCTAssertTrue(log.waitForNonExistence(timeout: 8), "the confirm sheet closes")
     }
 
-    func testTodayOpensOnTheRentalTheUserJustConfirmedThenRespectsAManualPick() {
+    func testTodayOpensOnTheRentalTheUserJustConfirmedThenRespectsAManualPick() throws {
+        // Like the rest of this class it drives the phone's tab bar; iPad's sidebar tabs are IPadColumnUITests' ground.
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom == .pad, "phone tab bar journey")
         launchTwoRentals()
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         XCTAssertTrue(chip.waitForExistence(timeout: 10))
