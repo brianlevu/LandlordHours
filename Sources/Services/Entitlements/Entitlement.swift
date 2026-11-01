@@ -115,6 +115,10 @@ enum Plan: Equatable, Codable, Sendable {
 }
 
 enum EntitlementResolver {
+    /// Apple's longest billing grace period (16 days for yearly plans). A grace record without an
+    /// end date never grants more than this past the expiry, so an offline cache can't keep Pro.
+    static let maxGracePeriod: TimeInterval = 16 * 86_400
+
     static func resolve(_ inputs: EntitlementInputs) -> Plan {
         let usable = inputs.transactions.filter(isUsable)
         let subscription = activeSubscription(usable, renewal: inputs.renewal, now: inputs.now)
@@ -129,6 +133,13 @@ enum EntitlementResolver {
     static func foundingWasRefunded(_ inputs: EntitlementInputs) -> Bool {
         guard let latest = inputs.foundingLatest, latest.productID == ProductIDs.founding else { return false }
         return latest.revocationDate != nil
+    }
+
+    /// StoreKit knows the founding product but it doesn't count (refunded, or family-shared while
+    /// Family Sharing is off): the cached flag must be cleared.
+    static func foundingInvalid(_ inputs: EntitlementInputs) -> Bool {
+        guard let latest = inputs.foundingLatest, latest.productID == ProductIDs.founding else { return false }
+        return !isUsable(latest) && !inputs.transactions.contains { $0.productID == ProductIDs.founding && isUsable($0) }
     }
 
     /// StoreKit shows a live founding purchase (the cached flag can be set).
@@ -165,21 +176,20 @@ enum EntitlementResolver {
             case .revoked, .expired:
                 return nil
             case .inGracePeriod:
-                if let graceEnd = renewal.gracePeriodExpirationDate {
-                    inGrace = now < graceEnd
-                    active = active || inGrace
-                } else {
-                    inGrace = true
-                    active = true
-                }
+                let graceEnd = renewal.gracePeriodExpirationDate ?? expires.addingTimeInterval(maxGracePeriod)
+                inGrace = now >= expires && now < graceEnd
+                active = active || inGrace
             case .inBillingRetryPeriod, .subscribed:
                 break // The date decides.
             }
         }
         guard active else { return nil }
         let info = Plan.Subscription(startedAt: latest.purchaseDate, expiresAt: expires,
-                                     willAutoRenew: renewal?.willAutoRenew ?? true,
+                                     // Unknown renewal (offline, unverified): assume it won't
+                                     // renew, so no "Keep Pro" reminder runs on a guess.
+                                     willAutoRenew: renewal?.willAutoRenew ?? false,
                                      inGracePeriod: inGrace, originalTransactionID: latest.originalTransactionID)
-        return (info, latest.offer == .freeTrial)
+        // A trial that failed to bill and sits in grace is a lapsed trial being retried: Pro in grace.
+        return (info, latest.offer == .freeTrial && !inGrace)
     }
 }

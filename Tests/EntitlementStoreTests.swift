@@ -224,4 +224,41 @@ final class EntitlementStoreTests: XCTestCase {
         XCTAssertEqual(infos.first?.displayPrice, "€54,99")
         XCTAssertEqual(infos.first?.introTrialDays, 14)
     }
+
+    // MARK: Verifier round (2026-10-31)
+
+    @MainActor
+    func testFamilySharedFoundingClearsTheCachedFlag() async {
+        defaults.set(true, forKey: "t.isProUser")
+        let client = FakeStoreClient()
+        client.latest[ProductIDs.founding] = EntitlementFact(productID: ProductIDs.founding, transactionID: 3, originalTransactionID: 3,
+                                                             purchaseDate: now, ownership: .familyShared)
+        let store = makeStore()
+        let plan = await store.refresh(using: client)
+        XCTAssertEqual(plan, .free)
+        XCTAssertFalse(defaults.bool(forKey: "t.isProUser"))
+        let cold = makeStore()
+        cold.loadCached()
+        XCTAssertEqual(cold.plan, .free, "no founding flash on the next offline cold start")
+    }
+
+    func testProfilesDoNotShareKeys() {
+        let a = EntitlementStore(defaults: defaults, key: { "u.a.\($0)" }, clock: { [unowned self] in self.now })
+        let b = EntitlementStore(defaults: defaults, key: { "u.b.\($0)" }, clock: { [unowned self] in self.now })
+        a.setFoundingFlag(true)
+        _ = a.pickFreeRental(oak, rentals: rentals)
+        b.loadCached()
+        XCTAssertEqual(b.plan, .free)
+        XCTAssertEqual(b.freeRentalID(rentals: rentals), pine)
+    }
+
+    func testProEndingWithAnOldPickDoesNotAskAgain() {
+        let store = makeStore()
+        _ = store.pickFreeRental(oak, rentals: rentals)
+        store.setFoundingFlag(true)
+        store.setFoundingFlag(false)
+        XCTAssertFalse(store.needsFreeRentalPick(rentals: rentals))
+        XCTAssertEqual(store.freeRentalID(rentals: rentals), oak)
+    }
 }
+

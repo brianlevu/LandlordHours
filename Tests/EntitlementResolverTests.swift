@@ -212,4 +212,42 @@ final class EntitlementResolverTests: XCTestCase {
             XCTAssertEqual(try JSONDecoder().decode(Plan.self, from: data), plan)
         }
     }
+
+    // MARK: Verifier round (2026-10-31)
+
+    func testGraceWithoutAnEndDateEndsAfterSixteenDays() {
+        let paid = yearly(start: now.addingTimeInterval(-365 * day - 10 * day), days: 365) // expired 10 days ago
+        let grace = RenewalFact(state: .inGracePeriod, willAutoRenew: true)
+        guard case .pro = EntitlementResolver.resolve(inputs([paid], renewal: grace)) else { return XCTFail("inside 16 days") }
+        let old = yearly(start: now.addingTimeInterval(-365 * day - 17 * day), days: 365) // expired 17 days ago
+        XCTAssertEqual(EntitlementResolver.resolve(inputs([old], renewal: grace)), .free, "a cached grace record can't keep Pro forever")
+    }
+
+    func testUnknownRenewalMeansNoAutoRenewal() {
+        let trial = yearly(start: now.addingTimeInterval(-3 * day), days: 14, offer: .freeTrial)
+        guard case .trial(let sub) = EntitlementResolver.resolve(inputs([trial])) else { return XCTFail("expected trial") }
+        XCTAssertFalse(sub.willAutoRenew, "no reminder runs on a guess")
+    }
+
+    func testTrialInBillingGraceIsProInGrace() {
+        let trial = yearly(start: now.addingTimeInterval(-15 * day), days: 14, offer: .freeTrial)
+        let plan = EntitlementResolver.resolve(inputs([trial], renewal: RenewalFact(
+            state: .inGracePeriod, willAutoRenew: true, gracePeriodExpirationDate: now.addingTimeInterval(5 * day))))
+        guard case .pro(let sub) = plan else { return XCTFail("expected pro in grace, got \(plan)") }
+        XCTAssertTrue(sub.inGracePeriod)
+    }
+
+    func testRefundedFoundingWithAnActiveYearlyIsPro() {
+        let paid = yearly(start: now.addingTimeInterval(-3 * day), days: 365)
+        let plan = EntitlementResolver.resolve(inputs([paid], renewal: RenewalFact(state: .subscribed, willAutoRenew: true),
+                                                      foundingLatest: founding(revoked: now), cachedFounding: true))
+        guard case .pro = plan else { return XCTFail("expected pro, got \(plan)") }
+    }
+
+    func testFamilySharedFoundingWithTheCachedFlagIsFreeAndInvalid() {
+        let i = inputs([], foundingLatest: founding(ownership: .familyShared), cachedFounding: true)
+        XCTAssertEqual(EntitlementResolver.resolve(i), .free)
+        XCTAssertTrue(EntitlementResolver.foundingInvalid(i), "the store clears the cached flag")
+    }
 }
+

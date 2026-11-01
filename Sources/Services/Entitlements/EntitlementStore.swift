@@ -56,7 +56,7 @@ final class EntitlementStore: ObservableObject {
         let renewal = hasSubscription ? await client.renewalState(for: ProductIDs.yearly) : nil
         let inputs = EntitlementInputs(transactions: transactions, renewal: renewal, foundingLatest: foundingLatest,
                                        cachedFounding: foundingFlag, now: clock())
-        if EntitlementResolver.foundingWasRefunded(inputs) {
+        if EntitlementResolver.foundingInvalid(inputs) {
             writeFoundingFlag(false)
         } else if EntitlementResolver.foundingSeen(inputs) {
             writeFoundingFlag(true)

@@ -66,7 +66,7 @@ struct StoreKit2Client: StoreClient {
         let renewalInfo: Product.SubscriptionInfo.RenewalInfo?
         if case .verified(let info) = status.renewalInfo { renewalInfo = info } else { renewalInfo = nil }
         return RenewalFact(state: Self.state(status.state),
-                           willAutoRenew: renewalInfo?.willAutoRenew ?? true,
+                           willAutoRenew: renewalInfo?.willAutoRenew ?? false,
                            gracePeriodExpirationDate: renewalInfo?.gracePeriodExpirationDate)
     }
 
