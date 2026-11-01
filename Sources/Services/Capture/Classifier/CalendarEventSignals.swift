@@ -123,6 +123,10 @@ extension RulesEngine {
         /// "rent collection", "hoa", "paint"). The bare verb does only with nothing against it:
         /// "Rent review" yes, "Rent a car" and "Rent tuxedo for wedding" no.
         var vouches: Bool { strong > 0 || (any > 0 && !hasNotLandlord) }
+        /// The title carries the event on its own (2.3 F, D2): the same as `vouches`, at a word of
+        /// weight 1.0 or more. "Deck", "check in", "window", "install" (0.4–0.6) vouch but never carry:
+        /// they lost to the invite in 21 of the 42 office look-alikes (inbox-noise report §1).
+        var carries: Bool { strong >= RulesEngine.carryingTitleKeyword || (any >= RulesEngine.carryingTitleKeyword && !hasNotLandlord) }
         /// Strong enough to outweigh the table's noise words ("Lease signing - Dr Patel dental practice").
         var isStrong: Bool { strong >= RulesEngine.strongTitleKeyword }
     }
@@ -148,9 +152,13 @@ extension RulesEngine {
         return out
     }
 
-    /// True when a landlord word in the title vouches for the event. One answer for both the live
-    /// scan and the cleanup.
-    static func titleHasLandlordKeyword(_ title: String) -> Bool { titleKeywords(title).vouches }
+    /// True when a landlord word of weight 1.0 or more in the title carries the event (2.3 F, D2).
+    /// One answer for the live scan, the backfill and both cleanups.
+    static func titleHasLandlordKeyword(_ title: String) -> Bool { titleKeywords(title).carries }
+
+    /// A title word at least this heavy keeps an event visible against the invite, and brings a
+    /// skipped event back as "Not sure" (`CalendarVisibility`). Was any word (> 0) in 2.2.
+    static let carryingTitleKeyword = 1.0
 
     /// A strong landlord word: the table weight is at least this.
     static let strongTitleKeyword = 2.0
@@ -173,9 +181,25 @@ extension RulesEngine {
         properties: [RentalProperty]
     ) -> RulesVerdict {
         let joined = [title, location ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
-        var verdict = evaluate(text: joined, properties: properties)
-        let titleOnly = evaluate(text: title, properties: properties)
         let penalties = CalendarEventSignals.penalties(title: title, location: location, context: context)
+        // Name-word collision guard (2.3 F): one word of a rental's name or a one-word alias next to
+        // invite signals is a coincidence ("[PLAT] Atlas check-in" beside "Atlas Lofts"), not a match.
+        var scored = properties
+        var collision: String?
+        if !penalties.isEmpty, let match = matchProperty(normalized: normalize(joined), properties: properties), match.isSingleWord {
+            scored = []
+            collision = "property (one name word beside invite signals): \(match.reason)"
+        }
+        var verdict = evaluate(text: joined, properties: scored)
+        if let collision { verdict.evidence.append(collision) }
+        let titleOnly = evaluate(text: title, properties: scored)
+        let base = legacyCalendarVerdict(verdict, title: title, titleOnly: titleOnly, penalties: penalties)
+        return gated(base, penalties: penalties)
+    }
+
+    /// The 2.2 rules (title against invite, location-only cap), before the 2.3 gate.
+    private static func legacyCalendarVerdict(_ joinedVerdict: RulesVerdict, title: String, titleOnly: RulesVerdict, penalties: [CalendarEventSignals.Penalty]) -> RulesVerdict {
+        var verdict = joinedVerdict
         let penalty = penalties.reduce(0.0) { $0 + $1.score }
         let hasNegativeKeyword = verdict.evidence.contains { $0.hasPrefix("not landlord:") }
         let meetingish = CalendarEventSignals.titleHasMeetingWord(title)
@@ -213,12 +237,64 @@ extension RulesEngine {
         // invite (attendees, repeat, meeting word, work organizer), but not against a personal
         // appointment or a remote place, and not against noise words.
         let hardPenalty = penalties.contains { $0.reason == "personal appointment words" || $0.reason == "remote location" }
-        let titleCarries = keywords.isStrong || (keywords.vouches && penalty < 0 && !hardPenalty)
+        let titleCarries = keywords.isStrong || (keywords.carries && penalty < 0 && !hardPenalty)
         verdict.hasLandlordSignal = stillSignal || titleCarries
         if !verdict.hasLandlordSignal, penalty < 0 {
             return hidden(verdict, score: verdict.score, note: "event signals outweigh the match")
         }
         return verdict
+    }
+
+    // MARK: The positive-signal gate (2.3 F, "G2" + "D2" in the inbox-noise report)
+
+    /// Words that never count alone: they need another positive word beside them. "Check in" is a
+    /// team meeting as often as a guest arrival, "deck" a slide deck as often as a porch.
+    static let pairingOnlyWords: Set<String> = ["check in", "deck", "window", "tour", "potential", "keys", "replacement", "inquir"]
+    /// Hardware stores pass the gate on their own (a trip to buy parts).
+    static let storeNames: Set<String> = ["home depot", "lowes", "lowe s", "hardware store"]
+    /// One positive word at least this heavy (and not pairing-only) passes the gate.
+    static let gateSingleWord = 0.6
+    /// Positive words that together reach this pass the gate ("Guest check in").
+    static let gateWordSum = 1.2
+
+    /// The table weight of every landlord keyword in `evidence` ("keyword: plumb").
+    static func keywordHits(_ evidence: [String]) -> [(phrase: String, weight: Double)] {
+        evidence.compactMap { line in
+            guard line.hasPrefix("keyword: ") else { return nil }
+            let phrase = String(line.dropFirst("keyword: ".count))
+            guard let weight = ClassifierKeywords.signals.last(where: { $0.phrase == phrase })?.landlord else { return nil }
+            return (phrase, weight)
+        }
+    }
+
+    /// G2: the event names something only rental work would. A property name, alias or address;
+    /// a keyword of 0.6 or more that is not pairing-only; a hardware store; or positive keywords
+    /// summing to 1.2 or more. Without one, nothing (the model included) can put it in the Inbox.
+    static func hasRentalCue(_ evidence: [String]) -> Bool {
+        if evidence.contains(where: { $0.hasPrefix("property:") }) { return true }
+        let hits = keywordHits(evidence)
+        if hits.contains(where: { $0.weight >= gateSingleWord && !pairingOnlyWords.contains($0.phrase) }) { return true }
+        if hits.contains(where: { storeNames.contains($0.phrase) }) { return true }
+        return hits.map(\.weight).filter { $0 > 0 }.reduce(0, +) >= gateWordSum
+    }
+
+    /// Applies G2 and D2 to a calendar verdict. Hidden items carry `notRentalEvidence` (so the model
+    /// is not asked and its "yes" can't bring them back); items that pass carry `rentalCueEvidence`.
+    private static func gated(_ verdict: RulesVerdict, penalties: [CalendarEventSignals.Penalty]) -> RulesVerdict {
+        if verdict.evidence.contains(ClassifierThresholds.notRentalEvidence) { return verdict }
+        guard hasRentalCue(verdict.evidence) else {
+            return hidden(verdict, score: verdict.score, note: "no rental cue")
+        }
+        // D2: invite signals (attendees, a repeat, a work organizer, a remote place) beat every
+        // title word under 1.0 when no property matched. Under 2.0 ("D") cost 4 points of recall.
+        let property = verdict.evidence.contains { $0.hasPrefix("property:") }
+        let heaviest = keywordHits(verdict.evidence).map(\.weight).max() ?? 0
+        if !penalties.isEmpty, !property, heaviest < carryingTitleKeyword {
+            return hidden(verdict, score: verdict.score, note: "invite signals outweigh weak words")
+        }
+        var out = verdict
+        out.evidence.append(ClassifierThresholds.rentalCueEvidence)
+        return out
     }
 
     private static func hidden(_ verdict: RulesVerdict, score: Double, note: String) -> RulesVerdict {
@@ -229,5 +305,32 @@ extension RulesEngine {
         out.evidence.append(ClassifierThresholds.notRentalEvidence)
         out.evidence.append("hidden: \(note)")
         return out
+    }
+}
+
+/// Whether a classifier outcome is shown in the Inbox. One answer for the live scan, the backfill
+/// and the one-time cleanup, so they can never disagree about the same event.
+enum CalendarVisibility {
+    /// The classification to show, or nil to hide. A hidden item with a landlord word of 1.0 or
+    /// more in its title is kept as "Not sure" (confidence at least 0.30), unless the rules marked
+    /// it as not rental work (no rental cue, invite signals, a personal appointment, a remote
+    /// place). Muted items are nil: a mute is the user's rule, handled by the caller. Pure (moved
+    /// here from the coordinator in 2.3 so the synthetic-set harness runs the real code).
+    ///
+    /// `keepKeywordTitles`: the cleanup of items already in the Inbox. It never deletes one with a
+    /// landlord word in its title, even when the rules marked it not rental; it drops to "Not sure".
+    static func shown(_ outcome: ClassifierOutcome, title: String, keepKeywordTitles: Bool = false) -> CaptureClassification? {
+        switch outcome {
+        case .suggest(let classification):
+            return classification
+        case .skip(var classification):
+            guard keepKeywordTitles || !classification.evidence.contains(ClassifierThresholds.notRentalEvidence),
+                  RulesEngine.titleHasLandlordKeyword(title) else { return nil }
+            classification.confidence = max(classification.confidence, ClassifierThresholds.notSure)
+            classification.evidence.append(ClassifierThresholds.landlordSignalEvidence)
+            return classification
+        case .muted:
+            return nil
+        }
     }
 }

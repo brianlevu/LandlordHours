@@ -216,6 +216,18 @@ struct Suggestion: Identifiable, Codable, Equatable {
         isPending && !mightAlreadyBeLogged && proposedPropertyId != nil && (proposedHours ?? 0) > 0
     }
 
+    /// The repeating calendar series this occurrence belongs to ("cal:<externalId>"), or nil for a
+    /// one-off event or another kind. Every occurrence key of the series starts with it plus ":".
+    var seriesId: String? {
+        guard kind == .calendar else { return nil }
+        if let externalId, !externalId.isEmpty, sourceKey.hasPrefix("cal:\(externalId):") { return "cal:\(externalId)" }
+        if let local = legacyEventIdentifier, !local.isEmpty, sourceKey.hasPrefix("cal-local:\(local):") { return "cal-local:\(local)" }
+        return nil
+    }
+
+    /// True when `key` is an occurrence of `seriesId` (see `seriesId`).
+    static func key(_ key: String, isIn seriesId: String) -> Bool { key.hasPrefix(seriesId + ":") }
+
     /// The TimeEntry id a confirm of this suggestion produces for `profileId`, on every device.
     func entryId(profileId: String) -> UUID {
         CaptureIdentity.entryId(profileId: profileId, sourceKey: sourceKey)

@@ -28,6 +28,7 @@
 		11165D810E3C70F4D8A2CFEA /* S-201-suggestions.md in Resources */ = {isa = PBXBuildFile; fileRef = 67D6AAAC3FD7B983EE650DD7 /* S-201-suggestions.md */; };
 		1271C43405BD7788AF2A11A9 /* LockedPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2487D044B1E2C51F52E4363B /* LockedPreview.swift */; };
 		12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37718C6C352F5146B1B19AAA /* ExportPDFView.swift */; };
+		1316009632E735A83B103CC9 /* InboxQuietUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAD0470FCA988B318BD238E /* InboxQuietUITests.swift */; };
 		13B70E45F6EC9C686901E6BB /* OnboardingCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57343B4D218F75B37CA7F147 /* OnboardingCaptureUITests.swift */; };
 		1424FAA16D7E9B48091EBE67 /* StoreKitLocalIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */; };
 		14A18F83881D0C346E14D87B /* Polish2CaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A3407BEDF04CD24CEB6090 /* Polish2CaptureUITests.swift */; };
@@ -118,6 +119,7 @@
 		4FEB158B22F5E540112D703C /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
 		5033678B0E5805A4E2FEEB23 /* craft_build_dark.mov in Resources */ = {isa = PBXBuildFile; fileRef = D36B83A1EDCB4BEA30A0F2CF /* craft_build_dark.mov */; };
 		511575339D5FAE17292F68C7 /* Fraunces.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F421EA11ACB374A491346AA3 /* Fraunces.ttf */; };
+		51416022E186053BD793E844 /* InboxQuiet.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 80C26617AC3B17A91B159F98 /* InboxQuiet.xcstrings */; };
 		518F77E3248E5C1571182B28 /* LandlordHoursAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */; };
 		5234E6574DCCFD5F2C378E52 /* WidgetSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA9EF0B2E3079F9E7B54DA26 /* WidgetSurface.swift */; };
 		5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */; };
@@ -525,6 +527,7 @@
 		4E7575580F74476145B81402 /* PaywallCaptureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallCaptureUITests.swift; sourceTree = "<group>"; };
 		4E78224ED686BF6782F6BDE8 /* LHSegmented.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHSegmented.swift; sourceTree = "<group>"; };
 		4E79BD77CF9AD17DD821AFBF /* LandlordHoursAppEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursAppEntry.swift; sourceTree = "<group>"; };
+		4EAD0470FCA988B318BD238E /* InboxQuietUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxQuietUITests.swift; sourceTree = "<group>"; };
 		4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementLabView.swift; sourceTree = "<group>"; };
 		4FDD68FA0561A0A011AB6241 /* RecordSetAnswers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordSetAnswers.swift; sourceTree = "<group>"; };
 		4FDEE42CEACE212DB8664E82 /* PropertiesDebugSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesDebugSeed.swift; sourceTree = "<group>"; };
@@ -592,6 +595,7 @@
 		7EFF1A62FB52ACFBA349CFB9 /* Rentals.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Rentals.xcstrings; sourceTree = "<group>"; };
 		7F0B8274FBC9C3C8703637AE /* LHComponentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHComponentSheet.swift; sourceTree = "<group>"; };
 		8050AE37925D54C7824A075C /* DevelopmentContainerSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentContainerSyncTests.swift; sourceTree = "<group>"; };
+		80C26617AC3B17A91B159F98 /* InboxQuiet.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InboxQuiet.xcstrings; sourceTree = "<group>"; };
 		80FA7F95B6FE60E29F67E1C5 /* OnboardingSteps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSteps.swift; sourceTree = "<group>"; };
 		820B581AFB8B62B3E8DF9D48 /* LoadingJobsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingJobsTests.swift; sourceTree = "<group>"; };
 		8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursUITests.swift; sourceTree = "<group>"; };
@@ -943,6 +947,7 @@
 				06883004BB1E57213877840B /* Foundations.xcstrings */,
 				5A198C4D0761DC85DCC7E433 /* Identity.xcstrings */,
 				62177BDC1EB74EBC85C64513 /* Inbox.xcstrings */,
+				80C26617AC3B17A91B159F98 /* InboxQuiet.xcstrings */,
 				F065DEC6977972CFF15C176D /* LogTime.xcstrings */,
 				E409D122800D1F14F4E39BC4 /* RecordsReports.xcstrings */,
 				7EFF1A62FB52ACFBA349CFB9 /* Rentals.xcstrings */,
@@ -1247,6 +1252,7 @@
 				52398F43CF0F110B06A053F5 /* IdentityCaptureUITests.swift */,
 				07304A69757DB91D8CF20A79 /* IdentityJourneyUITests.swift */,
 				DD0C1C4662F46051DF0E5A62 /* InboxCaptureUITests.swift */,
+				4EAD0470FCA988B318BD238E /* InboxQuietUITests.swift */,
 				00D256C8A4030CDDD3F2378D /* InboxUITests.swift */,
 				0B05AD89AF5FAC8EFB6BEE96 /* IPadColumnUITests.swift */,
 				8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */,
@@ -1655,6 +1661,7 @@
 				511575339D5FAE17292F68C7 /* Fraunces.ttf in Resources */,
 				B6ECA775D73C16F64314967A /* Identity.xcstrings in Resources */,
 				0FCBF8F9F40CBB00DE9FF60A /* Inbox.xcstrings in Resources */,
+				51416022E186053BD793E844 /* InboxQuiet.xcstrings in Resources */,
 				173044588DEFFA03F9D2F95B /* InfoPlist.xcstrings in Resources */,
 				38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */,
 				3C9A055713D8A40AAFFB526A /* Learn.xcstrings in Resources */,
@@ -2037,6 +2044,7 @@
 				7DA9C5694D8267A7161C9FED /* IdentityCaptureUITests.swift in Sources */,
 				9CDB07DC7A70BF0E73004FA1 /* IdentityJourneyUITests.swift in Sources */,
 				F7C5F8A5FB802ED1144DAB1B /* InboxCaptureUITests.swift in Sources */,
+				1316009632E735A83B103CC9 /* InboxQuietUITests.swift in Sources */,
 				E7C67889F1F2B1F8138B9B71 /* InboxUITests.swift in Sources */,
 				20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */,
 				2D5B96848DC40BDCD46B0B19 /* LearnDeleteRestoreUITests.swift in Sources */,

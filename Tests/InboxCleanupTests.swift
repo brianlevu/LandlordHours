@@ -210,4 +210,184 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
         XCTAssertNil(store.suggestion(forKey: "cal:T"), "No landlord word: removed")
         XCTAssertEqual(result?.removed, 1)
     }
+
+    // MARK: - 2.3 package F: the second cleanup, series dismissal, calendar choice
+
+    func testTheSecondCleanupRunsAfterTheFirstAndRemovesWhatTheGateHides() async throws {
+        // On 2.2 the first pass already ran; a 1:1 and a deck review were kept as "Not sure".
+        let oneOnOne = snapshot("O", "Alex / Jordan", hour: 9, location: "")
+        let deck = snapshot("K", "2026 Deck Q4R", hour: 10, attendees: 4, location: "")
+        let plumber = snapshot("P", "Plumber", hour: 12, location: "")
+        let window = snapshot("W", "Window", hour: 13, location: "")
+        let store = makeStore()
+        store.ingest([oldPending(oneOnOne), oldPending(deck), oldPending(plumber), oldPending(window)], existingEntries: [], calendar: calendar)
+        store.markPendingCleanupDone()
+        XCTAssertTrue(store.hasRunPendingCleanup)
+        XCTAssertFalse(store.hasRunPendingCleanupV2)
+
+        let result = await run([oneOnOne, deck, plumber, window], store: store)
+        XCTAssertEqual(result?.removed, 3, "1:1, deck review and a bare weak word leave")
+        XCTAssertEqual(store.pending.map(\.title), ["Plumber"])
+        XCTAssertTrue(store.hasRunPendingCleanupV2)
+        XCTAssertTrue(store.contents.dismissedKeys.isEmpty, "The system's call, never a user dismissal")
+        let again = await run([oneOnOne], store: store)
+        XCTAssertNil(again, "Once per install")
+        XCTAssertTrue(SuggestionStore(userId: profileId, baseDirectory: baseDir).hasRunPendingCleanupV2)
+    }
+
+    func testTheSecondCleanupNeverDeletesAnItemWithACarryingTitleWord() async throws {
+        // A rental word of 1.0+ in the title, even with every invite signal against it: kept.
+        let hoa = snapshot("H", "HOA board", hour: 9, attendees: 8, location: "")
+        let lease = snapshot("L", "Lease renewal - team", hour: 10, attendees: 6, location: "Remote")
+        let store = makeStore()
+        store.ingest([oldPending(hoa), oldPending(lease)], existingEntries: [], calendar: calendar)
+        let result = await run([hoa, lease], store: store)
+        XCTAssertEqual(result?.removed, 0)
+        XCTAssertEqual(Set(store.pending.map(\.title)), ["HOA board", "Lease renewal - team"])
+    }
+
+    func testAFreshInstallRunsOnlyOnePass() async {
+        let store = makeStore()
+        let result = await run([], store: store)
+        XCTAssertEqual(result, InboxCleanupResult())
+        XCTAssertTrue(store.hasRunPendingCleanup)
+        XCTAssertTrue(store.hasRunPendingCleanupV2)
+    }
+
+    private func series(_ id: String, _ title: String, days: [Int], container: String = "WORK") -> [Suggestion] {
+        days.map { day in
+            let start = date(2026, 5, day, 9)
+            var s = calendarSuggestion(externalId: id, start: start, title: title, propertyId: nil, hours: 0.5)
+            s.containerId = container
+            s.confidence = 0.4
+            return s
+        }
+    }
+
+    func testNotRentalWorkOnOneOccurrenceHidesTheWholeSeries() throws {
+        let store = makeStore()
+        let weekly = series("SER", "Alex / Jordan", days: [4, 11, 18])
+        let other = series("ONE", "Plumber", days: [5], container: "HOME")
+        store.ingest(weekly + other, existingEntries: [], calendar: calendar)
+        XCTAssertEqual(weekly[0].seriesId, "cal:SER")
+
+        store.dismiss(key: weekly[1].sourceKey, reason: .notLandlordWork)
+        XCTAssertEqual(store.pending.map(\.title), ["Plumber"], "Every pending occurrence leaves")
+        XCTAssertTrue(store.isSeriesDismissed("cal:SER"))
+
+        // A later occurrence is never suggested, and a scan doesn't even classify it.
+        let next = series("SER", "Alex / Jordan", days: [25])
+        XCTAssertFalse(store.wouldIngest(sourceKey: next[0].sourceKey))
+        XCTAssertTrue(store.ingest(next, existingEntries: [], calendar: calendar).isEmpty)
+        // The dismissal counts once against the calendar.
+        XCTAssertEqual(store.feedback(forCalendar: "WORK").notRental, 1)
+
+        // Undo brings the series back, and the count with it.
+        store.restorePending(keys: [weekly[1].sourceKey])
+        XCTAssertEqual(store.pending.filter { $0.title == "Alex / Jordan" }.count, 3)
+        XCTAssertFalse(store.isSeriesDismissed("cal:SER"))
+        XCTAssertEqual(store.feedback(forCalendar: "WORK").notRental, 0)
+        XCTAssertTrue(store.wouldIngest(sourceKey: next[0].sourceKey))
+    }
+
+    func testAOneOffDismissalHidesOnlyItself() {
+        let store = makeStore()
+        var one = calendarSuggestion(externalId: "ONEOFF", start: date(2026, 5, 4, 9), title: "Deck", propertyId: nil)
+        one.sourceKey = SuggestionKey.calendar(externalId: "ONEOFF")
+        XCTAssertNil(one.seriesId)
+        store.ingest([one], existingEntries: [], calendar: calendar)
+        store.dismiss(key: one.sourceKey, reason: .notLandlordWork)
+        XCTAssertTrue(store.contents.dismissedSeries?.isEmpty ?? true)
+    }
+
+    func testACalendarWithThreeDismissalsAndNoConfirmsIsOfferedOnce() {
+        let store = makeStore()
+        let items = (0..<4).flatMap { series("S\($0)", "Sync \($0)", days: [4 + $0]) }
+        store.ingest(items, existingEntries: [], calendar: calendar)
+        for item in items.prefix(2) { store.dismiss(key: item.sourceKey, reason: .notLandlordWork) }
+        XCTAssertTrue(store.calendarsToOfferQuieting(excluded: []).isEmpty, "Two is not enough")
+        store.dismiss(key: items[2].sourceKey, reason: .notLandlordWork)
+        XCTAssertEqual(store.calendarsToOfferQuieting(excluded: []), ["WORK"])
+        XCTAssertTrue(store.calendarsToOfferQuieting(excluded: ["WORK"]).isEmpty, "Already turned off")
+        store.markQuietPromptShown(calendar: "WORK")
+        XCTAssertTrue(store.calendarsToOfferQuieting(excluded: []).isEmpty, "One time only")
+        // Counts are on this device, in the profile's file.
+        XCTAssertEqual(SuggestionStore(userId: profileId, baseDirectory: baseDir).feedback(forCalendar: "WORK").notRental, 3)
+    }
+
+    func testAConfirmOnTheCalendarMeansItIsNeverOffered() {
+        let store = makeStore()
+        let items = (0..<4).flatMap { series("S\($0)", "Thing \($0)", days: [4 + $0]) }
+        store.ingest(items, existingEntries: [], calendar: calendar)
+        store.markConfirmed(key: items[3].sourceKey, entryId: UUID())
+        for item in items.prefix(3) { store.dismiss(key: item.sourceKey, reason: .notLandlordWork) }
+        XCTAssertEqual(store.feedback(forCalendar: "WORK").confirmed, 1)
+        XCTAssertTrue(store.calendarsToOfferQuieting(excluded: []).isEmpty)
+        // A mute is not a "Not rental work" answer.
+        XCTAssertEqual(store.feedback(forCalendar: "WORK").notRental, 3)
+    }
+
+    func testTurningACalendarOffRemovesItsPendingItemsWithoutDismissingThem() {
+        let store = makeStore()
+        store.ingest(series("A", "Sync", days: [4]) + series("B", "Plumber", days: [5], container: "HOME"), existingEntries: [], calendar: calendar)
+        XCTAssertEqual(store.removePending(inCalendars: ["WORK"]), 1)
+        XCTAssertEqual(store.pending.map(\.title), ["Plumber"])
+        XCTAssertTrue(store.contents.dismissedKeys.isEmpty)
+    }
+
+    func testTheDetectorSkipsTurnedOffCalendars() async throws {
+        let work = CalendarEventSnapshot(externalId: "W", calendarId: "WORK", title: "Plumber", start: date(2026, 5, 20, 9), end: date(2026, 5, 20, 10))
+        let home = CalendarEventSnapshot(externalId: "H", calendarId: "HOME", title: "Plumber", start: date(2026, 5, 20, 11), end: date(2026, 5, 20, 12))
+        let source = ListingCalendarSource(events: [work, home], calendars: ["WORK", "HOME"])
+        let off = CalendarDetector(source: source, excludedCalendars: { ["WORK"] }, clock: { [now] in now! }, calendar: calendar)
+        let found = try await off.detect(in: DateInterval(start: date(2026, 5, 1), end: date(2026, 5, 31)))
+        XCTAssertEqual(found.map(\.containerId), ["HOME"])
+        let allOn = CalendarDetector(source: source, excludedCalendars: { [] }, clock: { [now] in now! }, calendar: calendar)
+        XCTAssertNil(allOn.scannedCalendarIds(), "Nothing off: every calendar, new ones included")
+    }
+
+    func testCalendarChoiceIsStoredPerProfile() {
+        let defaults = UserDefaults(suiteName: "inbox-quiet-\(UUID().uuidString)")!
+        InboxQuietCalendars.setChecked(false, calendarId: "WORK", profileId: "p1", defaults: defaults)
+        XCTAssertEqual(InboxQuietCalendars.excluded(profileId: "p1", defaults: defaults), ["WORK"])
+        XCTAssertTrue(InboxQuietCalendars.excluded(profileId: "p2", defaults: defaults).isEmpty)
+        InboxQuietCalendars.setChecked(true, calendarId: "WORK", profileId: "p1", defaults: defaults)
+        XCTAssertTrue(InboxQuietCalendars.excluded(profileId: "p1", defaults: defaults).isEmpty)
+    }
+
+    func testAWorkCalendarIsAnyAccountThatIsNotAConsumerMailDomain() {
+        XCTAssertTrue(WorkCalendarRule.isWork(sourceIsExchange: true, accountTitle: "Exchange"))
+        XCTAssertTrue(WorkCalendarRule.isWork(sourceIsExchange: false, accountTitle: "sam@example-corp.com"))
+        for personal in ["sam@gmail.com", "Sam@iCloud.com", "iCloud", "Subscribed Calendars", "Other", nil] as [String?] {
+            XCTAssertFalse(WorkCalendarRule.isWork(sourceIsExchange: false, accountTitle: personal), personal ?? "nil")
+        }
+    }
+
+    func testNotSureItemsLeaveTheMainListAndTheCount() {
+        var sure = calendarSuggestion(externalId: "S", start: date(2026, 5, 20, 9), propertyId: oak.id)
+        sure.confidence = 0.9
+        var maybe = calendarSuggestion(externalId: "M", start: date(2026, 5, 20, 11), title: "Install shelves", propertyId: nil)
+        maybe.confidence = 0.45
+        let later = date(2026, 6, 1)
+        XCTAssertEqual(InboxLogic.visible([sure, maybe], now: later).map(\.title), [sure.title])
+        XCTAssertEqual(InboxLogic.mainList([sure, maybe]).map(\.title), [sure.title])
+        XCTAssertEqual(InboxLogic.maybeList([sure, maybe], now: later).map(\.title), ["Install shelves"])
+        XCTAssertEqual(InboxLogic.sections([sure, maybe], now: later, calendar: calendar).flatMap(\.items).count, 1)
+        // Today's "To confirm" count reads the same list.
+        XCTAssertEqual(TodayConfirm.count(visible: InboxLogic.visible([sure, maybe], now: later), rentalID: nil), 1)
+    }
 }
+
+/// A calendar source that also lists its calendars (Settings › Calendars).
+final class ListingCalendarSource: CalendarEventSource {
+    let events: [CalendarEventSnapshot]
+    let ids: [String]
+    init(events: [CalendarEventSnapshot], calendars: [String]) { self.events = events; self.ids = calendars }
+    func accessState() -> CalendarAccess { .fullAccess }
+    func requestFullAccess() async -> CalendarAccess { .fullAccess }
+    func events(in interval: DateInterval, calendarIds: Set<String>?) -> [CalendarEventSnapshot] {
+        events.filter { $0.start < interval.end && $0.end > interval.start && (calendarIds == nil || calendarIds!.contains($0.calendarId)) }
+    }
+    func calendars() -> [CalendarInfo] { ids.map { CalendarInfo(id: $0, title: $0, account: "test", color: nil, isWork: false) } }
+}
+

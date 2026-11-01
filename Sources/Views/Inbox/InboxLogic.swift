@@ -20,9 +20,15 @@ struct InboxSection: Identifiable, Equatable {
 }
 
 enum InboxLogic {
-    /// Items the inbox shows now: pending, and the event is over (an upcoming event's
-    /// suggestion becomes visible at its `detectedAt`, which is the event end).
+    /// Items the inbox's main list shows now: pending, the event is over (an upcoming event's
+    /// suggestion becomes visible at its `detectedAt`, which is the event end), and not "Not
+    /// sure" (2.3 F: those sit behind the collapsed row, `maybeList`, and are never counted).
     static func visible(_ suggestions: [Suggestion], now: Date) -> [Suggestion] {
+        mainList(due(suggestions, now: now))
+    }
+
+    /// Pending and over, "Not sure" included.
+    static func due(_ suggestions: [Suggestion], now: Date) -> [Suggestion] {
         suggestions.filter { $0.isPending && $0.detectedAt <= now }
     }
 

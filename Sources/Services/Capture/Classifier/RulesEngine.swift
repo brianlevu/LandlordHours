@@ -221,6 +221,9 @@ enum RulesEngine {
         let phrase: String?
         /// An address/street match on a property the owner lives in: needs a work keyword.
         let isWeak: Bool
+        /// Matched on one word only: a one-word alias ("Q4R") or one distinctive word of the
+        /// name ("Atlas" of "Atlas Lofts"). Beside invite signals it doesn't count (2.3 F).
+        var isSingleWord = false
     }
 
     /// Finds the property the text is about. Order of trust:
@@ -256,7 +259,8 @@ enum RulesEngine {
                 // address match for a home the owner lives in.
                 let weak = p.isOwnerOccupied && hit.3 && nameIsStreet(p)
                 let boost = weak ? propertyNameBoost * ownerOccupiedFactor : propertyNameBoost
-                return PropertyMatch(property: p, boost: boost, reason: hit.3 ? p.name : "also called \(hit.2)", phrase: hit.1, isWeak: weak)
+                return PropertyMatch(property: p, boost: boost, reason: hit.3 ? p.name : "also called \(hit.2)", phrase: hit.1, isWeak: weak,
+                                     isSingleWord: !hit.1.contains(" "))
             }
         }
 
@@ -280,7 +284,7 @@ enum RulesEngine {
             let p = best.0
             let weak = p.isOwnerOccupied && nameIsStreet(p)
             return PropertyMatch(property: p, boost: weak ? propertyNameBoost * ownerOccupiedFactor : propertyNameBoost,
-                                 reason: p.name, phrase: nil, isWeak: weak)
+                                 reason: p.name, phrase: nil, isWeak: weak, isSingleWord: best.1 == 1)
         }
 
         // 3. Every street word, or a unit token, alone. A street made only of generic place

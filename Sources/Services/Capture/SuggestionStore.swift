@@ -141,7 +141,35 @@ final class SuggestionStore {
         /// The 2.2 one-time re-check of pending calendar items has run on this install.
         /// Optional so files written before it still decode.
         var pendingCleanupDone: Bool?
+        /// 2.3 F: the second one-time re-check (the positive-signal gate) has run on this install.
+        var pendingCleanupV2Done: Bool?
+        /// 2.3 F: repeating series the user called "Not rental work" (series id → when). No
+        /// occurrence of these is suggested again. Optional so older files still decode.
+        var dismissedSeries: [String: Date]?
+        /// 2.3 F: what one "Not rental work" took with it: the series and the other pending
+        /// occurrences it dismissed, by the key the user acted on. Undo reads it.
+        var seriesDismissals: [String: SeriesDismissal]?
+        /// 2.3 F: per calendar (container id), the user's own verdicts. On this device only.
+        var calendarFeedback: [String: CalendarFeedback]?
     }
+
+    struct SeriesDismissal: Codable, Equatable {
+        var seriesId: String
+        var siblingKeys: [String]
+    }
+
+    /// How the user has answered for one calendar's events.
+    struct CalendarFeedback: Codable, Equatable {
+        /// "Not rental work" taps (a series counts once).
+        var notRental = 0
+        /// Events confirmed as rental work.
+        var confirmed = 0
+        /// The one-time "Stop checking this calendar?" prompt was shown (answered either way).
+        var prompted = false
+    }
+
+    /// "Not rental work" answers that make a calendar worth asking about (2.3 F).
+    static let quietPromptDismissals = 3
 
     static let fileName = "suggestions.json"
 
@@ -213,6 +241,70 @@ final class SuggestionStore {
     }
 
     var hasRunPendingCleanup: Bool { contents.pendingCleanupDone == true }
+    var hasRunPendingCleanupV2: Bool { contents.pendingCleanupV2Done == true }
+
+    /// Marks both one-time cleanups done (V2 supersedes V1: it runs the same pass under the 2.3 rules).
+    func markPendingCleanupV2Done() {
+        guard contents.pendingCleanupV2Done != true || contents.pendingCleanupDone != true else { return }
+        contents.pendingCleanupV2Done = true
+        contents.pendingCleanupDone = true
+        save()
+    }
+
+    // MARK: Series and calendar feedback (2.3 F)
+
+    func isSeriesDismissed(_ seriesId: String) -> Bool { contents.dismissedSeries?[seriesId] != nil }
+
+    /// The dismissed series `key` belongs to, if any.
+    private func dismissedSeries(containing key: String) -> String? {
+        contents.dismissedSeries?.keys.first { Suggestion.key(key, isIn: $0) }
+    }
+
+    func feedback(forCalendar containerId: String) -> CalendarFeedback {
+        contents.calendarFeedback?[containerId] ?? CalendarFeedback()
+    }
+
+    private func updateFeedback(_ containerId: String?, _ change: (inout CalendarFeedback) -> Void) {
+        guard let containerId, !containerId.isEmpty else { return }
+        var all = contents.calendarFeedback ?? [:]
+        var entry = all[containerId] ?? CalendarFeedback()
+        change(&entry)
+        all[containerId] = entry
+        contents.calendarFeedback = all
+    }
+
+    /// Calendars to offer the one-time "Stop checking this calendar?" prompt for: 3 or more "Not
+    /// rental work" answers, no confirms, never asked, and still checked (`excluded` holds the
+    /// calendars the user already turned off). Most dismissed first.
+    func calendarsToOfferQuieting(excluded: Set<String>) -> [String] {
+        (contents.calendarFeedback ?? [:])
+            .filter { id, f in f.notRental >= Self.quietPromptDismissals && f.confirmed == 0 && !f.prompted && !excluded.contains(id) }
+            .sorted { $0.value.notRental != $1.value.notRental ? $0.value.notRental > $1.value.notRental : $0.key < $1.key }
+            .map(\.key)
+    }
+
+    func markQuietPromptShown(calendar containerId: String) {
+        updateFeedback(containerId) { $0.prompted = true }
+        save()
+    }
+
+    #if DEBUG
+    /// `-LHInboxQuietPrompt` (frames, UI tests): a calendar with `count` "Not rental work" answers
+    /// and no confirms, so the Inbox's one-time prompt shows.
+    func debugSeedQuietPrompt(calendar containerId: String, count: Int) {
+        updateFeedback(containerId) { $0 = CalendarFeedback(notRental: count, confirmed: 0, prompted: false) }
+        save()
+    }
+    #endif
+
+    /// Takes every pending item of a calendar the user stopped checking out of the Inbox. The
+    /// system's call: nothing is remembered as dismissed, so turning the calendar back on brings
+    /// them back on the next scan. Returns how many.
+    @discardableResult
+    func removePending(inCalendars containerIds: Set<String>) -> Int {
+        let keys = Set(contents.suggestions.filter { $0.isPending && containerIds.contains($0.containerId ?? "") }.map(\.sourceKey))
+        return removeHiddenBySystem(keys: keys)
+    }
 
     func markPendingCleanupDone() {
         guard contents.pendingCleanupDone != true else { return }
@@ -249,6 +341,7 @@ final class SuggestionStore {
     /// skips classifying these (no model call for an event that is settled).
     func wouldIngest(sourceKey: String) -> Bool {
         if isDismissed(sourceKey) { return false }
+        if dismissedSeries(containing: sourceKey) != nil { return false }
         if let existing = contents.suggestions.first(where: { $0.sourceKey == sourceKey }) { return existing.isPending }
         return true
     }
@@ -275,6 +368,8 @@ final class SuggestionStore {
         for var candidate in candidates {
             guard seenKeys.insert(candidate.sourceKey).inserted else { continue }
             guard !isDismissed(candidate.sourceKey), !isMuted(candidate) else { continue }
+            // 2.3 F: one "Not rental work" hides the whole repeating series.
+            if let series = candidate.seriesId, isSeriesDismissed(series) { continue }
 
             if let index = contents.suggestions.firstIndex(where: { $0.sourceKey == candidate.sourceKey }) {
                 guard contents.suggestions[index].isPending else { continue }
@@ -347,25 +442,74 @@ final class SuggestionStore {
     func markConfirmed(key: String, entryId: UUID) {
         guard let index = contents.suggestions.firstIndex(where: { $0.sourceKey == key }) else { return }
         guard contents.suggestions[index].state != .confirmed(entryId: entryId) else { return }
+        if contents.suggestions[index].isPending, contents.suggestions[index].kind == .calendar {
+            updateFeedback(contents.suggestions[index].containerId) { $0.confirmed += 1 }
+        }
         contents.suggestions[index].state = .confirmed(entryId: entryId)
         contents.suggestions[index].mightAlreadyBeLogged = false
         save()
     }
 
     /// Dismisses a suggestion and remembers its key so it never comes back. Safe to repeat.
+    ///
+    /// 2.3 F: "Not rental work" on a calendar item also counts against its calendar, and on one
+    /// occurrence of a repeating event it hides the whole series (the other pending occurrences
+    /// and every future one). Undo (`restorePending`) reverses both.
     func dismiss(key: String, reason: Suggestion.DismissReason, now: Date = Date()) {
         if let index = contents.suggestions.firstIndex(where: { $0.sourceKey == key }),
            contents.suggestions[index].isPending {
+            let item = contents.suggestions[index]
             contents.suggestions[index].state = .dismissed(reason: reason)
+            if reason == .notLandlordWork, item.kind == .calendar {
+                updateFeedback(item.containerId) { $0.notRental += 1 }
+                if let series = item.seriesId { dismissSeries(series, from: key, now: now) }
+            }
         }
         if contents.dismissedKeys[key] == nil { contents.dismissedKeys[key] = now }
         save()
+    }
+
+    private func dismissSeries(_ series: String, from key: String, now: Date) {
+        var siblings: [String] = []
+        for index in contents.suggestions.indices
+        where contents.suggestions[index].isPending && contents.suggestions[index].seriesId == series {
+            contents.suggestions[index].state = .dismissed(reason: .notLandlordWork)
+            let sibling = contents.suggestions[index].sourceKey
+            if contents.dismissedKeys[sibling] == nil { contents.dismissedKeys[sibling] = now }
+            siblings.append(sibling)
+        }
+        var all = contents.dismissedSeries ?? [:]
+        all[series] = all[series] ?? now
+        contents.dismissedSeries = all
+        var undo = contents.seriesDismissals ?? [:]
+        undo[key] = SeriesDismissal(seriesId: series, siblingKeys: siblings)
+        contents.seriesDismissals = undo
     }
 
     /// Undo: puts these suggestions back in the inbox as pending and forgets their dismissed
     /// keys. The caller removes any entry or mute rule the undone action created.
     func restorePending(keys: Set<String>) {
         guard !keys.isEmpty else { return }
+        var keys = keys
+        // 2.3 F: undo what each answer counted, and bring back a series it hid.
+        for index in contents.suggestions.indices where keys.contains(contents.suggestions[index].sourceKey) {
+            let item = contents.suggestions[index]
+            guard item.kind == .calendar else { continue }
+            switch item.state {
+            case .dismissed(reason: .notLandlordWork):
+                updateFeedback(item.containerId) { $0.notRental = max(0, $0.notRental - 1) }
+            case .confirmed:
+                updateFeedback(item.containerId) { $0.confirmed = max(0, $0.confirmed - 1) }
+            default:
+                break
+            }
+        }
+        for key in keys {
+            guard let undo = contents.seriesDismissals?[key] else { continue }
+            contents.dismissedSeries?[undo.seriesId] = nil
+            contents.seriesDismissals?[key] = nil
+            keys.formUnion(undo.siblingKeys)
+        }
         for index in contents.suggestions.indices where keys.contains(contents.suggestions[index].sourceKey) {
             contents.suggestions[index].state = .pending
         }
