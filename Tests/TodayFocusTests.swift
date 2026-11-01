@@ -75,4 +75,67 @@ final class TodayFocusTests: XCTestCase {
         let lines = props.map { PropertyMeta.hoursLine(0, goal: .mp100, groupingElection: false, counted: counted.contains($0.id)) }
         XCTAssertEqual(lines, ["0h this year", "0h of 100h", "0h this year"])
     }
+
+    // MARK: Show the result where it happened (DESIGN-STANDARD §E.1)
+
+    private func pages(_ props: [RentalProperty]) -> [TodayFocus] {
+        TodayFocusList.make(rentals: props.map { .init(id: $0.id, name: $0.name, hours: 10) }, goal: 100, allRentalsName: "All rentals")
+    }
+
+    private func change(_ p: RentalProperty, _ kind: UserChangeSignal.Kind = .logged, at: Date = Date()) -> UserChangeSignal.Change {
+        .init(rentalID: p.id, kind: kind, at: at)
+    }
+
+    func testArrivalGoesToTheChangedRentalEvenFromAllRentals() {
+        let list = pages([delaney, santaRay, yeandle])
+        let all = list[0].id
+        XCTAssertEqual(TodayFocusList.arrivalFocusID(list, current: all, change: change(santaRay)), CraftDropLedger.focus(rentalID: santaRay.id))
+        XCTAssertEqual(TodayFocusList.arrivalFocusID(list, current: CraftDropLedger.focus(rentalID: delaney.id), change: change(yeandle, .confirmed)),
+                       CraftDropLedger.focus(rentalID: yeandle.id))
+    }
+
+    func testArrivalStaysWhenAlreadyThereOrNothingChanged() {
+        let list = pages([delaney, santaRay])
+        XCTAssertNil(TodayFocusList.arrivalFocusID(list, current: CraftDropLedger.focus(rentalID: santaRay.id), change: change(santaRay)))
+        XCTAssertNil(TodayFocusList.arrivalFocusID(list, current: list[0].id, change: nil))
+    }
+
+    func testArrivalIgnoresARentalThatIsNoLongerAPage() {
+        let list = pages([delaney, santaRay])
+        XCTAssertNil(TodayFocusList.arrivalFocusID(list, current: list[0].id, change: change(yeandle)), "deleted or hidden rental")
+        XCTAssertNil(TodayFocusList.arrivalFocusID([], current: nil, change: change(yeandle)))
+    }
+
+    func testSignalIsTakenOnceAndTheLatestRentalWins() {
+        let clock = Clock()
+        let signal = UserChangeSignal(now: { clock.now })
+        signal.record(rentalID: delaney.id, kind: .logged)
+        clock.now.addTimeInterval(5)
+        signal.record(rentalID: santaRay.id, kind: .confirmed)
+        let taken = signal.take()
+        XCTAssertEqual(taken?.rentalID, santaRay.id, "several rentals changed: the latest")
+        XCTAssertEqual(taken?.kind, .confirmed)
+        XCTAssertNil(signal.take(), "switch once: the second visit finds nothing, so a manual pick stays")
+        XCTAssertNil(signal.peek())
+    }
+
+    func testSignalExpiresAndCanBeDiscarded() {
+        let clock = Clock()
+        let signal = UserChangeSignal(now: { clock.now })
+        signal.record(rentalID: delaney.id, kind: .logged)
+        clock.now.addTimeInterval(UserChangeSignal.lifetime + 1)
+        XCTAssertNil(signal.take(), "an old change is not the screen the person opens next")
+
+        signal.record(rentalID: delaney.id, kind: .logged)
+        signal.discard()
+        XCTAssertNil(signal.take(), "Today was already showing the result")
+    }
+
+    func testRecordingTellsAVisibleTodayToDropTheChange() {
+        let posted = expectation(forNotification: .userChangeRecorded, object: nil)
+        UserChangeSignal(now: Date.init).record(rentalID: delaney.id, kind: .logged)
+        wait(for: [posted], timeout: 1)
+    }
+
+    private final class Clock { var now = Date(timeIntervalSince1970: 1_800_000_000) }
 }

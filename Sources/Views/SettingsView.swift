@@ -595,6 +595,8 @@ private struct AutoCaptureSettingsSection: View {
                 .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
                 .accessibilityIdentifier("settings.capture.calendar")
 
+            InboxQuietCalendarsRow()   // seam: package F
+
             LHRow.Toggle(HS.t("settings.capture.prompts.title", "Ask when an event ends"),
                          subtitle: calendarOn
                             ? HS.t("settings.capture.prompts.on", "At most twice a day, never after 9 pm.")

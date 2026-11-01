@@ -5,7 +5,7 @@ import Foundation
 // MARK: - Rating prompt
 
 enum RatingPromptTrigger: String {
-    /// The user finished sharing their first export.
+    /// The user finished sharing their first PDF export (a CSV share never counts).
     case exportShared = "export_shared"
     /// The user logged their tenth entry (or more).
     case entriesMilestone = "entries_milestone"
@@ -53,6 +53,17 @@ final class RatingPromptCoordinator: ObservableObject {
     /// Set when the policy says yes; the view consumes it and clears it.
     @Published var pendingRequest: RatingPromptTrigger?
 
+    /// What the export screen is about to report as shared. Set just before `AppViewModel.exportShared`
+    /// (which does not pass the format on), cleared by `consider`. nil = unknown, treated as a PDF.
+    private var sharedExportFormat: ExportFormat?
+
+    #if DEBUG
+    /// `-LHRatingProbe`: the last trigger the policy accepted, for UI tests. The system prompt is not
+    /// queued in this mode, so nothing covers the app.
+    @Published private(set) var probeLastRequest: String = "none"
+    static var probeEnabled: Bool { ProcessInfo.processInfo.arguments.contains("-LHRatingProbe") }
+    #endif
+
     private(set) var sessionShowedPaywall = false
     private(set) var sessionHadError = false
 
@@ -76,16 +87,30 @@ final class RatingPromptCoordinator: ObservableObject {
     /// Off under XCTest and any `-LH*` QA launch, so test runs never trigger the system prompt.
     static var defaultEnabled: Bool {
         let info = ProcessInfo.processInfo
+        #if DEBUG
+        if probeEnabled { return true }
+        #endif
         if info.environment["XCTestConfigurationFilePath"] != nil { return false }
         return !info.arguments.contains { $0.hasPrefix("-LH") }
     }
 
     /// Call once per launch. The first launch with this code is treated as the install date.
     func recordLaunch() {
+        #if DEBUG
+        if Self.probeEnabled {
+            // A QA launch starts from a known state: installed 8 days ago, nothing asked yet.
+            defaults.set(now().addingTimeInterval(-8 * 86_400), forKey: Self.installDateKey)
+            defaults.removeObject(forKey: Self.sharedExportKey)
+            defaults.removeObject(forKey: Self.lastRequestedVersionKey)
+        }
+        #endif
         if defaults.object(forKey: Self.installDateKey) == nil {
             defaults.set(now(), forKey: Self.installDateKey)
         }
     }
+
+    /// The export screen is about to report a completed share of this kind.
+    func noteSharedExport(format: ExportFormat) { sharedExportFormat = format }
 
     func notePaywallShown() { sessionShowedPaywall = true }
     func noteError() { sessionHadError = true }
@@ -116,11 +141,21 @@ final class RatingPromptCoordinator: ObservableObject {
         var current = state()
         current.entryCount = entryCount
         if trigger == .exportShared {
-            // Only the first shared export ever counts, whether or not the guards pass now.
+            let format = sharedExportFormat
+            sharedExportFormat = nil
+            // A CSV share is not "the first export": it neither asks nor uses up the first.
+            if let format, format != .pdf { return false }
+            // Only the first shared PDF ever counts, whether or not the guards pass now.
             defaults.set(true, forKey: Self.sharedExportKey)
         }
         guard isEnabled, RatingPromptPolicy.shouldRequest(trigger: trigger, state: current) else { return false }
         defaults.set(currentVersion, forKey: Self.lastRequestedVersionKey)
+        #if DEBUG
+        if Self.probeEnabled {
+            probeLastRequest = trigger.rawValue
+            return true
+        }
+        #endif
         pendingRequest = trigger
         Analytics.ratingPromptRequested(trigger: trigger)
         return true

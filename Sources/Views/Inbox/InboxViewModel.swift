@@ -109,7 +109,7 @@ final class InboxViewModel: ObservableObject {
 
     // MARK: Reads
 
-    var visible: [Suggestion] { InboxLogic.visible(suggestions, now: now()) }
+    var visible: [Suggestion] { InboxLogic.mainList(InboxLogic.visible(suggestions, now: now())) }   // seam: package F
 
     var sections: [InboxSection] { InboxLogic.sections(suggestions, now: now(), calendar: calendar) }
 

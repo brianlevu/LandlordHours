@@ -418,6 +418,15 @@ enum TodayFocusList {
         return focuses.first?.id
     }
 
+    /// "Show the result where it happened" (DESIGN-STANDARD §E.1): the page Today moves to when it
+    /// is next seen after the user changed a rental themselves. nil = stay where it is: no change
+    /// is pending, the rental is no longer a page, or Today is already on it. A rental is always
+    /// a page of its own, even with "All rentals" leading, so the result is shown in its place.
+    static func arrivalFocusID(_ focuses: [TodayFocus], current: String?, change: UserChangeSignal.Change?) -> String? {
+        guard let change, let page = focuses.first(where: { $0.rentalID == change.rentalID }) else { return nil }
+        return page.id == current ? nil : page.id
+    }
+
     /// The page `step` away from `current`, wrapping (swipe on the house, VoiceOver adjust).
     static func step(_ focuses: [TodayFocus], from current: String?, by step: Int) -> String? {
         guard !focuses.isEmpty else { return nil }
