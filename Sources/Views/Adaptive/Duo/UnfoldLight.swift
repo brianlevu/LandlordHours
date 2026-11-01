@@ -7,8 +7,8 @@ import SwiftUI
 // light always enters from the door's side (`FoldPosture.workPaneFoldEdge`). Under Reduce Motion the
 // veil does not wipe: the whole veil fades out with the crossfade. At rest it draws nothing.
 //
-// The veil's colour and strength are art constants the caller passes (package J's `DoorArt.veilDusk`
-// at 0.70, `DoorArt.veilNight` at 0.78), so this view keeps no hex of its own.
+// The veil's colour and strength are art constants the caller passes (`DoorArt.veil(dark:)`:
+// dusk at 0.70, night at 0.78), so this view keeps no hex of its own.
 
 struct UnfoldLight: View {
     let pose: DoorPose

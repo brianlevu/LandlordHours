@@ -366,6 +366,16 @@ SANCTIONED = {
     ("color-hex", "Sources/Views/Adaptive/DoorArt.swift",
      'static func shelfPillEdge(dark: Bool) -> Color { Color(hex: dark ? "5D6AA0" : "7A6F58") }'):
         "§1.27 [grep]: DoorArt art constants (DU15 shelf pill edge)",
+    ("color-hex", "Sources/Views/Adaptive/Duo/DoorArt+Duo.swift", 'static let hallDuskTop = Color(hex: "2A1C12")'):
+        "§1.27 [grep]: DoorArt art constants (the Duo door: hall, lamp, veil; feat/duo-door)",
+    ("color-hex", "Sources/Views/Adaptive/Duo/DoorArt+Duo.swift", 'static let hallDuskBottom = Color(hex: "4A3220")'):
+        "§1.27 [grep]: DoorArt art constants (the Duo door: hall, lamp, veil; feat/duo-door)",
+    ("color-hex", "Sources/Views/Adaptive/Duo/DoorArt+Duo.swift", 'static let warmDusk = Color(hex: "F2B872")'):
+        "§1.27 [grep]: DoorArt art constants (the Duo door: hall, lamp, veil; feat/duo-door)",
+    ("color-hex", "Sources/Views/Adaptive/Duo/DoorArt+Duo.swift", 'static let veilDusk = Color(hex: "2A1A0A").opacity(0.70)'):
+        "§1.27 [grep]: DoorArt art constants (the Duo door: hall, lamp, veil; feat/duo-door)",
+    ("color-hex", "Sources/Views/Adaptive/Duo/DoorArt+Duo.swift", 'static let veilNight = Color(hex: "05081A").opacity(0.78)'):
+        "§1.27 [grep]: DoorArt art constants (the Duo door: hall, lamp, veil; feat/duo-door)",
     ("fixed-size", "Sources/Views/Adaptive/OnTheRecordCard.swift", "fixedSize(horizontal: false, vertical: true)"):
         "§1.27 two-pane: the off-screen measure (hidden, never read aloud); nothing shown is fixed",
     ("hand-header", "Sources/Views/Adaptive/TodayWorkPane.swift", ".toolbar(.hidden, for: .navigationBar)"):

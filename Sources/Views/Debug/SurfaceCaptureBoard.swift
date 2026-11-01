@@ -89,8 +89,6 @@ struct SurfaceCaptureRoot: View {
         // 2.3 foundation components (Components23Board.swift).
         case "components23-a": Components23BoardA().preferredColorScheme(launch.scheme)
         case "components23-b": Components23BoardB().preferredColorScheme(launch.scheme)
-        // duoUnfold door frames, off-screen at the Duo sizes (UnfoldCaptureBoard.swift).
-        case "unfold-door": UnfoldCaptureBoard()
         default: Text("Unknown board \(launch.name)")
         }
     }

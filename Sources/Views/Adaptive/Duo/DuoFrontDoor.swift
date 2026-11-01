@@ -1,0 +1,104 @@
+import SwiftUI
+
+// MARK: - DuoFrontDoor: `duoUnfold`'s leaf, hall and step light (§B.3; DU14; ported from package J)
+//
+// The hero overlay (`TwoPaneHooks.heroOverlay`). The leaf is the still's own door pixels, masked to
+// `DoorArt.doorRect(stage:)` and turned about its left edge in perspective; the hall behind it and the
+// step pool rise with it. Every layer reads the clock's `DoorPose`, so the motion and a still at any t
+// are the same thing. At rest t = 1 (open and lit); only a hinge event moves it. Under Reduce Motion
+// the open door fades in over the house's own closed door (no leaf turn). Stages with no door rect
+// draw nothing; the pane light still plays.
+
+struct DuoFrontDoor: View {
+    let stage: CraftStage
+    let side: CGFloat
+    @ObservedObject var clock: UnfoldClock
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var door: CGRect? {
+        guard let px = DoorArt.doorRect(stage: stage) else { return nil }
+        let k = side / DoorArt.stillSide
+        return CGRect(x: px.minX * k, y: px.minY * k, width: px.width * k, height: px.height * k)
+    }
+
+    var body: some View {
+        if let door {
+            let pose = clock.pose
+            let open = pose.leafTurn
+            let glow = pose.doorLight
+            let dark = colorScheme == .dark
+            let warm = DoorArt.warm(dark: dark)
+            ZStack(alignment: .topLeading) {
+                // The hall behind the door: the opening, in the wall's perspective.
+                DoorOpening(slope: DoorArt.facadeSlope)
+                    .fill(dark
+                          ? AnyShapeStyle(LinearGradient(colors: [warm, warm.opacity(0.78)], startPoint: .top, endPoint: .bottom))
+                          : AnyShapeStyle(LinearGradient(colors: [DoorArt.hallDuskTop, DoorArt.hallDuskBottom], startPoint: .top, endPoint: .bottom)))
+                    .overlay {
+                        if !dark {
+                            RadialGradient(colors: [warm.opacity(0.75), .clear], center: UnitPoint(x: 0.65, y: 0.45),
+                                           startRadius: 0, endRadius: door.height * 0.55)
+                        }
+                    }
+                    .frame(width: door.width, height: door.height)
+                    .clipShape(DoorOpening(slope: DoorArt.facadeSlope))
+                    .offset(x: door.minX, y: door.minY)
+                    .opacity(glow)
+                // The step pool: a radial with 5 stops (no hard edge), sheared and turned with the leaf.
+                let spill = door.width * 3.4
+                RadialGradient(stops: [.init(color: warm.opacity(dark ? 0.62 : 0.42), location: 0),
+                                       .init(color: warm.opacity(dark ? 0.40 : 0.27), location: 0.22),
+                                       .init(color: warm.opacity(dark ? 0.19 : 0.13), location: 0.48),
+                                       .init(color: warm.opacity(dark ? 0.06 : 0.03), location: 0.76),
+                                       .init(color: warm.opacity(0), location: 1)],
+                               center: .center, startRadius: 0, endRadius: spill / 2)
+                    .frame(width: spill, height: spill * 0.62)
+                    .transformEffect(CGAffineTransform(a: 1, b: 0, c: 0.45 * open, d: 1, tx: 0, ty: 0))
+                    .rotationEffect(.degrees(16 * open))
+                    .offset(x: door.midX - spill / 2 + door.width * (0.5 + 0.9 * open),
+                            y: door.maxY - spill * 0.62 / 2 + door.width * 0.5)
+                    .blendMode(dark ? .plusLighter : .screen)
+                    .opacity(glow)
+                // The leaf: the still's own door pixels, swung on its left hinge.
+                Image(stage.assetName(lit: true))
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: side, height: side)
+                    .brightness(dark ? CraftHouseView.nightLift(stage) : 0)
+                    .mask(alignment: .topLeading) {
+                        DoorOpening(slope: DoorArt.facadeSlope)
+                            .frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
+                    }
+                    .brightness(pose.leafDarken)
+                    .rotation3DEffect(.degrees(pose.leafAngleDegrees), axis: (x: 0, y: 1, z: 0),
+                                      anchor: UnitPoint(x: door.minX / side, y: door.midY / side), perspective: 2.2)
+                    .shadow(color: .black.opacity(pose.leafShadow), radius: 1.5, x: 1, y: 0)
+            }
+            .frame(width: side, height: side, alignment: .topLeading)
+            .opacity(pose.doorLayerOpacity)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// The door opening on the receding wall: the door's bounding box with its top and bottom edges
+/// sloped by the wall (`slope` px of y per px of x; negative rises to the right). The vertical edges
+/// stay vertical, as the still's do.
+struct DoorOpening: Shape {
+    let slope: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let rise = abs(slope) * rect.width
+        let leftDrop = slope < 0 ? rise : 0
+        let rightDrop = slope > 0 ? rise : 0
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY + leftDrop))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rightDrop))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - leftDrop))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - rightDrop))
+        p.closeSubpath()
+        return p
+    }
+}
