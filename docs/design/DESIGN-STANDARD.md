@@ -2,6 +2,24 @@
 
 **v2, 2026-10-24.** Status: the system Brian locked ("the crafted house"); every screen is redone against it in one pass (`docs/design/v2-revamp-plan.md`; plain-English summary in `docs/design/v2-summary.md`). v1 (draft r2, 2026-10-23) covered components, density, motion, voice and adaptive layout; most of it stands. v2 adds **§H The crafted object** and **§F Future extensions**, and amends the rules listed in the changelog. **v2 r2 (same day)** applies every fix from the fresh-context review (`~/AgentScratch/landlordhours/2026-10-24/v2-review/review.md`, verdict READY AFTER FIXES); the review response table is below the changelog. The hero rules were measured on the CRAFT reference frames, not on production code.
 
+## 2.3 amendments (2026-10-31)
+
+Brian approved the 2.3 hi-fi designs on 2026-10-31 (`~/AgentScratch/landlordhours/2026-11-02/2.3-hifi/`, NOTES.md; sandbox branch `design/2.3-hifi`). These amendments come from that NOTES.md list (items 1–11) and his small calls the same day. Components live in `Sources/Views/Components/` (foundation branch `pkg/2.3-foundation`); greppable rules are in `scripts/qa/standard_lint.py`. Build plan: `docs/plans/2.3-build-plan.md`.
+
+| # | Rule | Where | Kind |
+|---|---|---|---|
+| 1 | Done marker: `LHRow.DoneTile` (the 36pt glyph tile turns the `positive` check) for a logged care item or a read lesson; the meta line says what was done, never a score; the 22pt circle stays the To confirm control only | §1.4a | grep (`done-tile-row`) |
+| 2 | A browse row that opens a sheet (a care item opens Log time) keeps the chevron; the whole row is the target; no trailing `plus` | §1.4 | judgment |
+| 3 | Read-only lines inside a card (`LHCardLines`): inline glyph, no dividers, nothing to tap; not rows, so D1/D3 don't apply | §1.1a | judgment |
+| 4 | `LHTimeline`: 32pt nodes, 2pt line; reached `action`/`onAction`, later `actionSurface`/`action` | §1.28 | measured |
+| 5 | `LHProgressBar` and `LHSegmentedProgress` at 4pt (`actionSurface` track, `action` fill) in cards and sheets; onboarding keeps 3pt | §1.24a | measured |
+| 6 | Paywall rewritten for 2.3: timeline → price card → "In Pro" list → pinned primary with the cancel rule and legal links | §1.23 | measured + judgment |
+| 7 | Sheet surfaces: grouped-card sheets on the canvas, inner-surface sheets on `backgroundSecondary`; every pinned foot uses `LHFootFade` (16pt) | §1.20 | grep (`foot-fade`) |
+| 8 | The stock iOS 27 `Toggle` off track is exempt from the 3:1 non-text check, in writing (Brian's default, 2026-10-31) | §1.6 | judgment |
+| 9 | `behind` (`#9A3624` / `#F08A70`) added to the brand token table | brand doc §2 | grep |
+| 10 | Tag tones: an offer tag ("14 days free") uses `action`; `positive` stays reserved for met or on pace | §1.16 | judgment |
+| 11 | Canonical keys: lessons end on `learn.notAdvice` ("General learning, not tax advice."); `common.cpaFootnote` is the CPA line | §C.5 | grep (`canonical-literal`) |
+
 ## Changelog: v1 → v2
 
 Brian's locked decisions (2026-10-24): the house is the hero (a rendered diorama on Today at ~44% of the screen, ~28% at AX, never in a card); dusk in light, night in dark, one key light, a cool rim and warm interior light; windows show state (lit when hours were logged today; a work lamp on the framing stages); the motion signature is the timber drop then the windows; a native iOS 27 tab bar with "+" as a native fifth "Log time" item; new tokens `behind`, `positiveOnPage`, `pageCardEdge`, the dusk page gradient and the spill pool; the blueprint-grid canvas, tape measure, stamp, kraft and vellum dropped; Porch Light and The Record dropped; minimum OS iOS 18.
@@ -243,6 +261,10 @@ Causes, which repeat across the app: a decision row built like a detail card; th
 
 From the anchors: Reminders, Things and Copilot never put a button in a row. The row is the tap target; per-item decisions are a leading control, a swipe, or the detail view; the batch action sits once at the card's foot. We do the same.
 
+#### 1.1a Read-only card lines `LHCardLines` (2.3 amendment 3)
+
+Anchors: Monzo lessons, Lloyds lesson card. A short list a person reads, not acts on ("Usually counts" / "Usually doesn't" in a lesson): one `LHRowGroup` card; each line is an inline SF glyph (18 wide, `.body.semibold`, `positive` for yes, `textSecondary` for no, `action` for neutral notes) and one `.body` `textPrimary` sentence; **no dividers**; 14pt from the card edge at the first and last line, 12 between lines, 16 horizontal. **They are lines, not rows:** D1 (56–88pt), D2 and the D3 row count do not apply, and the gate never measures them as rows. A line that does something is a row (`LHRow.Browse`), never a card line. Max 5 lines per card **[judgment]**.
+
 ### 1.2 Tokens the components use
 
 Page gutter **20** (Today's 24 and Properties' 16 retire) · section gap **24** · header→content **8** · card padding **16** · card radius **20 continuous** · inner surface **12** · tag **6** · stat tile **16** · hairline `border` 0.5 · type: system text styles, `design: .rounded` for numbers (always `monospacedDigit()`), `design: .monospaced` for drafting labels only in the PDF and the Reports eyebrow (v2: retired on every other screen), Fraunces only for tab titles and display (§1.14) · colours: intent tokens only. **[grep]** no `.system(size:)`, no `Color(hex:)` outside the token files.
@@ -289,6 +311,12 @@ Anchor: Copilot's pinned "Yes, these are probably duplicates". Rendered with `sa
 
 Records, Properties, Learn, picker lists. Same grid as 1.3: leading **36pt** tile (`CategoryToolTile(36)` in Records; the **house-only thumbnail at 44** in Properties (`LHThumb(stage:lit:size:)` at 44, `LHThumb.row`, lit state by `loggedToday`, §H.5); an SF glyph in a 36 wash tile elsewhere), 12 gap, title up to 2 lines + meta 1 line (a second meta line from XXL), trailing value (`LHFormat.hours`, `.subheadline.rounded`) and the disclosure chevron. Height 56–64 at default. **Chevron (decided 2026-10-27):** one view, `LHChevron` (`chevron.right`, `.footnote.semibold`), one ink, the `chevron` token (= `textSecondary`, 7.5:1 light / 8.9:1 dark **[measured]**, minimum 3:1 for a UI glyph). Never `textTertiary` and never a system grey: the stock List disclosure measured #C5C5C7 on white = 1.72:1 **[grep: no `Image(systemName: "chevron.right")` outside `LHChevron`; system List chevrons are hidden, as `HistoryView` does]**. **At AX the chevron is not drawn** in `LHRow.Browse` and `SettingRow` (it frees about 23pt: chevron plus gap), so labels like "Notifications" and "Material participation" keep whole words; the value drops under the label. **Wrapping:** the title wraps to 2 lines below AX and `lineLimit(nil)` at AX; `lhWrapsText()` (the one sanctioned vertical `fixedSize`) is for subtitles that a sibling would otherwise cut. One ornament per row **[grep]**: Properties shows the thumbnail, never the monogram seal beside it (today `PropertyRow` has a 40pt seal, a 48pt house tile and a chevron).
 
+**A browse row that opens a sheet (2.3 amendment 2, Brian's default 2026-10-31).** Browse rows usually push. A care item opens Log time (a sheet) with the rental and the kind filled in; it keeps the chevron, because the whole row is the target (BMW next services, Tesla maintenance). No trailing `plus` (it reads as a button inside the row) and no second tap target. VoiceOver hint says what opens ("Opens Log time with this filled in").
+
+#### 1.4a Done marker `LHRow.DoneTile` (2.3 amendment 1)
+
+A browse row whose thing is done (a care item logged this season, a lesson read) swaps its 36pt leading glyph tile for the `positive` check tile, `LHRow.DoneTile()` (= `LHRowGlyph("checkmark", .positive)`). Its meta line says what was done ("Logged 1h · Oct 4", "Read"), never a score, streak or percentage. The row stays tappable (it opens what was logged or the lesson again). The 22pt circle (§1.3) is the To confirm control and is **never** a done marker anywhere else. **[grep]** `LHRow.DoneTile(` appears only in an `LHRow.Browse` leading slot (`standard_lint.py` rule `done-tile-row`: an `LHRow.Browse(` within the 6 lines above).
+
 **Exception: the Rentals gallery (Brian, 2026-10-26).** The Rentals tab with two or more rentals is a browse and identity screen, and the house is the point, so it is a two-column grid of tiles (`RentalGallery`, `RentalTile`), not rows. This is the only screen that gets a card per list item; the "a card per list item" defect in the component table and the per-item density limit (one item at most 12% of the viewport) do not apply to it, and nothing else may copy it. **D6 for the tiles (card share):** a tile measured 27–36.5% of the viewport on the captured gallery frames (r2 and r3), so D6's 20% card cap is replaced for the tiles by a hard cap of **38%** **[measured]**. `frame_check.py density --rentals-gallery` applies it; the carve-out is never inferred from a frame's name, and D1–D4 and the hero rules are unchanged. **Tile recipe, night:** two layers lift the house, both dark only. (1) The night exposure: the unlit still drawn again over the house with plus-lighter at **0.30** (roofed: `half`, `complete`) or **0.12** (framing: `started`, `frame70`, `framing`), so the house's own pixels brighten in proportion and its shadows stay dark (`RentalTileHouse.nightExposure`). The unlit still is used in both states, so the walls match lit and unlit and the lit windows keep their glow. (2) The roofed stages keep the hero's night lift (+0.065 brightness) and the §H.4 `backlight` token (`#5E86D6`) behind the art at the hero's strength (1.0: 0.50 → 0 inside 0.88 × side plus the 0.34 → 0 rim ellipse); the framing stages draw no backlight. The glow lights the tile around the house, not the house, so it is never the lever for contrast. Light mode draws none of this. **[measured]** on captured 3× dark frames, house mask from the still's alpha (> 8) at the tile geometry: every stage, lit and unlit, p99 art contrast against the card `#141C3F` ≥ 2.55:1 (unlit roofed went 2.10–2.12 → 2.84–2.89, framing 2.48–2.52 → 2.94–2.99, started 2.78 → 3.33; lit ≥ 4.5).
 Tile **[measured]**: two columns with 20 between columns and rows, 20 page gutter; radius 20 continuous on `backgroundSecondary` (dark: a hairline `border`); padding 12; 8 between house and words. House = the transparent lit or unlit still (`CraftStage.assetName(lit:)`, lit by `loggedToday`) drawn straight on the tile at 1.05 of the tile's inner width in a frame 0.95 as tall, with no box, no crop and no `backgroundTertiary` behind it; the lot is never cut by a clip. Words: name `.headline` wrapping at whole words (no line limit), "88 of 100h" `.subheadline` rounded `textSecondary`, one pace line `.footnote.semibold` in `positive`, `behind` or `textSecondary` ("On pace", "Behind by 36h", "10h a week to go", "Done for the year"); no "to confirm" count (Inbox has no per-rental count). A tile is about 235pt tall at default; four tiles show above the fold on 402×874. From XXL the grid is one column and the tile lays the house (128 wide) beside the words; from AX1 the house (160 wide) sits above them. The scroll content has a 104 bottom margin so the last tile clears the tab bar at rest. Exactly one rental: the tab is that rental's page, with Add rental at the leading edge of the bar (Edit keeps the trailing one). At the free limit with two or more rentals the one `.row` locked preview follows the grid.
 
@@ -301,6 +329,8 @@ Inside sheets and forms, in an inner surface (radius 12, `backgroundTertiary`): 
 `SettingToggleRow` as is: min 44, label `.body` + optional one-line `.subheadline` subtitle, system `Toggle` tinted `action`. The subtitle says the effect, not the mechanism ("At most two a day, never at night.").
 
 **At AX (2026-10-27):** the switch drops under the label and subtitle, which take the full row width (a 7-line subtitle beside the switch made one row 54% of the viewport against the 45% D2 cap; stacked it is 43.9% **[measured]**). A subtitle is 1–2 short sentences, 20 words or fewer. **Grouped lists on Settings and Records sit on the 20pt gutter** (`.contentMargins(.horizontal, LHMetrics.gutter)` with row insets 0 for page-level rows; measured 20.0pt on all 35 list frames). At AX a value under its label gets 8pt of air and semibold ink, so it never reads as part of the sentence above.
+
+**The stock switch's off track (2.3 amendment 8, Brian's default 2026-10-31).** The stock iOS 27 `Toggle` off track measures 1.72:1 on white, under the 3:1 non-text bar. It is a system control drawn by the OS (as the sidebar is, §1.27), the same in shipped Settings and in Apple's own apps, so it is **exempt from our contrast check in writing**. We never replace or outline it to pass a number. The row's label carries the state for VoiceOver (the system reads "Switch button, off"). Our own text and glyphs in the row keep ≥ 4.5:1 / ≥ 3:1.
 
 ### 1.7 Text field `LHField`
 
@@ -371,6 +401,8 @@ Anchor: Copilot's date dividers, Things' "Today / This Evening". Every actionabl
 | Colour | intent ink on 12% wash (category wash for categories) | selected `action`/`onAction`; idle `backgroundTertiary`/`textPrimary` |
 | Limit | 2 per row | one strip per screen, 8 gaps |
 
+**Tones (2.3 amendment 10).** An offer or plan tag ("14 days free") uses the `action` tone. `positive` is reserved for met, confirmed and on pace (brand doc §2), so a green "free" tag would read as a result. Status tags keep their intent tones.
+
 ### 1.17 Icon rules
 
 - SF Symbols for everything functional. Weight follows the text automatically: symbols are placed with `Label` or `Image(systemName:)` under the same `.font` as their text; **[grep]** no explicit `.fontWeight`/`weight:` on a symbol outside `LHButton.icon`.
@@ -397,6 +429,8 @@ System `.sheet`, detents `[.medium, .large]` when content allows, drag indicator
 
 **Focused-entry sheets (Log time, the confirm sheet), decided by Brian 2026-10-23:** an **opaque** `.large` sheet on `backgroundSecondary`, with the system's push-back and dim of the screen behind it, so the task has the whole screen and nothing shows through. Liquid Glass appears only on the Log (`.primary`) button and on the system keyboard; the sheet surface itself is never glass or translucent material. **[grep]** no `.presentationBackground(.thinMaterial/.ultraThinMaterial/.glass…)` on `LogTimeSheet` or `SuggestionConfirmSheet`; `.presentationDetents([.large])` on both; the primary button carries the glass style only inside the `#available(iOS 26, *)` branch.
 
+**Sheet surfaces and the pinned foot (2.3 amendment 7, one rule).** A sheet takes the surface of what it holds: a sheet of **grouped cards** (the lesson sheet, Pick your free rental) sits on the canvas (`background`; the cards are `backgroundSecondary`); a sheet of **inner surfaces** (the day-12 reminder, Log time, the confirm sheet) sits on `backgroundSecondary` (its inner surfaces are `backgroundTertiary`). Every pinned foot (`safeAreaInset(edge: .bottom)` holding the `.primary`) draws `LHFootFade(color:)` in the sheet's own surface colour: opaque, with a **16pt** fade above it, never hit-testable, running into the bottom safe area. Full-screen pages with a pinned foot (the paywall) pass their page bottom colour (`pageBottom`). The AX footer policy above (24pt fade at AX sizes) still applies. **[grep]** no hand-made `LinearGradient(… .opacity(0) …)` outside `LHFootFade.swift` (`standard_lint.py` rule `foot-fade`; the 11 sites in 2.2 are baselined and migrate as their packages touch them).
+
 ### 1.21 Alerts and dialogs
 
 System `.alert` only for irreversible destructive acts (delete all data, remove a rental): title ≤ 6 words, message ≤ 2 sentences, buttons are verbs ("Delete", "Keep"), destructive role set; never "OK"/"Yes". ≥ 3 choices → `.confirmationDialog`. Everything reversible gets a toast with Undo, never an alert **[grep: `.alert(` sites listed in the hand-off]**.
@@ -407,11 +441,23 @@ System `.alert` only for irreversible destructive acts (delete all data, remove 
 
 ### 1.23 Paywall scaffold
 
-**v2: on the plain canvas, no blueprint band, no house.** The record preview (≤ 40% of viewport; its title string is the same key as the real PDF title, §C.5) → plan card radius 20: name + `LHTag` "PAY ONCE" → price `.largeTitle.rounded.bold` + "once, yours to keep" `.subheadline` → one body line → `.primary` "Unlock for $29.99" → `.tertiary` "Restore purchase" → status line → benefits as 56pt `LHRow.Browse` with SF glyphs → legal `.footnote` links in 44 frames. Close is `.icon`. No countdowns, no fake scarcity, no `dynamicTypeSize` clamp. The paywall opens about the thing tapped (the record, the export, the second rental) and names it in its first line.
+**2.3 (amendment 6; Paywall B approved 2026-10-31, frame p1).** Anchors: TIDE trial timeline, Brilliant and Copilot trial timelines, Bevel reminder. On the dusk/night page (`LHPage`), top to bottom:
+1. Title in Fraunces 28 (`LHFont.screenTitle(size: 28)`), with the close `.icon` on the title row. **The title never says "free"** ("How your trial works") **[judgment; copy gate]**.
+2. `LHTimeline` (§1.28), three steps from `TrialSchedule`: Today (reached) → "In 12 days · <date>" (the reminder) → "In 14 days · <date>" (the renewal, with the price and "cancel at least a day before and you pay nothing"). The lengths come from the product's intro offer, never literals.
+3. The price card (radius 20, `backgroundSecondary`, `pageCardEdge` stroke on the page): "Dormer Pro" `.headline` + `LHTag` offer tag in the `action` tone (§1.16); the price `.largeTitle.rounded.bold` (34pt at default) + "a year" `.title3.semibold`; one `.subheadline` line with the renewal terms. **The price is StoreKit's localized `displayPrice` and the largest price text on screen** (App Review 3.1.2) **[measured; grep: no price literal in Sources]**.
+4. "In Pro": 3 `LHRow.Browse` rows with SF glyphs, no chevrons.
+5. One `.footnote` line saying what stays free ("You keep logging at one rental for free, and every hour stays.").
+6. Pinned foot (`LHFootFade` in `pageBottom`): `.primary` "Start free trial" (or "Subscribe" when the trial is used, `PaywallOffer`), the cancel rule `.footnote` centred, then Restore purchase · Terms · Privacy as `.footnote.semibold` `action` links in 44 frames.
+
+No countdowns, no fake scarcity, no `dynamicTypeSize` clamp. The paywall still opens about the thing tapped (`PaywallContext`) and the trial starts from it the first time a person taps a Pro feature. Trial start (p2), the day-12 sheet (p3: "Keep Pro" primary + "Cancel in Settings" `.tertiary`), Pick your free rental (p4), the view-only card (p5) and Settings › Free rental (p6) are frames of the same system. 2.2's record-preview paywall and its "PAY ONCE" card retire with 2.3.
 
 ### 1.24 Onboarding scaffold
 
 Uses the app's components and tokens; `OnbColor` and the `Onb*` styles are deleted **[grep]**. **Welcome (v2):** the dusk/night page with `craft_complete` lit at the Today hero size (§H.5), the headline in Fraunces 34, one `.primary` pinned in a `safeAreaInset`, "Have an account?" as a `.tertiary` that never truncates; frames at AX5 required (the 2026-10-23 Duo probe found the headline clipped under the button at AX5). The add-a-rental step shows the 120pt `craft_started` thumbnail beside the field. Progress: 3pt track `border`, fill `action`. Back `.icon`, Skip `.tertiary`. Step title SF `.title1.semibold` (Fraunces only on Welcome). Option cards are `LHRow.Browse` rows in one grouped container; selection is shown the Apple Settings way, with a **trailing `checkmark` in `action`** (`.body.semibold`, 44 frame) on the selected row and the row's hairline stroke turning `action`; the leading slot holds the option's SF glyph. The 22pt leading circle is reserved for confirm in §1.3 and never appears in onboarding or pickers **[grep]**. One `.primary` pinned. No Dynamic Type clamps; frames at AX3 required.
+
+#### 1.24a Progress bars `LHProgressBar`, `LHSegmentedProgress` (2.3 amendment 5)
+
+Anchors: Monzo lessons, Brilliant path. In cards and sheets a progress bar is **4pt**, capsule ends, `actionSurface` track and `action` fill (dark: `#182A5C` / `#8FD3FF`). `LHProgressBar(value:)` is a continuous share (the Learning center card, "1 of 6"); `LHSegmentedProgress(count:current:)` is one capsule per step with 6pt gaps, steps up to the current one filled (the lesson sheet, "Card 2 of 3"). The count is always also written in text beside the bar, so both are hidden from VoiceOver unless given a label. Changes animate with `standard`, bound to the value. Onboarding keeps its 3pt bar (§1.24). **[measured: 4pt ±0.5 at 3×; fill and track sampled against the tokens]**
 
 ### 1.25 Navigation and Liquid Glass
 
@@ -671,6 +717,10 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 | AD21 | Stacked: ≥ 3 To confirm rows | 1 row + "See all N" + On the record today, gap ≤ 20%, "All rentals" included (**relaxed 2026-10-25** to the v7 frame) | ≈ 380pt free in the half against ≈ 406pt for 3 rows + header + foot + On the record |
 
 ---
+
+### 1.28 Timeline `LHTimeline` (2.3 amendment 4)
+
+Anchors: TIDE, Brilliant, Copilot trial timelines. A vertical list of steps: a **32pt** circular node (`@ScaledMetric`) with an SF Symbol in `.subheadline.semibold`, joined to the next node by a **2pt** line with 4pt of air at each end; 14 between the node column and the text. A **reached** node is `action` with `onAction` ink and its line below is `action`; a **later** node is the `actionSurface` wash with `action` ink and its line is `border`. Text: title `.headline` `textPrimary`, one `.subheadline` `textSecondary` line; 18 between steps. Each step is one VoiceOver element (title then text). Used by the paywall (§1.23); reusable for year-end prep steps. Max 4 steps **[judgment]**. **[measured: node 32 ±1, line 2 ±0.5 at 3× default]**
 
 ## S. Screen anatomy: tokens → components → screen scaffolds (decided 2026-10-27)
 
@@ -1107,6 +1157,9 @@ Canonical lines are String Catalog keys; a screen that needs the idea uses the k
 | `row.action.dontSuggestAgain` | "Don't suggest this again" (the mute; replaces "Don't suggest events like this") |
 | `row.batch.confirmLikely` | "Confirm %lld likely" |
 | `pdf.title` | "Rental hours record %lld" — used by the PDF, the CSV file name and the paywall preview |
+| `learn.notAdvice` | "General learning, not tax advice." — the last line of every lesson's last card and of the lesson list (2.3 amendment 11). Every lesson ends on a "Talk to your CPA" card and carries this line. |
+
+**[grep]** the English text of a canonical line never appears in Swift without its key on the same line (`standard_lint.py` rule `canonical-literal`, checks `common.cpaFootnote` and `learn.notAdvice`).
 
 The 10 worst live lines, with rewrites that keep their meaning:
 

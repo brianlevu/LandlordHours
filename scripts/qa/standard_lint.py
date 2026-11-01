@@ -256,6 +256,46 @@ def tab_scaffold(rel, lines):
     return []
 
 
+# 2.3 amendments (DESIGN-STANDARD §1.1a, §1.4a, §1.20, C.5; docs/plans/2.3-build-plan.md foundation)
+FOOT_FADE_HOME = "LHFootFade.swift"
+CANONICAL_LINES = {  # String Catalog key -> its English line; the line never appears without its key
+    "common.cpaFootnote": "Your CPA decides what the numbers mean.",
+    "learn.notAdvice": "General learning, not tax advice.",
+}
+
+
+def r_foot_fade(path, line):
+    """A pinned sheet foot fades with LHFootFade; a hand-made transparent-to-opaque gradient is a finding."""
+    if base(path) == FOOT_FADE_HOME or line.lstrip().startswith("//"):
+        return False
+    return "LinearGradient(" in line and ".opacity(0)" in line
+
+
+def r_canonical_literal(path, line):
+    """A canonical line is used through its key (C.5): the English text on a line without the key is a variant."""
+    if line.lstrip().startswith("//"):
+        return False
+    return any(f'"{text}' in line and key not in line for key, text in CANONICAL_LINES.items())
+
+
+DONE_TILE_DEF = "LHRowDoneTile.swift"
+DONE_TILE_WINDOW = 6  # lines above a DoneTile that must contain the LHRow.Browse( it decorates
+
+
+def done_tile_rows(rel, lines):
+    """§1.4a: LHRow.DoneTile( only in an LHRow.Browse leading slot (the Browse call within the 6 lines above).
+    Returns [line numbers] of DoneTiles outside a browse row."""
+    if base(rel) == DONE_TILE_DEF:
+        return []
+    out = []
+    for i, l in enumerate(lines, 1):
+        if "DoneTile(" in l and not l.lstrip().startswith("//"):
+            window = lines[max(0, i - 1 - DONE_TILE_WINDOW):i]
+            if not any("LHRow.Browse(" in w for w in window):
+                out.append(i)
+    return out
+
+
 RULES = [
     ("system-size", "no .system(size:) outside token files (1.2)", r_system_size),
     ("color-hex", "no Color(hex:) outside token files (1.2)", r_color_hex),
@@ -286,6 +326,12 @@ RULES = [
                     "outside LHScreenScaffold.swift; use .lhTabScreen / .lhSheetScreen (Screen anatomy S1)", r_hand_header),
     ("tab-top-padding", "no literal .padding(.top, N) / .contentMargins(.top, N) in a tab root: the scaffold owns the "
                         "top inset and the gaps; use LHMetrics tokens (Screen anatomy S4)", r_tab_top_padding),
+    ("foot-fade", "a pinned sheet foot fades with LHFootFade, not a hand-made LinearGradient(… .opacity(0) …) (1.20, 2.3)",
+     r_foot_fade),
+    ("canonical-literal", "canonical lines (common.cpaFootnote, learn.notAdvice) only through their key (C.5, 2.3)",
+     r_canonical_literal),
+    ("done-tile-row", "LHRow.DoneTile( only in an LHRow.Browse leading slot; the 22pt circle is never a done marker (1.4a, file rule)",
+     lambda p, l: False),
     ("tab-scaffold", "every tab root calls .lhTabScreen( and the Log time chrome calls .lhSheetScreen( (file rule, Screen anatomy S1)",
      lambda p, l: False),
 ]
@@ -326,11 +372,13 @@ def scan(root=None):
                 continue
             for i in tab_shell(rel, lines):
                 out.append(dict(rule="tab-shell", file=rel, line=i, text=re.sub(r"\s+", " ", lines[i - 1].strip())[:160]))
+            for i in done_tile_rows(rel, lines):
+                out.append(dict(rule="done-tile-row", file=rel, line=i, text=re.sub(r"\s+", " ", lines[i - 1].strip())[:160]))
             for i in tab_scaffold(rel, lines):
                 out.append(dict(rule="tab-scaffold", file=rel, line=i, text="missing " + TAB_ROOTS[rel]))
             for i, line in enumerate(lines, 1):
                 for rule, _, fn_ in RULES:
-                    if rule in ("tab-shell", "tab-scaffold"):
+                    if rule in ("tab-shell", "tab-scaffold", "done-tile-row"):
                         continue
                     if rule == "dynamic-type-clamp" and (CLAMP_MARKER in line or (i > 1 and CLAMP_MARKER in lines[i - 2])):
                         continue
