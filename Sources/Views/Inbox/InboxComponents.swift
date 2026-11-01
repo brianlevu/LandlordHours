@@ -63,10 +63,10 @@ struct CapturePrivacyFooter: View {
                 .foregroundStyle(colors.positive)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "capture.privacy.title", defaultValue: "Stays on your iPhone", table: "Inbox"))
+                Text(String(localized: "capture.privacy.title", defaultValue: "Stays on this device", table: "Inbox"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.positiveText)
-                Text(String(localized: "capture.privacy.body", defaultValue: "We read event titles on your iPhone. Only events you confirm are saved.", table: "Inbox"))
+                Text(String(localized: "capture.privacy.body", defaultValue: "We read event titles on this device. Only events you confirm are saved.", table: "Inbox"))
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -137,6 +137,24 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
     func testCaptureScaffoldLightXXL() { captureScaffold("light-xxl", scheme: "light", size: "xxl") }
     func testCaptureScaffoldDarkXXL() { captureScaffold("dark-xxl", scheme: "dark", size: "xxl") }
 
+    // The iCloud screen alone (iPad column fix): frames plus the back button's and first row's frames.
+    func testICloudOnlyLightDefault() { captureICloudOnly("light-default", scheme: "light", size: nil) }
+    func testICloudOnlyDarkDefault() { captureICloudOnly("dark-default", scheme: "dark", size: nil) }
+    func testICloudOnlyLightXXL() { captureICloudOnly("light-xxl", scheme: "light", size: "xxl") }
+    func testICloudOnlyDarkXXL() { captureICloudOnly("dark-xxl", scheme: "dark", size: "xxl") }
+
+    private func captureICloudOnly(_ s: String, scheme: String, size: String?) {
+        launch(fixture: "D2-106-signed-in", zone: "fail", scheme: scheme, size: size)
+        openSettings()
+        scrollTo(element("settings.icloud.status"))
+        tap(reveal("settings.icloud.status"))
+        XCTAssertTrue(element("icloud.detail").waitForExistence(timeout: 10))
+        shoot("icloud-\(s)")
+        let back = element("icloud.back").frame
+        let row = element("settings.icloud.status").frame
+        print("ICLOUD_FRAMES \(s) back=\(back) row=\(row)")
+    }
+
     private func captureScaffold(_ s: String, scheme: String, size: String?) {
         launch(fixture: "D3-106-signed-out-two", zone: "empty", scheme: scheme, size: size)
         if element("identity.mergeQuestion").waitForExistence(timeout: 25) { tap(element("sheet.close")) }

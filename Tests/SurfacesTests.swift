@@ -410,8 +410,8 @@ final class ToastQueueTests: XCTestCase {
     }
 
     func testPersistenceCopy() {
-        XCTAssertEqual(AppViewModel.saveFailureMessage, "Couldn’t save your last change. Your iPhone may be out of space.")
-        XCTAssertEqual(AppViewModel.loadFailureMessage, "Couldn’t open your records. They’re still safe on this iPhone.")
+        XCTAssertEqual(AppViewModel.saveFailureMessage, "Couldn’t save your last change. Your device may be out of space.")
+        XCTAssertEqual(AppViewModel.loadFailureMessage, "Couldn’t open your records. They’re still safe on this device.")
     }
 }
 

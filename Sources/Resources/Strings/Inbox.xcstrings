@@ -293,7 +293,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "We read event titles on your iPhone. Only events you confirm are saved."
+            "value": "We read event titles on this device. Only events you confirm are saved."
           }
         }
       }
@@ -304,7 +304,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stays on your iPhone"
+            "value": "Stays on this device"
           }
         }
       }

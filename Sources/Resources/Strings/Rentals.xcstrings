@@ -118,7 +118,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ goes from this iPhone and iCloud. This can’t be undone."
+            "value": "%@ goes from this device and iCloud. This can’t be undone."
           }
         }
       }
@@ -129,7 +129,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@, its %2$@ of logged time and any photos go from this iPhone and iCloud. This can’t be undone."
+            "value": "%1$@, its %2$@ of logged time and any photos go from this device and iCloud. This can’t be undone."
           }
         }
       }

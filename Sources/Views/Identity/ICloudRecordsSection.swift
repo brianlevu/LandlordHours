@@ -219,8 +219,6 @@ struct ICloudRecordsView: View {
             }
             .padding(.horizontal, LHMetrics.gutter)
             .padding(.bottom, 16)
-            .frame(maxWidth: LHMetrics.readingColumn)
-            .frame(maxWidth: .infinity)
         }
         .background(colors.background)
         .lhTabScreen(String(localized: "iCloud", table: "Identity"), back: LHBackAction(identifier: "icloud.back") { dismiss() })

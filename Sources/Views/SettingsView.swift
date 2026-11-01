@@ -340,7 +340,7 @@ struct SettingsView: View {
         } header: {
             header(HS.t("settings.section.records", "Records"))
         } footer: {
-            Text(HS.t("settings.photos.footer", "Photos attached to records stay on this iPhone. They aren’t included in iCloud sync."))
+            Text(HS.t("settings.photos.footer", "Photos attached to records stay on this device. They aren’t included in iCloud sync."))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("settings.photoStorageDisclosure")
@@ -580,15 +580,15 @@ private struct AutoCaptureSettingsSection: View {
     static let aiDisclosureWithPCC = String(localized: "settings.capture.aiDisclosure.pcc", defaultValue: "Apple\u{2019}s on-device model reads your calendar suggestions and Log time notes. If it can\u{2019}t, Private Cloud Compute may read a note instead (turn that off above). Apple keeps nothing, and we never see it.", table: "Foundations")
 
     static var aiDisclosureOnDevice: String {
-        HS.t("settings.capture.disclosure.device", "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log.")
+        HS.t("settings.capture.disclosure.device", "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on this device, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log.")
     }
 
-    static let pccSubtitle = String(localized: "settings.capture.pcc.subtitle", defaultValue: "Used only if your iPhone can\u{2019}t read a note. Apple keeps nothing, and we never see it.", table: "Foundations")
+    static let pccSubtitle = String(localized: "settings.capture.pcc.subtitle", defaultValue: "Used only if this device can\u{2019}t read a note. Apple keeps nothing, and we never see it.", table: "Foundations")
 
     var body: some View {
         Section {
             LHRow.Toggle(HS.t("settings.capture.calendar.title", "Calendar"),
-                         subtitle: HS.t("settings.capture.calendar.subtitle", "Spot work in your events. Titles are read on your iPhone."),
+                         subtitle: HS.t("settings.capture.calendar.subtitle", "Spot work in your events. Titles are read on this device."),
                          isOn: Binding(get: { calendarOn }, set: { setCalendar($0) }))
                 .disabled(isAsking)
                 .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
@@ -804,7 +804,7 @@ private struct AppearancePreferenceRow: View {
                 Text(HS.t("settings.appearance.title", "Appearance"))
                     .font(.body)
                     .foregroundStyle(colors.textPrimary)
-                Text(HS.t("settings.appearance.subtitle", "Follow your iPhone or pick a theme"))
+                Text(HS.t("settings.appearance.subtitle", "Follow this device or pick a theme"))
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
             }

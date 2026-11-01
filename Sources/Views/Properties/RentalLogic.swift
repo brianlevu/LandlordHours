@@ -314,11 +314,11 @@ enum RentalsText {
     static func deleteMessage(name: String, hours: String?) -> String {
         if let hours {
             return String(localized: "rentals.delete.messageHours",
-                          defaultValue: "\(name), its \(hours) of logged time and any photos go from this iPhone and iCloud. This can’t be undone.",
+                          defaultValue: "\(name), its \(hours) of logged time and any photos go from this device and iCloud. This can’t be undone.",
                           table: "Rentals")
         }
         return String(localized: "rentals.delete.message",
-                      defaultValue: "\(name) goes from this iPhone and iCloud. This can’t be undone.", table: "Rentals")
+                      defaultValue: "\(name) goes from this device and iCloud. This can’t be undone.", table: "Rentals")
     }
 }
 

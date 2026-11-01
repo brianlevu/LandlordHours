@@ -1162,9 +1162,9 @@ class AppViewModel: ObservableObject {
     private static let persistenceLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Persistence")
 
     /// Shown in the one toast with "Retry" (copy sheet §6).
-    static let saveFailureMessage = "Couldn’t save your last change. Your iPhone may be out of space."
+    static var saveFailureMessage: String { String(localized: "Couldn’t save your last change. Your iPhone may be out of space.", table: "Identity") }
     /// Shown in the one toast with "Help" (opens Get help).
-    static let loadFailureMessage = "Couldn’t open your records. They’re still safe on this iPhone."
+    static var loadFailureMessage: String { String(localized: "Couldn’t open your records. They’re still safe on this iPhone.", table: "Identity") }
 
     /// The toast's "Retry": writes everything again (clears the error on success).
     func retrySave() {
