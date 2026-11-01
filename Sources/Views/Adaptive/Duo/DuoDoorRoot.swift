@@ -11,7 +11,9 @@ struct DuoDoorRoot: View {
     let content: AnyView
     let split: LayoutSplit
 
-    @StateObject private var clock = UnfoldClock()
+    /// Held, not observed: only the leaf, the pane light and the hinge modifier follow it, so the
+    /// layout is not re-evaluated on each frame of the unfold (must-prove 10).
+    @State private var clock = UnfoldClock()
 
     private var posture: FoldPosture { DuoHooks.posture(split) }
 

@@ -12,7 +12,9 @@ import Foundation
 //   partiallyOpen ↔ fullyOpen            nothing (the door does not replay as the hinge widens)
 //   a touch while 0 < t < 1              t = 1 (the layout is live and hit-testable from frame 0)
 //   a fold with t < 1 and no run ≥ 1 s   t = 1 (`isStranded`: a missed open event never leaves the
-//                                        work pane veiled; must-prove 3)
+//                                        work pane veiled; must-prove 3), also on returning to the
+//                                        foreground
+//   no fold, hinge known closed          t = 0 (`restsShut`: the next unfold plays from shut)
 //
 // `DoorPose` turns t into each layer's value: the leaf turns over t 0–0.42 (78°, darkening 0.12, a
 // 0.35 shadow), the hall and step light rise over 0.05–0.50, the work pane's veil wipes away from the
@@ -80,6 +82,12 @@ enum UnfoldDoor {
         guard posture.hostsDoor, !running, current < 1 else { return false }
         guard let since = secondsSinceHingeEvent else { return true }
         return since >= strandedAfter
+    }
+
+    /// True when the door should rest shut without a run: the window is on a display with no fold and
+    /// the hinge is known to be closed (the outer display). Never on a cold launch (no report yet).
+    static func restsShut(posture: FoldPosture, hinge: HingeStatus?, running: Bool) -> Bool {
+        !running && !posture.hostsDoor && hinge == .closed
     }
 
     /// Ease-out cubic of `t` over its own window [a, b].

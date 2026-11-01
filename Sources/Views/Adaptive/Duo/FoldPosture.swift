@@ -10,8 +10,9 @@ import CoreGraphics
 //   · a vertical division   → `.open`    the Duo held open (landscape 951×669): house left, work right
 //   · a horizontal division → `.propped` the Duo propped up (669×951): house above, work below
 //
-// It agrees with package J's `PaneDivision.isVertical` (height ≥ width is vertical), so the door's
-// light and the panes never disagree about which way the fold runs. The layout mode itself (and the
+// It uses the same rule as `PaneDivision.isVertical` (height ≥ width is vertical) on the part of the
+// division inside the window; `LayoutMode.resolve` only accepts divisions inside it, so for every
+// split the layout makes, the door's light and the panes agree on which way the fold runs. The layout mode itself (and the
 // 380pt pane floor) stays `LayoutMode.resolve`'s; the posture only says where the door can play and
 // which edge of the work pane the light comes from.
 

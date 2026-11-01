@@ -118,6 +118,19 @@ final class UnfoldDoorTests: XCTestCase {
         XCTAssertFalse(UnfoldDoor.isStranded(current: 0, running: false, posture: .flat, secondsSinceHingeEvent: 9))
     }
 
+    func testTheDoorRestsShutOnlyWhenFoldedWithTheHingeKnownClosed() {
+        // Folded onto the outer display: the next unfold must play from shut.
+        XCTAssertTrue(UnfoldDoor.restsShut(posture: .flat, hinge: .closed, running: false))
+        // A cold launch (no hinge report yet), every iPhone and iPad: left lit.
+        XCTAssertFalse(UnfoldDoor.restsShut(posture: .flat, hinge: nil, running: false))
+        // A fold still showing (the inner display): never forced shut.
+        XCTAssertFalse(UnfoldDoor.restsShut(posture: .open, hinge: .closed, running: false))
+        XCTAssertFalse(UnfoldDoor.restsShut(posture: .propped, hinge: .closed, running: false))
+        // Open hinge, or a run in progress (the 0.50 s fold): leave it to the run.
+        XCTAssertFalse(UnfoldDoor.restsShut(posture: .flat, hinge: .fullyOpen, running: false))
+        XCTAssertFalse(UnfoldDoor.restsShut(posture: .flat, hinge: .closed, running: true))
+    }
+
     // MARK: The pose: every layer is a pure function of t (§B.3 windows)
 
     func testRestIsOpenAndLitWithNothingOverThePane() {

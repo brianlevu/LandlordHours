@@ -30,7 +30,7 @@ When the two-pane layout merges to a release branch, this branch merges after it
 | `TwoPaneHooks+Duo.swift` | The installed hooks. | |
 | `DuoDoorCapture.swift` | DEBUG. `-LHDuoDoorRender` renders the real shell at Duo sizes with the clock held at each instant. | v8 `DuoV2Snapshotter` motion mode |
 
-Tests: `Tests/FoldPostureTests.swift` (10), `Tests/UnfoldDoorTests.swift` (18), `Tests/UnfoldClockTests.swift` (8).
+Tests: `Tests/FoldPostureTests.swift` (10), `Tests/UnfoldDoorTests.swift` (19), `Tests/UnfoldClockTests.swift` (13).
 
 ## Differences from package J's door, on purpose
 
@@ -38,8 +38,10 @@ Tests: `Tests/FoldPostureTests.swift` (10), `Tests/UnfoldDoorTests.swift` (18), 
 |---|---|---|---|
 | 1 | The hinge listener was on only while the window was two-pane. | On wherever a hinge exists, plus a guard that settles a door left shut on a fold after 1 s. | The open event can land while the window is still compact; dropped, the work pane would stay veiled (must-prove 3). Observed in J's code; the device order is still unproven. |
 | 2 | The veil always wiped leading to trailing. | From the fold's edge: leading when open, top when propped. | Propped, the work pane is below the fold. |
+| 5 | A touch was a tap (fires on lift; a scroll never finished the door). | A touch-down press finishes it; the gesture is masked to `.subviews` at rest so every other control keeps its taps. | §B.3 "a touch sets t = 1". |
+| 6 | No re-check after a fold that stayed on the inner display, or on returning from the background. | The stranded check re-runs whenever the door comes to rest short of open and when the scene becomes active; folded onto the outer display with the hinge closed, the door rests shut so the next unfold plays. | Fresh-context code review, 2026-11-01. |
 | 3 | Reduce Motion set t = 1 at once. | A 0.20 s crossfade, no leaf turn, no wipe. | §B.3's Reduce Motion column. |
-| 4 | A `Task` slept 16 ms per step; the layout and house pane observed the clock. | `CADisplayLink`; only the leaf and the veil observe it. | Must-prove 10 (no hitches); fewer views redraw per frame. Hitch cost is inferred until Instruments on a device. |
+| 4 | A `Task` slept 16 ms per step; the layout and house pane observed the clock. | `CADisplayLink`; the root holds the clock in `@State` (not observed); only the leaf, the veil and the hinge modifier follow it. | Must-prove 10 (no hitches); fewer views redraw per frame. Hitch cost is inferred until Instruments on a device. |
 
 ## Requests
 

@@ -22,7 +22,10 @@ final class UnfoldClock: ObservableObject {
     private(set) var hinge: HingeStatus?
     private(set) var lastHingeEvent: Date?
 
-    private var move: UnfoldMove?
+    /// True while a run is on the display link (published, so the touch gesture follows it).
+    @Published private(set) var isRunning = false
+
+    private var move: UnfoldMove? { didSet { if isRunning != (move != nil) { isRunning = move != nil } } }
     private var began: CFTimeInterval = 0
     private var link: CADisplayLink?
 
@@ -32,8 +35,6 @@ final class UnfoldClock: ObservableObject {
     var pose: DoorPose { DoorPose(t: t, style: style) }
     /// The same for a hero with no door (framing stages, the "All rentals" skyline).
     func pose(hasDoor: Bool) -> DoorPose { DoorPose(t: t, style: style, hasDoor: hasDoor) }
-
-    var isRunning: Bool { move != nil }
 
     // MARK: Events
 
@@ -62,6 +63,15 @@ final class UnfoldClock: ObservableObject {
         style = .swing
     }
 
+    /// The window's fold changed. Folded onto the outer display with the hinge known closed, the door
+    /// rests shut, so the next unfold plays from 0 even if a settle had lit it (a cold launch, with no
+    /// hinge report yet, is left lit).
+    func postureChanged(to posture: FoldPosture) {
+        guard UnfoldDoor.restsShut(posture: posture, hinge: hinge, running: isRunning), t != 0 else { return }
+        t = 0
+        style = .swing
+    }
+
     // MARK: Running
 
     func run(_ move: UnfoldMove) {
@@ -70,8 +80,12 @@ final class UnfoldClock: ObservableObject {
         t = move.from
         self.move = move
         began = CACurrentMediaTime()
-        let proxy = DisplayLinkProxy { [weak self] in self?.tick() }
-        let link = CADisplayLink(target: proxy, selector: #selector(DisplayLinkProxy.step))
+        let proxy = DisplayLinkProxy { [weak self] in
+            guard let self else { return false }
+            self.tick()
+            return true
+        }
+        let link = CADisplayLink(target: proxy, selector: #selector(DisplayLinkProxy.step(_:)))
         link.add(to: .main, forMode: .common)
         self.link = link
     }
@@ -102,15 +116,17 @@ final class UnfoldClock: ObservableObject {
     #endif
 }
 
-/// `CADisplayLink` retains its target; the proxy keeps the clock free to go away (it invalidates the
-/// link when a run ends or a new one starts).
+/// `CADisplayLink` retains its target; the proxy keeps the clock free to go away. The clock invalidates
+/// the link when a run ends or a new one starts; if the clock itself is gone, the proxy does.
 private final class DisplayLinkProxy: NSObject {
-    private let action: @MainActor () -> Void
+    /// Returns false once its owner is gone.
+    private let action: @MainActor () -> Bool
 
-    init(_ action: @escaping @MainActor () -> Void) { self.action = action }
+    init(_ action: @escaping @MainActor () -> Bool) { self.action = action }
 
-    @objc func step() {
-        MainActor.assumeIsolated { action() }
+    @objc func step(_ link: CADisplayLink) {
+        let alive = MainActor.assumeIsolated { action() }
+        if !alive { link.invalidate() }
     }
 }
 
@@ -129,23 +145,35 @@ private struct UnfoldHingeModifier: ViewModifier {
     let posture: FoldPosture
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Re-checked whenever the fold changes or the door comes to rest short of open.
+    private struct StrandKey: Equatable {
+        let posture: FoldPosture
+        let idleShort: Bool
+    }
 
     func body(content: Content) -> some View {
         content
             .modifier(HingeListener { old, new in
                 clock.hingeChanged(from: old, to: new, reduceMotion: reduceMotion)
             })
-            // At rest only the subviews' own gestures run (`.none` would switch off every tap in the app).
-            .simultaneousGesture(TapGesture().onEnded { clock.finish() }, including: clock.isRunning ? .all : .subviews)
-            .task(id: posture) {
+            // Any touch mid-run (a tap, the start of a scroll) jumps the door to its end. At rest only
+            // the subviews' own gestures run (`.none` would switch off every tap in the app).
+            .simultaneousGesture(LongPressGesture(minimumDuration: 0, maximumDistance: .infinity).onEnded { _ in clock.finish() },
+                                 including: clock.isRunning ? .all : .subviews)
+            .onChange(of: posture) { _, new in clock.postureChanged(to: new) }
+            .onChange(of: scenePhase) { _, phase in
+                // Back from the background: an unfold that happened meanwhile sent no event here.
+                if phase == .active { clock.settleIfStranded(posture: posture) }
+            }
+            .task(id: StrandKey(posture: posture, idleShort: !clock.isRunning && clock.t < 1)) {
                 // Must-prove 3: if the open event is missed while the window changes display, the door
-                // must not stay shut over a lit fold. Checked a few times after the posture lands.
-                guard posture.hostsDoor else { return }
-                for _ in 0..<3 {
-                    try? await Task.sleep(for: .seconds(UnfoldDoor.strandedAfter))
-                    if Task.isCancelled { return }
-                    clock.settleIfStranded(posture: posture)
-                }
+                // must not stay shut over a lit fold.
+                guard posture.hostsDoor, !clock.isRunning, clock.t < 1 else { return }
+                try? await Task.sleep(for: .seconds(UnfoldDoor.strandedAfter))
+                if Task.isCancelled { return }
+                clock.settleIfStranded(posture: posture)
             }
     }
 }
