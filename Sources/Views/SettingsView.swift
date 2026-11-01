@@ -59,6 +59,7 @@ struct SettingsView: View {
                 profileSection
                 planSection
                 AutoCaptureSettingsSection(onOpenMuted: { route = .muted })
+                SettingsRemindersSection()   // 2.3 seam: package D
                 taxSection
                 recordsSection
                 appSection

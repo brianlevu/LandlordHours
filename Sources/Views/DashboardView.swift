@@ -492,6 +492,9 @@ struct DashboardView: View {
                           })
             .padding(.top, LHMetrics.sectionGap)
             .padding(.horizontal, LHMetrics.gutter)
+        // 2.3 seams: Learn (package C) under To confirm, then care (package B). Each owns its padding.
+        TodayLearnSlot(rentalID: focus?.rentalID)
+        TodayCareSlot(rentalID: focus?.rentalID)
         if showsRecordSlot {
             TodayRecordSlot(year: currentYear, confirmedHours: countedHours) { showRecordExport = true }
                 .padding(.horizontal, LHMetrics.gutter)

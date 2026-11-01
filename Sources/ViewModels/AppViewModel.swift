@@ -788,6 +788,7 @@ class AppViewModel: ObservableObject {
         Analytics.sessionLogged(category: category, participant: participant)
         Analytics.entryLogged(source: source)
         RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
+        UserChangeSignal.shared.record(rentalID: propertyId, kind: .logged)   // 2.3 seam: package E
         return .saved(entry.id)
     }
 

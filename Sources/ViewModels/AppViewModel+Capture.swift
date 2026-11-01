@@ -116,6 +116,7 @@ extension AppViewModel {
         store?.markConfirmed(key: suggestion.sourceKey, entryId: entry.id)
         reportHouseSave(previousHours: houseHoursBefore)
         Analytics.entryLogged(source: source)
+        UserChangeSignal.shared.record(rentalID: propertyId, kind: .confirmed)   // 2.3 seam: package E
         return .created(entryId: entry.id)
     }
 
