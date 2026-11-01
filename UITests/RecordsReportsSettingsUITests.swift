@@ -82,7 +82,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
             XCTAssertTrue(disclosure.label.contains("we never see it"), disclosure.label)
             XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle below iOS 27")
         }
-        element("settings.capture.muted").tap()
+        tapWhenReady(element("settings.capture.muted"))
         XCTAssertTrue(element("settings.muted.screen").waitForExistence(timeout: 5))
     }
 
@@ -405,6 +405,24 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         let tabBar = app.buttons["tab.today"]
         if tabBar.exists, element.frame.maxY > tabBar.frame.minY - 8 {
             app.swipeUp()
+        }
+        // And clear of the compact title, which floats over the top of the list once it scrolls
+        // (the plan rows above Auto-capture can leave a row parked under it).
+        let title = app.descendants(matching: .any)["screen.compactTitle"].firstMatch
+        let headerBottom = title.exists && title.frame.maxY > 0 ? title.frame.maxY + 12 : 110
+        if element.frame.minY < headerBottom + 8 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            // Slow, with a hold before release, so the list doesn't fling.
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 160)),
+                        withVelocity: .slow, thenHoldForDuration: 0.3)
+        }
+        // A tap while the list is still decelerating only stops the scroll; wait until it rests.
+        var last = element.frame
+        for _ in 0..<15 {
+            Thread.sleep(forTimeInterval: 0.2)
+            let now = element.frame
+            if now == last { break }
+            last = now
         }
         element.tap()
     }
