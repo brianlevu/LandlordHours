@@ -367,7 +367,7 @@ enum NudgeDebug {
             let plan = NudgePlan(id: "debug.nudge.sample.\(kind.rawValue)", kind: kind,
                                  fireDate: Date().addingTimeInterval(note.2), title: note.0.title, body: note.0.body,
                                  rentalID: nil, itemID: "debug")
-            try? await center.add(NudgeScheduler.request(for: plan, profileID: UserScope.userId, calendar: .current))
+            try? await center.add(NudgeScheduler.request(for: plan, profileID: nil, calendar: .current))   // a sample belongs to no profile, so a profile switch never hides it
         }
     }
 

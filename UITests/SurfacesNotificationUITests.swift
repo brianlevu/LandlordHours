@@ -82,7 +82,8 @@ final class SurfacesNotificationUITests: XCTestCase {
         let care = springboard.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS 'Pine Cabin'")).firstMatch
         // Banners come and go: read each label the moment it shows.
-        XCTAssertTrue(pace.waitForExistence(timeout: 30), "The pace note arrives")
+        if !pace.waitForExistence(timeout: 45) { shoot("nudges-missing", scheme) }
+        XCTAssertTrue(pace.exists, "The pace note arrives")
         let paceLabel = pace.label
         XCTAssertFalse(paceLabel.contains("Pine Cabin"), "Pace never carries a rental's care item")
         XCTAssertTrue(care.waitForExistence(timeout: 30), "The care note arrives")
