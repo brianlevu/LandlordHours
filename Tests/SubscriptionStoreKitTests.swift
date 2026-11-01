@@ -113,20 +113,8 @@ final class SubscriptionStoreKitTests: XCTestCase {
         XCTAssertEqual(plan, .free)
     }
 
-    /// Buys, then waits until the app sees the purchase. `buyProduct` returns before the
-    /// transaction reaches `Transaction.latest` (it was still nil 10–30 ms later in most runs), so
-    /// a read straight after it, like the lapsed test's renewal state, saw nothing.
     private func buy(_ id: String) async throws -> EntitlementFact {
-        let fact = StoreKit2Client.fact(try await session.buyProduct(identifier: id))
-        let deadline = Date().addingTimeInterval(5)
-        while await client.latestTransaction(for: id)?.transactionID != fact.transactionID {
-            guard Date() < deadline else {
-                XCTFail("purchase \(fact.transactionID) of \(id) never reached the app")
-                return fact
-            }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        return fact
+        StoreKit2Client.fact(try await SharedStoreKitTestSession.buyAndWaitForApp(session, id))
     }
 
     /// StoreKit test actions land asynchronously; poll briefly.

@@ -494,6 +494,25 @@ enum SharedStoreKitTestSession {
         SubscriptionManager.shared.attachStoreKit()
         return made
     }
+
+    /// Buys through the session, then waits until the app sees the purchase. `buyProduct` returns
+    /// 10–30 ms before the transaction reaches `Transaction.latest`. Rarely the harness never hands
+    /// it over at all (storekitd holds it, the app never sees it, about 1 in 1,600 purchases): that
+    /// fails here, named, instead of as a wrong plan later. No retry.
+    @MainActor
+    static func buyAndWaitForApp(_ session: SKTestSession, _ id: String,
+                                 file: StaticString = #filePath, line: UInt = #line) async throws -> Transaction {
+        let bought = try await session.buyProduct(identifier: id)
+        let deadline = Date().addingTimeInterval(5)
+        while true {
+            if case .verified(let seen)? = await Transaction.latest(for: id), seen.id == bought.id { return bought }
+            guard Date() < deadline else {
+                XCTFail("purchase \(bought.id) of \(id) never reached the app (StoreKit test harness)", file: file, line: line)
+                return bought
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
 }
 
 @MainActor
@@ -579,7 +598,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         let model = PaywallModel(context: .export, entry: .exportPage, store: manager)
         await model.start()
         XCTAssertEqual(model.phase, .ready)
-        let bought = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        let bought = try await SharedStoreKitTestSession.buyAndWaitForApp(session, "com.openclaw.landlordhours.pro")
         await waitForPro(manager)
         let dump = await entitlementsDump()
         XCTAssertTrue(manager.isPro, "bought \(bought.id) revoked=\(String(describing: bought.revocationDate)) upgraded=\(bought.isUpgraded); \(dump)")
@@ -595,7 +614,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
     func testRestoreFindsAnEarlierPurchase() async throws {
         let manager = SubscriptionManager.shared
         await manager.loadProducts()
-        _ = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        _ = try await SharedStoreKitTestSession.buyAndWaitForApp(session, "com.openclaw.landlordhours.pro")
         // Let the purchase land in the test session's entitlements before signing "out".
         await waitForPro(manager)
         resetScoped()
@@ -623,7 +642,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
     func testTheTestSessionReachesTheApp() async throws {
         // Guards the root cause: a purchase in the test session must be a real transaction the
         // app sees, not the id-0 placeholder a Sandbox-bound process gets.
-        let bought = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        let bought = try await SharedStoreKitTestSession.buyAndWaitForApp(session, "com.openclaw.landlordhours.pro")
         XCTAssertNotEqual(bought.id, 0)
         XCTAssertTrue(SubscriptionManager.shared.isStoreKitAttached)
     }
@@ -656,7 +675,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
     func testRestoreFindsAPurchaseOnThisDeviceWithoutAskingTheAppStore() async throws {
         let manager = SubscriptionManager.shared
         await manager.loadProducts()
-        _ = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        _ = try await SharedStoreKitTestSession.buyAndWaitForApp(session, "com.openclaw.landlordhours.pro")
         // buyProduct returns before the purchase reaches currentEntitlements (under load it was
         // still empty in 32 of 150 runs, so restore saw nothing and fell back to AppStore.sync()).
         // Wait for it to land, as testRestoreFindsAnEarlierPurchase does, before "signing out".
