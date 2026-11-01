@@ -389,11 +389,25 @@ final class ToastQueueTests: XCTestCase {
     }
 
     func testTimesOutAndShowsTheNext() async {
-        let center = LHToastCenter(sleep: { _ in await Task.yield() }, announce: { _ in })
+        // The first toast's wait ends at once; the second's lasts until `clear()`. The test waits
+        // for the second wait to start (the first toast has timed out and the next is on screen)
+        // instead of counting yields: the runtime doesn't order the two timers against the test's
+        // yields, and the second toast timed out too in 73 of 3,000 runs.
+        var waits = 0
+        var secondWaitStarted: CheckedContinuation<Void, Never>?
+        let center = LHToastCenter(sleep: { _ in
+            waits += 1
+            guard waits > 1 else { return }
+            secondWaitStarted?.resume()
+            secondWaitStarted = nil
+            try? await Task.sleep(for: .seconds(3600))
+        }, announce: { _ in })
         center.show(.success, "a")
         center.show(.success, "b")
-        for _ in 0..<50 where center.current?.message == "a" { await Task.yield() }
+        await withCheckedContinuation { secondWaitStarted = $0 }
         XCTAssertEqual(center.current?.message, "b")
+        XCTAssertTrue(center.queue.isEmpty)
+        center.clear()
     }
 
     func testDurations() {
