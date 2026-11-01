@@ -44,7 +44,8 @@ struct LessonSheet: View {
             header
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
-                    ForEach(lesson.cards) { item in
+                    // A free person's preview holds card 1 only: the other cards aren't built at all.
+                    ForEach(isPreview ? Array(lesson.cards.prefix(1)) : lesson.cards) { item in
                         ScrollView {
                             LessonCardView(card: item, isLast: item.index == lesson.cards.count - 1, personalNote: personalNote)
                                 .padding(.horizontal, LHMetrics.gutter)
@@ -63,7 +64,7 @@ struct LessonSheet: View {
             .scrollDisabled(isPreview)
             .scrollPosition(id: Binding(get: { Optional(card) }, set: { if let value = $0 { card = value } }))
             .defaultScrollAnchor(.leading)
-            .animation(reduceMotion ? AppAnimation.quick : AppAnimation.flow, value: card)
+            .animation(reduceMotion ? nil : AppAnimation.flow, value: card)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(isLast ? LearnLibrary.line("lesson.done") : LearnLibrary.line("lesson.next")) { advance() }
@@ -136,24 +137,27 @@ struct LessonSheetHost: ViewModifier {
         content.sheet(item: $open) { item in
             if let lesson = LearnLibrary.lesson(id: item.lessonID) {
                 LessonSheet(lesson: lesson, startCard: item.card, access: item.access,
-                            personalNote: note(for: lesson), onUpgrade: upgrade)
+                            personalNote: note(for: lesson), onUpgrade: { upgrade(lesson.id) })
             }
         }
     }
 
     private func note(for lesson: Lesson) -> String? {
         let year = Calendar.current.component(.year, from: Date())
+        // The same person the Today number counts (REPS is one spouse alone).
+        let participant = GoalManager.shared.repsParticipant
         let entries = viewModel.timeEntries
-            .filter { Calendar.current.component(.year, from: $0.date) == year }
+            .filter { Calendar.current.component(.year, from: $0.date) == year && $0.participant == participant }
             .map { (category: $0.category, hours: $0.hours) }
         guard let share = LessonInsights.share(entries: entries) else { return nil }
         return LearnLibrary.format("lesson.counts.c1.note", share.hours, share.phrase)
     }
 
-    private func upgrade() {
+    private func upgrade(_ lessonID: String) {
         open = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            ProPaywallPresenter.shared.present(entry: .settingsPro)
+            // After a purchase the lesson opens in full.
+            ProPaywallPresenter.shared.present(entry: .settingsPro, onUnlocked: { open = LessonOpen(lessonID: lessonID, access: .full) })
         }
     }
 }

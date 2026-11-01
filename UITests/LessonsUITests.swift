@@ -57,8 +57,9 @@ final class LessonsUITests: XCTestCase {
 
     func testNoCardBelowTheFirstMilestone() {
         launchToday(scenario: "frequent", hours: "40")
-        XCTAssertTrue(app.buttons["tab.today"].exists || app.tabBars.firstMatch.exists || app.staticTexts.firstMatch.waitForExistence(timeout: 20))
-        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertTrue(element("today.hero").waitForExistence(timeout: 20), "Today is up")
+        XCTAssertTrue(element("today.confirm").waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1.0)
         XCTAssertFalse(element("today.learn").exists, "Only at milestones")
     }
 
@@ -88,13 +89,32 @@ final class LessonsUITests: XCTestCase {
         XCTAssertTrue(element("learn.progress").label.hasPrefix("1 of 3"), "Reaching the last card counts as read: \(element("learn.progress").label)")
     }
 
+    /// Reading the last unread lesson clears the Today card; the open sheet must stay up on its last card.
+    func testSheetStaysUpWhenTheLastUnreadLessonClearsTheCard() {
+        launchToday(scenario: "frequent", extra: ["-LHLearnRead", "counts,spouse"])
+        XCTAssertTrue(scrollTo(element("today.learn")))
+        element("today.learn.read").tap()
+        XCTAssertTrue(element("lesson.sheet").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("lesson.card.1").waitForExistence(timeout: 5))
+        element("lesson.next").tap()
+        XCTAssertTrue(element("lesson.card.2").waitForExistence(timeout: 5))
+        element("lesson.next").tap()
+        XCTAssertTrue(element("lesson.card.3").waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertTrue(element("lesson.sheet").exists, "Reaching the last card marks it read; the sheet stays")
+        XCTAssertTrue(element("lesson.notAdvice").exists)
+        element("lesson.next").tap()   // Done
+        XCTAssertTrue(element("lesson.sheet").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(element("today.learn").waitForNonExistence(timeout: 5), "Every lesson read: no card")
+    }
+
     func testFreeUserGetsCardOneThenThePaywall() {
         launchToday(scenario: "frequent", extra: ["-LHLearnFree"])
         XCTAssertTrue(scrollTo(element("today.learn")), "The card shows on the free plan too")
         element("today.learn.read").tap()
         XCTAssertTrue(element("lesson.sheet").waitForExistence(timeout: 10))
         XCTAssertTrue(element("lesson.card.1").exists)
-        XCTAssertFalse(element("lesson.card.2").isHittable, "A free person sees card 1 only")
+        XCTAssertFalse(element("lesson.card.2").exists, "A free person gets card 1 only: the rest isn't built")
         element("lesson.next").tap()
         XCTAssertTrue(app.buttons["paywall.close"].waitForExistence(timeout: 10), "Next opens the paywall")
         XCTAssertFalse(element("lesson.sheet").exists)
@@ -118,7 +138,8 @@ final class LessonsUITests: XCTestCase {
         let suffix = scheme + (size.map { "-\($0)" } ?? "")
 
         if wants("today") {
-            launchToday(scenario: "frequent", scheme: scheme, size: size)
+            // Real hours, no override: the goal750 seed puts the hero and the card on the same number.
+            launchToday(scenario: "frequent", hours: nil, scheme: scheme, size: size, extra: ["-LHCraftSeed", "goal750"])
             XCTAssertTrue(scrollTo(element("today.learn")))
             settleAndCapture("l1-today-learn-\(suffix)")
         }
@@ -153,8 +174,9 @@ final class LessonsUITests: XCTestCase {
 
     // MARK: Helpers
 
-    private func launchToday(scenario: String, hours: String = "420", scheme: String = "light", size: String? = nil, extra: [String] = []) {
-        launch(["-LHMockScenario", scenario, "-LHInitialTab", "0", "-LHLearnHours", hours, "-LHLearnReset", "-LHSeedSuggestions", "inbox"] + extra, scheme: scheme, size: size)
+    private func launchToday(scenario: String, hours: String? = "420", scheme: String = "light", size: String? = nil, extra: [String] = []) {
+        let hoursArgs = hours.map { ["-LHLearnHours", $0] } ?? []
+        launch(["-LHMockScenario", scenario, "-LHInitialTab", "0"] + hoursArgs + ["-LHLearnReset", "-LHSeedSuggestions", "inbox"] + extra, scheme: scheme, size: size)
     }
 
     private func launch(_ extra: [String], scheme: String = "light", size: String? = nil) {

@@ -23,7 +23,9 @@ struct TodayLearnSlot: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private var card: LearnMilestone.Card? {
-        let hours = Self.debugHours ?? viewModel.houseCountableHours()
+        // The number the hero shows: this rental's hours when Today is on one rental, else the house total.
+        let hours = Self.debugHours ?? (rentalID.map { viewModel.propertyCountableHours($0, goal: goalManager.houseGoal) }
+                                        ?? viewModel.houseCountableHours())
         return LearnMilestone.card(hours: hours, goal: Int(goalManager.houseGoal.targetHours),
                                    wantsGoal750: goalManager.goalChoice == .reps750,
                                    handled: progress.handledMilestone, read: progress.readIDs,
@@ -31,7 +33,9 @@ struct TodayLearnSlot: View {
     }
 
     var body: some View {
-        Group {
+        // A real container (not a Group): it stays when the card clears, so it keeps hosting the open sheet
+        // after the last unread lesson is read.
+        VStack(spacing: 0) {
             if let card, let lesson = LearnLibrary.lesson(id: card.lessonID) {
                 milestone(card, lesson: lesson)
                     .padding(.top, LHMetrics.sectionGap)

@@ -20,6 +20,11 @@ final class LessonProgressStore: ObservableObject {
         #if DEBUG
         // `-LHLearnReset` starts a UI-test launch with nothing read and no milestone handled.
         if defaults === UserDefaults.standard, ProcessInfo.processInfo.arguments.contains("-LHLearnReset") { reset() }
+        // `-LHLearnRead counts,spouse` then marks those lessons read.
+        let args = ProcessInfo.processInfo.arguments
+        if defaults === UserDefaults.standard, let i = args.firstIndex(of: "-LHLearnRead"), args.indices.contains(i + 1) {
+            args[i + 1].split(separator: ",").forEach { markRead(String($0)) }
+        }
         #endif
     }
 
