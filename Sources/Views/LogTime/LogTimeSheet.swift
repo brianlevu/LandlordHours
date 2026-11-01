@@ -638,12 +638,14 @@ struct LogTimeSheet: View {
     func readNote(delay: Double, source: LogFillSource, rulesOnly: Bool = false) {
         readTask?.cancel()
         let text = form.trimmedNote
-        guard text.count >= 6, mode == .log, !manual, !LogSheetDebug.holdsReading else {
+        // A care entry reads only what the person typed (`readableNote`), never the app's own words.
+        let readable = form.readableNote
+        guard text.count >= 6, !readable.isEmpty, mode == .log, !manual, !LogSheetDebug.holdsReading else {
             if !LogSheetDebug.holdsReading { isReading = false }
             noteDirty = false
             return
         }
-        let request = NoteReadRequest(text: text, properties: properties, spouseTracking: spouseTracking)
+        let request = NoteReadRequest(text: readable, properties: properties, spouseTracking: spouseTracking)
         let chain = noteReader
         readTask = Task { @MainActor in
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }

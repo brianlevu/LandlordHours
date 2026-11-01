@@ -245,26 +245,55 @@ final class CarePlanTests: XCTestCase {
         XCTAssertEqual(LogTimeFormat.buttonTitle(form: form, properties: [pine, lakeside], now: oct31), CareText.setHowLong)
     }
 
-    /// Verifier v1 blocker: a rental named "Apt 4H" put 4 hours in How long through the note reader.
-    func testTheAppsOwnNoteIsNeverReadIntoHours() {
+    /// Verifier v1/v2 blocker: a rental named "Apt 4H" put 4 hours in How long through the note
+    /// reader, first on the prefilled note and then on any edit of it. The note no longer names the
+    /// rental, and a care entry reads only what the person typed, through the real rules reader.
+    private func readTyped(_ form: inout LogForm, properties: [RentalProperty]) {
+        let reading = NoteRules.read(NoteReadRequest(text: form.readableNote, properties: properties, spouseTracking: false,
+                                                     now: oct31, calendar: calendar))
+        form.apply(reading, source: .note, spouseTracking: false, calendar: calendar)
+    }
+
+    func testTheAppsOwnWordsNeverBecomeHours() {
         for name in ["Apt 4H", "Suite 12h", "Unit 2M", "from 9 to 5 Lofts"] {
             let rental = RentalProperty(name: name, address: "", propertyType: .ltr)
-            var form = LogForm.care(CarePrefill.make(task: CarePlanCatalog.task(id: "gutters")!, rental: rental), properties: [rental], now: oct31)
+            let other = RentalProperty(name: "Oak Street Duplex", address: "", propertyType: .ltr)
+            let properties = [rental, other]
+            let prefill = CarePrefill.make(task: CarePlanCatalog.task(id: "gutters")!, rental: rental)
+            XCTAssertFalse(prefill.note.contains(name), "\(name): the note never names the rental")
+            var form = LogForm.care(prefill, properties: properties, now: oct31)
             XCTAssertTrue(form.noteIsCarePrefill)
-            var reading = NoteReading()
-            reading.hours = 4
-            reading.propertyId = rental.id
-            let wrote = form.apply(reading, source: .note, spouseTracking: false)
-            XCTAssertTrue(wrote.isEmpty, name)
-            XCTAssertEqual(form.hours, 0, "\(name): never hours from the app's own words")
+            XCTAssertEqual(form.readableNote, "", "nothing typed yet, nothing to read")
+
+            // Even a reading that claims hours is ignored while the note is the app's text.
+            var claim = NoteReading()
+            claim.hours = 4
+            XCTAssertTrue(form.apply(claim, source: .note, spouseTracking: false).isEmpty, name)
+            XCTAssertEqual(form.hours, 0, name)
             XCTAssertNil(form.fillSource, "\(name): no 'filled from your note' on text the app wrote")
-            // Once the person writes, their words are read as usual.
-            form.note += ", about 2 hours"
-            XCTAssertFalse(form.noteIsCarePrefill)
-            reading.hours = 2
-            form.apply(reading, source: .note, spouseTracking: false)
-            XCTAssertEqual(form.hours, 2, name)
+
+            // Words with no duration keep How long empty.
+            form.note += " and the downspout"
+            readTyped(&form, properties: properties)
+            XCTAssertEqual(form.readableNote, "and the downspout")
+            XCTAssertEqual(form.hours, 0, "\(name): an edit never turns the app's words into hours")
+            XCTAssertEqual(form.gap(properties: properties), .hours, name)
+            XCTAssertEqual(form.propertyId, rental.id, "\(name): the rental stays the person's pick")
+
+            // A duration the person types is read as usual.
+            form.note += " took 2h"
+            readTyped(&form, properties: properties)
+            XCTAssertEqual(form.hours, 2, "\(name): their own words set the hours")
         }
+    }
+
+    func testANoteRewrittenFromScratchIsAllThePersonsWords() {
+        let rental = RentalProperty(name: "Apt 4H", address: "", propertyType: .ltr)
+        var form = LogForm.care(CarePrefill.make(task: CarePlanCatalog.task(id: "alarms")!, rental: rental), properties: [rental], now: oct31)
+        form.note = "Swapped the batteries, 30 minutes"
+        XCTAssertEqual(form.readableNote, "Swapped the batteries, 30 minutes")
+        readTyped(&form, properties: [rental])
+        XCTAssertEqual(form.hours, 0.5, accuracy: 0.001)
     }
 
     func testEveryCarePrefillStartsEmptyForEveryTask() {

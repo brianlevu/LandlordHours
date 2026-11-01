@@ -119,6 +119,20 @@ final class CarePlanUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)   // past the reader's 600 ms pause
         XCTAssertTrue(app.buttons["log.hours"].label.contains("not chosen"), app.buttons["log.hours"].label)
         XCTAssertFalse(element("log.fill.caption").exists, "nothing is read from the app's own words")
+        // An edit that adds no duration keeps How long empty (v2 blocker: any edit read "4H" as 4h).
+        let note = element("log.note")
+        note.tap()
+        // The caret lands at the start of the field; what is typed goes in front of the app's words.
+        note.typeText("And the downspout. ")
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertTrue(app.buttons["log.hours"].label.contains("not chosen"), app.buttons["log.hours"].label)
+        // A duration the person types is read.
+        note.typeText("Took 2h. ")
+        let hours = app.buttons["log.hours"]
+        let read = NSPredicate(format: "NOT (label CONTAINS %@)", "not chosen")
+        let deadline = Date().addingTimeInterval(8)
+        while !read.evaluate(with: hours) && Date() < deadline { Thread.sleep(forTimeInterval: 0.3) }
+        XCTAssertTrue(read.evaluate(with: hours), "note: \(String(describing: note.value)); hours: \(hours.label)")
     }
 
     func testTheChipsComeFromTheOwnHistory() {

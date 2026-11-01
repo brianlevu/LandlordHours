@@ -140,6 +140,19 @@ struct LogForm: Equatable {
     /// The note is still the text a care row wrote (not the person's words).
     var noteIsCarePrefill: Bool { carePrefillNote != nil && trimmedNote == carePrefillNote }
 
+    /// What the note reader may read. Normally the whole note. On a care entry only the words the
+    /// person typed: the care row's own text is taken out first, so nothing the app wrote (a task,
+    /// a rental's name) can ever turn into hours. A note rewritten from scratch is all theirs.
+    var readableNote: String {
+        let note = trimmedNote
+        guard let prefill = carePrefillNote, !prefill.isEmpty else { return note }
+        var typed = note
+        if let range = note.range(of: prefill, options: [.caseInsensitive]) {
+            typed.removeSubrange(range)
+        }
+        return typed.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+    }
+
     static let step = 0.25
     static let maxHours = 24.0
 
@@ -747,9 +760,10 @@ struct CarePrefill: Equatable {
     let note: String
 
     /// The prefill for a task at a rental: "Cleared the gutters at Pine Cabin".
+    /// The note is the task alone ("Cleared the gutters"): the Rental row already names the rental,
+    /// and a rental's name ("Apt 4H") must never sit in text the note reader might read.
     static func make(task: CareTask, rental: RentalProperty) -> CarePrefill {
-        CarePrefill(taskID: task.id, rentalID: rental.id, kind: task.kind,
-                    note: String(localized: "care.log.noteAt", defaultValue: "\(task.doneNote) at \(rental.name)", table: "CarePlan"))
+        CarePrefill(taskID: task.id, rentalID: rental.id, kind: task.kind, note: task.doneNote)
     }
 }
 

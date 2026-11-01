@@ -122,17 +122,6 @@
         }
       }
     },
-    "care.log.noteAt": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ at %@"
-          }
-        }
-      }
-    },
     "care.log.setHowLong": {
       "extractionState": "manual",
       "localizations": {
