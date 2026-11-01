@@ -240,7 +240,8 @@ final class NudgeScheduler {
                       let fire = cal.date(from: trigger.dateComponents), fire > moment,
                       let rental = request.content.userInfo[NudgeNotification.rentalIDKey] as? String,
                       facts.rentals.contains(where: { $0.id.uuidString == rental }),
-                      facts.carePlanUntil.map({ fire < $0 }) ?? true else { continue }
+                      facts.carePlanUntil.map({ fire < $0 }) ?? true,
+                      !settings.isQuiet(fire, calendar: cal) else { continue }   // quiet hours may have changed
                 keptCareIDs.insert(request.identifier)
                 let item = request.content.userInfo[NudgeNotification.itemIDKey] as? String ?? request.identifier
                 held.append(NudgeLedgerEntry(kind: .carePlan, itemID: item, fireDate: fire))

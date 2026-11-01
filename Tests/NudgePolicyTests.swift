@@ -531,6 +531,18 @@ final class NudgeSchedulerTests: XCTestCase {
         XCTAssertTrue(center.pending.isEmpty, "not kept for a rental that no longer exists")
     }
 
+    func testAHeldCareNudgeIsDroppedIfQuietHoursNowCoverIt() async {
+        care = [gutters()]
+        turnOn(.carePlan)
+        let scheduler = makeScheduler()
+        await scheduler.rebuild(reason: "foreground")
+        XCTAssertEqual(center.pending.count, 1)
+        careReady = false; care = []
+        turnOn(quiet: (9, 12))                                              // the 10:00 slot is now quiet
+        await scheduler.rebuild(reason: "quiet-hours")
+        XCTAssertTrue(center.pending.isEmpty)
+    }
+
     func testAnUnreadyCareSourceDoesNotKeepCareForSomeoneWhoTurnedItOffOrLostPro() async {
         care = [gutters()]
         turnOn(.weeklyPace, .carePlan)
