@@ -16,6 +16,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         // The single model exists before any scene, notification response or intent.
         _ = AppModelHost.shared
         startCaptureNotifications()
+        startNudges()
         return true
     }
 
@@ -62,6 +63,29 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
+    // MARK: Pace and care nudges (2.3)
+
+    private var nudgeObservers: [NSObjectProtocol] = []
+
+    /// Rebuilds the opt-in nudges at launch, on every foreground and background (so the numbers in
+    /// the next weekly note are the latest), and when the time zone changes (quiet hours move).
+    private func startNudges() {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        #if DEBUG
+        NudgeDebug.applyLaunchSeeds()
+        #endif
+        let rebuild: (String) -> Void = { reason in
+            Task { @MainActor in await NudgeScheduler.shared.rebuild(reason: reason) }
+        }
+        let center = NotificationCenter.default
+        nudgeObservers = [
+            center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in rebuild("foreground") },
+            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in rebuild("background") },
+            center.addObserver(forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main) { _ in rebuild("time-zone") }
+        ]
+        rebuild("launch")
+    }
+
     func application(
         _ application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
@@ -92,6 +116,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // A nudge made for another profile never shows (the profile was switched since).
+        let info = notification.request.content.userInfo
+        if notification.request.content.categoryIdentifier == NudgeNotification.category,
+           let profile = NotificationPayload.profileId(in: info), profile != UserScope.userId {
+            completionHandler([])
+            return
+        }
         #if DEBUG
         completionHandler([.banner, .list])
         #else

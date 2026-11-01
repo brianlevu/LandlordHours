@@ -113,3 +113,52 @@ enum NotificationCopy {
         return text + "h"
     }
 }
+
+// MARK: - Pace and care nudges (2.3 package D)
+//
+// Settings › Pace reminders. The facts come first, then the number. No streaks, no guilt, no
+// "evidence" or "qualify". Pace is about hours; care is about upkeep and never mentions hours.
+// All strings live in `Sources/Resources/Strings/Nudges.xcstrings` (table "Nudges").
+
+enum NudgeStrings {
+    static let table = "Nudges"
+
+    static func t(_ key: StaticString, _ value: String.LocalizationValue) -> String {
+        String(localized: key, defaultValue: value, table: table)
+    }
+
+    static func f(_ key: StaticString, _ format: String.LocalizationValue, _ args: CVarArg...) -> String {
+        String(format: String(localized: key, defaultValue: format, table: table), arguments: args)
+    }
+}
+
+enum NudgeCopy {
+    /// "Your week" / "420 of 750 this year. About 38h a week gets you to 750 by Dec 31."
+    static func weekly(hours: Int, target: Int, perWeek: Int) -> NotificationText {
+        let title = NudgeStrings.t("nudge.weekly.title", "Your week")
+        if perWeek <= 0 {
+            return NotificationText(title: title, body: NudgeStrings.f("nudge.weekly.bodyMet", "%lld of %lld this year. You’re at your goal.", hours, target))
+        }
+        return NotificationText(title: title, body: NudgeStrings.f(
+            "nudge.weekly.body", "%lld of %lld this year. About %lldh a week gets you to %lld by Dec 31.", hours, target, perWeek, target))
+    }
+
+    /// "Your pace" / "About 24h behind the pace for 750 by Dec 31."
+    static func behind(hoursBehind: Int, target: Int) -> NotificationText {
+        NotificationText(
+            title: NudgeStrings.t("nudge.behind.title", "Your pace"),
+            body: NudgeStrings.f("nudge.behind.body", "About %lldh behind the pace for %lld by Dec 31.", hoursBehind, target))
+    }
+
+    /// "Year end" / "612 hours logged in 2026. Add anything missing before Dec 31."
+    static func yearEnd(year: Int, hours: Int) -> NotificationText {
+        NotificationText(
+            title: NudgeStrings.t("nudge.yearEnd.title", "Year end"),
+            body: NudgeStrings.f("nudge.yearEnd.body", "%lld hours logged in %lld. Add anything missing before Dec 31.", hours, year))
+    }
+
+    /// The rental is the title; the body names the one care item. No hours.
+    static func care(rental: String, item: String) -> NotificationText {
+        NotificationText(title: rental, body: NudgeStrings.f("nudge.care.body", "Up next: %@.", item))
+    }
+}
