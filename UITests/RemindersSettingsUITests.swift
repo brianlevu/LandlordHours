@@ -219,10 +219,19 @@ final class RemindersSettingsUITests: XCTestCase {
     func testCaptureRemindersFrames() throws {
         guard let dir = ProcessInfo.processInfo.environment["LH_SHOT_DIR"] else { throw XCTSkip("LH_SHOT_DIR not set") }
         let scheme = ProcessInfo.processInfo.environment["LH_SCHEME"] ?? "light"
-        launch(["-LHNudgeReset", "1", "-LHNudgeSeed", "weekly,yearEnd,care"], scheme: scheme, probe: false)
+        let size = ProcessInfo.processInfo.environment["LH_SIZE"] ?? "default"
+        var extra = ["-LHNudgeReset", "1", "-LHNudgeSeed", "weekly,yearEnd,care"]
+        if size == "xxl" { extra += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] }
+        launch(extra, scheme: scheme, probe: false)
         openScreen()
         Thread.sleep(forTimeInterval: 1.5)
-        let shot = XCUIScreen.main.screenshot()
-        try shot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("n1-reminders-\(scheme).png"))
+        func save(_ name: String) throws {
+            try XCUIScreen.main.screenshot().pngRepresentation
+                .write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name)-\(size)-\(scheme).png"))
+        }
+        try save("n1-reminders")
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 1)
+        try save("n1-reminders-scrolled")
     }
 }

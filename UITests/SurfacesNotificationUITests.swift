@@ -81,10 +81,14 @@ final class SurfacesNotificationUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS '420 of 750'")).firstMatch
         let care = springboard.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS 'Pine Cabin'")).firstMatch
+        // Banners come and go: read each label the moment it shows.
         XCTAssertTrue(pace.waitForExistence(timeout: 30), "The pace note arrives")
+        let paceLabel = pace.label
+        XCTAssertFalse(paceLabel.contains("Pine Cabin"), "Pace never carries a rental's care item")
         XCTAssertTrue(care.waitForExistence(timeout: 30), "The care note arrives")
-        XCTAssertFalse(pace.label.contains("Pine Cabin"), "Pace never carries a rental's care item")
-        XCTAssertFalse(care.label.contains("750"), "Care never carries hours")
+        let careLabel = care.label
+        XCTAssertFalse(careLabel.contains("750"), "Care never carries hours")
+        XCTAssertNotEqual(paceLabel, careLabel)
         shoot("nudges", scheme)
 
         // Locked: both sit on the Lock Screen as their own notifications.
@@ -92,9 +96,14 @@ final class SurfacesNotificationUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         XCUIDevice.shared.perform(NSSelectorFromString("pressLockButton"))
         Thread.sleep(forTimeInterval: 3)
+        if !pace.waitForExistence(timeout: 5) {
+            springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+                .press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+        shoot("nudges-lock", scheme)
         XCTAssertTrue(pace.waitForExistence(timeout: 6) && care.waitForExistence(timeout: 6), "Both on the Lock Screen")
         XCTAssertNotEqual(pace.frame, care.frame, "Two notifications, not one")
-        shoot("nudges-lock", scheme)
     }
 
     private func shoot(_ step: String, _ scheme: String) {
