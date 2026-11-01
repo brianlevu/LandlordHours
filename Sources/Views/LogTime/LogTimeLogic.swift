@@ -316,7 +316,7 @@ struct LogForm: Equatable {
                         tier: LogFillTier = .rules, late: Bool = false, rulesBaseline: NoteReading? = nil,
                         calendar: Calendar = .current) -> Set<LogField> {
         // A care row's own text is never read: no hours (or anything else) from words the app wrote.
-        if noteIsCarePrefill { return [] }
+        if noteIsCarePrefill || (careTaskID != nil && readableNote.isEmpty) { return [] }
         let current = snapshot
         let before = beforeFill ?? current
         let priorTiers = filledBy

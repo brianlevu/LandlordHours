@@ -287,6 +287,28 @@ final class CarePlanTests: XCTestCase {
         }
     }
 
+    /// Verifier v3 nit: no task's own note may read as a duration, whatever the rental.
+    func testNoTaskNoteReadsAsADuration() {
+        let rental = RentalProperty(name: "Pine Cabin", address: "", propertyType: .ltr)
+        for task in CarePlanCatalog.tasks {
+            let reading = NoteRules.read(NoteReadRequest(text: task.doneNote, properties: [rental], spouseTracking: false,
+                                                         now: oct31, calendar: calendar))
+            XCTAssertNil(reading.hours, "\(task.id): \(task.doneNote)")
+        }
+    }
+
+    func testAReadingIsIgnoredWhileOnlyTheAppsWordsAreThereEvenAfterACaseEdit() {
+        let rental = RentalProperty(name: "Apt 4H", address: "", propertyType: .ltr)
+        var form = LogForm.care(CarePrefill.make(task: CarePlanCatalog.task(id: "gutters")!, rental: rental), properties: [rental], now: oct31)
+        form.note = form.note.uppercased()
+        XCTAssertFalse(form.noteIsCarePrefill)
+        XCTAssertEqual(form.readableNote, "")
+        var claim = NoteReading()
+        claim.hours = 4
+        XCTAssertTrue(form.apply(claim, source: .note, spouseTracking: false).isEmpty)
+        XCTAssertEqual(form.hours, 0)
+    }
+
     func testANoteRewrittenFromScratchIsAllThePersonsWords() {
         let rental = RentalProperty(name: "Apt 4H", address: "", propertyType: .ltr)
         var form = LogForm.care(CarePrefill.make(task: CarePlanCatalog.task(id: "alarms")!, rental: rental), properties: [rental], now: oct31)
