@@ -300,7 +300,13 @@ struct PlanMomentsHost: View {
             .onChange(of: store.plan) { _, _ in evaluate() }
             .onChange(of: viewModel.properties.count) { _, _ in evaluate() }
             .onChange(of: presenter.request == nil) { _, closed in if closed { evaluate() } }
-            .onChange(of: scenePhase) { _, phase in if phase == .active { evaluate() } }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                evaluate()
+                // Auto-renew turned off in Settings › Subscriptions arrives as a renewal change:
+                // re-read StoreKit so the day-12 reminder is cancelled (a plan change re-runs evaluate).
+                Task { await SubscriptionManager.shared.refreshEntitlements() }
+            }
             .sheet(item: $moment, onDismiss: dismissed) { moment in
                 switch moment {
                 case .day12(let renewal, let id):

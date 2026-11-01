@@ -11,7 +11,6 @@ struct RentalAccessSlot: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @ObservedObject private var store = EntitlementStore.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
-    @State private var paywall: ProPaywallRequest?
     @State private var showSwitch = false
 
     var body: some View {
@@ -20,13 +19,13 @@ struct RentalAccessSlot: View {
         if viewModel.rentalAccess(property.id) == .viewOnly {
             ViewOnlyRentalCard(hours: hoursThisYear, freeRentalName: viewModel.freeRentalName,
                                price: subscriptionManager.proDisplayPrice,
-                               onSeePro: {
-                                   paywall = ProPaywallRequest(context: ProGate.context(for: .viewOnlyRental), entry: .viewOnlyRental)
-                               },
+                               // The shell's paywall, not a local cover: the card (and any cover it
+                               // held) goes away the moment the trial starts, and the trial-start
+                               // moment must stay on screen.
+                               onSeePro: { ProPaywallPresenter.shared.present(entry: .viewOnlyRental) },
                                onSwitch: { showSwitch = true })
                 .padding(.horizontal, LHMetrics.gutter)
                 .padding(.top, LHMetrics.sectionGap)
-                .proPaywall($paywall)
                 .navigationDestination(isPresented: $showSwitch) { FreeRentalSettingsView() }
                 .onAppear { Analytics.lockPreviewShown(entry: .viewOnlyRental) }
         }
