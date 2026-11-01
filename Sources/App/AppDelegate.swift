@@ -73,6 +73,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         #if DEBUG
         NudgeDebug.applyLaunchSeeds()
+        if UserDefaults.standard.bool(forKey: "LHNudgeFireSamples") { Task { await NudgeDebug.postSamples() } }
         #endif
         let rebuild: (String) -> Void = { reason in
             Task { @MainActor in await NudgeScheduler.shared.rebuild(reason: reason) }

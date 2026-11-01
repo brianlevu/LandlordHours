@@ -355,6 +355,7 @@
 		EF21223A16C262FC6C2FFE87 /* LHScreenScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */; };
 		EFF3AE658E53DAC47162C5C4 /* LogTimeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C268955DBE2F2924AFB79CBD /* LogTimeUITests.swift */; };
 		F2900FA54CCCEEED52E612B3 /* LogInlineEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAA75C0ABD5FDA065664E0A /* LogInlineEditors.swift */; };
+		F2A2CD3A99B2324518EF0CD2 /* RemindersSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2FDE41A0D6423F1A40C795 /* RemindersSettingsUITests.swift */; };
 		F37725A9361671D0ADDE717F /* PaywallCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7575580F74476145B81402 /* PaywallCaptureUITests.swift */; };
 		F38ED53DABDDE7B87EB77FBE /* EarlierRecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA19B6978C57160B1BE2C3C /* EarlierRecordsView.swift */; };
 		F53BA48CC55E73BBAE52C0E0 /* PropertiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B19069D2DB3708B654ABA06 /* PropertiesTests.swift */; };
@@ -478,6 +479,7 @@
 		294885677A14CB0F22849EF0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		2BBB3376945D830755F77630 /* HouseRevealUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseRevealUITests.swift; sourceTree = "<group>"; };
 		2BEE2CF6FCD6116BAC0787F9 /* TodayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTests.swift; sourceTree = "<group>"; };
+		2D2FDE41A0D6423F1A40C795 /* RemindersSettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersSettingsUITests.swift; sourceTree = "<group>"; };
 		2D6F3B35F2EFEC3249A5553A /* TodayWindowStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayWindowStateTests.swift; sourceTree = "<group>"; };
 		2D7DAE3AD0B264F49B7E93D6 /* InboxCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxCleanupTests.swift; sourceTree = "<group>"; };
 		2E4273674AA45CFC06C814BC /* ShotBugsCaptureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotBugsCaptureUITests.swift; sourceTree = "<group>"; };
@@ -1273,6 +1275,7 @@
 				65CD50959762385E221A6599 /* PropertyAliasUITests.swift */,
 				CC8D77D86EF7D09160EF0F0A /* RecordsReportsCaptureUITests.swift */,
 				86FFABF3A26D5A7309D8551B /* RecordsReportsSettingsUITests.swift */,
+				2D2FDE41A0D6423F1A40C795 /* RemindersSettingsUITests.swift */,
 				778AABBED9DA54CA097A797C /* ScreenAnatomyUITests.swift */,
 				B060A1E563DBB7AB0A5385B7 /* SettingsLongTailCaptureUITests.swift */,
 				1D6A18BDE3378CA9EE7B92F5 /* ShellTabUITests.swift */,
@@ -2065,6 +2068,7 @@
 				37D64D0788DE8C34351A264C /* PropertyAliasUITests.swift in Sources */,
 				FC6D6E7D90E9FA8838B7C4C7 /* RecordsReportsCaptureUITests.swift in Sources */,
 				93B7E693B037558B0A327A0F /* RecordsReportsSettingsUITests.swift in Sources */,
+				F2A2CD3A99B2324518EF0CD2 /* RemindersSettingsUITests.swift in Sources */,
 				4413C041996C93956840912F /* ScreenAnatomyUITests.swift in Sources */,
 				3DD86D113BDCA55AE315AB5B /* SettingsLongTailCaptureUITests.swift in Sources */,
 				0195F855BE57E7B48A7BB71E /* ShellTabUITests.swift in Sources */,

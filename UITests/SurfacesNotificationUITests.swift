@@ -62,6 +62,41 @@ final class SurfacesNotificationUITests: XCTestCase {
         shoot("list", scheme)
     }
 
+    /// 2.3: a pace note and a care note arrive as two separate notifications, never one (frame n2).
+    /// The samples are posted by the DEBUG hook `-LHNudgeFireSamples`. Matching is on the person's
+    /// data (the hours, the rental), not on wording.
+    func testNudgesArriveAsTwoSeparateNotifications() throws {
+        let scheme = ProcessInfo.processInfo.environment["LH_SCHEME"] ?? "light"
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-LHMockScenario", "occasional", "-LHNudgeFireSamples", "1", "-LHDebugNotificationDelay", "10",
+            "-LHColorScheme", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        ]
+        app.launch()
+        let allow = springboard.buttons["Allow"]
+        if allow.waitForExistence(timeout: 8) { allow.tap() }
+        XCUIDevice.shared.press(.home)
+
+        let pace = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS '420 of 750'")).firstMatch
+        let care = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'Pine Cabin'")).firstMatch
+        XCTAssertTrue(pace.waitForExistence(timeout: 30), "The pace note arrives")
+        XCTAssertTrue(care.waitForExistence(timeout: 30), "The care note arrives")
+        XCTAssertFalse(pace.label.contains("Pine Cabin"), "Pace never carries a rental's care item")
+        XCTAssertFalse(care.label.contains("750"), "Care never carries hours")
+        shoot("nudges", scheme)
+
+        // Locked: both sit on the Lock Screen as their own notifications.
+        XCUIDevice.shared.perform(NSSelectorFromString("pressLockButton"))
+        Thread.sleep(forTimeInterval: 2)
+        XCUIDevice.shared.perform(NSSelectorFromString("pressLockButton"))
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(pace.waitForExistence(timeout: 6) && care.waitForExistence(timeout: 6), "Both on the Lock Screen")
+        XCTAssertNotEqual(pace.frame, care.frame, "Two notifications, not one")
+        shoot("nudges-lock", scheme)
+    }
+
     private func shoot(_ step: String, _ scheme: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)

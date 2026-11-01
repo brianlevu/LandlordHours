@@ -18,18 +18,13 @@ struct SettingsRemindersSection: View {
                          action: { showing = true })
                 .longTailRow()
                 .accessibilityIdentifier("settings.paceReminders")
+                .onAppear { summary = Self.summaryText(NudgeScheduler.currentSettings()) }
         } header: {
             LHSectionHeader(NudgeStrings.t("settings.reminders.section", "Reminders")).textCase(nil)
         }
         .navigationDestination(isPresented: $showing) { RemindersSettingsView() }
         .onChange(of: showing) { _, isShowing in
             if !isShowing { summary = Self.summaryText(NudgeScheduler.currentSettings()) }
-        }
-        .onAppear {
-            summary = Self.summaryText(NudgeScheduler.currentSettings())
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-LHOpenReminders") { showing = true }
-            #endif
         }
     }
 

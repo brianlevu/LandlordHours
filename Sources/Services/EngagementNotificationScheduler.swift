@@ -307,6 +307,8 @@ final class NudgeScheduler {
 //   -LHNudgeQuietStart 16 -LHNudgeQuietEnd 9   quiet hours, applied once at launch
 //   -LHNudgeCareStub 1                         one care item due for every rental
 //   -LHNudgeSeed weekly,behind,yearEnd,care    turn those kinds on at launch
+//   -LHNudgeReset 1                            clear the choices and the send history first
+//   -LHNudgeFireSamples 1                      post the two example notifications (frame n2) a few seconds apart
 enum NudgeDebug {
     static var probeOn: Bool { ProcessInfo.processInfo.arguments.contains("-LHNudgeProbe") }
 
@@ -314,6 +316,11 @@ enum NudgeDebug {
         let defaults = UserDefaults.standard
         var settings = store.load()
         var changed = false
+        if defaults.bool(forKey: "LHNudgeReset") {
+            settings = .default
+            store.saveLedger([])
+            changed = true
+        }
         if defaults.object(forKey: "LHNudgeQuietStart") != nil, defaults.object(forKey: "LHNudgeQuietEnd") != nil {
             settings.quietStartHour = defaults.integer(forKey: "LHNudgeQuietStart")
             settings.quietEndHour = defaults.integer(forKey: "LHNudgeQuietEnd")
@@ -333,6 +340,29 @@ enum NudgeDebug {
         }
         if changed { store.save(settings) }
         if defaults.bool(forKey: "LHNudgeCareStub") { CareDue.source = StubCareDueSource() }
+    }
+
+    /// The two example notifications of frame n2, posted as two separate requests: a weekly pace
+    /// note, then a care note. For Release QA and the lock-screen capture only.
+    static func postSamples(center: UNUserNotificationCenter = .current()) async {
+        let delay = max(3, UserDefaults.standard.double(forKey: "LHDebugNotificationDelay"))
+        guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+        let notes: [(NotificationText, String, TimeInterval)] = [
+            (NudgeCopy.weekly(hours: 420, target: 750, perWeek: 38), NudgeNotification.paceThread, delay),
+            (NudgeCopy.care(rental: "Pine Cabin", item: "Clear the gutters"), NudgeNotification.careThread, delay + 3)
+        ]
+        for (index, note) in notes.enumerated() {
+            let content = UNMutableNotificationContent()
+            content.title = note.0.title
+            content.body = note.0.body
+            content.threadIdentifier = note.1
+            content.categoryIdentifier = NudgeNotification.category
+            content.userInfo = [NudgeNotification.kindKey: index == 0 ? "weeklyPace" : "carePlan",
+                                NotificationPayload.destinationKey: "home"]
+            let request = UNNotificationRequest(identifier: "debug.nudge.sample.\(index)", content: content,
+                                                trigger: UNTimeIntervalNotificationTrigger(timeInterval: note.2, repeats: false))
+            try? await center.add(request)
+        }
     }
 
     /// Every pending nudge as one line: `id | 2026-11-08 18:00 | title | body | thread`.

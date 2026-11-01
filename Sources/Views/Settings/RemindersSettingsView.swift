@@ -194,6 +194,9 @@ struct RemindersSettingsView: View {
                 .font(.caption2.monospaced())
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("nudge.probe.settings")
+            Button("Refresh") { Task { await model.refreshProbe() } }
+                .font(.caption2)
+                .accessibilityIdentifier("nudge.probe.refresh")
         }
     }
     #endif
@@ -219,9 +222,11 @@ private struct QuietHoursSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
                 LHRowGroup {
-                    hourRow(NudgeStrings.t("reminders.quiet.from", "From"), $start, id: "reminders.quiet.start")
-                    LHDivider(leadingInset: 16)
-                    hourRow(NudgeStrings.t("reminders.quiet.to", "Until"), $end, id: "reminders.quiet.end")
+                    HStack(alignment: .top, spacing: 0) {
+                        wheel(NudgeStrings.t("reminders.quiet.from", "From"), $start, id: "reminders.quiet.start")
+                        wheel(NudgeStrings.t("reminders.quiet.to", "Until"), $end, id: "reminders.quiet.end")
+                    }
+                    .padding(.vertical, 8)
                 }
                 LHFootnote(NudgeStrings.t("reminders.quiet.footnote", "Nothing is sent in this window. A reminder due then waits until it ends."))
             }
@@ -238,19 +243,20 @@ private struct QuietHoursSheet: View {
 
     private func save() { Task { await model.setQuietHours(start: start, end: end) } }
 
-    private func hourRow(_ title: String, _ value: Binding<Int>, id: String) -> some View {
-        HStack {
-            Text(title).font(.body).foregroundStyle(colors.textPrimary)
-            Spacer(minLength: 12)
+    /// A captioned hour wheel: "From" and "Until" side by side, the way iOS sets a time range.
+    private func wheel(_ title: String, _ value: Binding<Int>, id: String) -> some View {
+        VStack(spacing: 0) {
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textSecondary)
+                .padding(.top, 8)
             Picker(title, selection: value) {
                 ForEach(0..<24, id: \.self) { Text(RemindersSettingsModel.hourLabel($0)).tag($0) }
             }
-            .pickerStyle(.menu)
-            .tint(colors.action)
+            .pickerStyle(.wheel)
+            .labelsHidden()
+            .frame(height: 150)
             .accessibilityIdentifier(id)
         }
-        .padding(LHRow.insets)
-        .frame(minHeight: LHMetrics.rowMinHeight)
+        .frame(maxWidth: .infinity)
     }
 }
 
