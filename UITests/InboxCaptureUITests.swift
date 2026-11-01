@@ -96,7 +96,8 @@ final class InboxCaptureUITests: XCTestCase {
         let showing = app.descendants(matching: .any)["inbox.row.cal:debug-showing"]
         XCTAssertTrue(showing.waitForExistence(timeout: 20))
         let tab = app.tabBars.firstMatch.buttons["Inbox"]
-        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH '8'"), object: tab)
+        // 8 seeded, 2 of them "Not sure" (2.3 F): the badge counts the 6 likely items only.
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH '6'"), object: tab)
         XCTAssertEqual(XCTWaiter().wait(for: [settled], timeout: 10), .completed)
         Thread.sleep(forTimeInterval: 1.0)
         print("VIDEO_MARK_START \(Date().timeIntervalSince1970)")
@@ -111,13 +112,25 @@ final class InboxCaptureUITests: XCTestCase {
         XCTAssertTrue(showing.waitForExistence(timeout: 5), "Undo brought it back")
         Thread.sleep(forTimeInterval: 1.8)
 
-        // Swipe left: not rental work.
+        // Swipe left: not rental work, on the Not sure item (2.3 F: it sits behind the Not sure row).
+        openNotSure()
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
         XCTAssertTrue(sam.waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1.0)
         drag(sam, right: false)
         XCTAssertTrue(app.staticTexts["Marked not rental work"].waitForExistence(timeout: 3), "Swipe-left dismissed")
         Thread.sleep(forTimeInterval: 2.0)
         print("VIDEO_MARK_END \(Date().timeIntervalSince1970)")
+    }
+
+    /// 2.3 F: "Not sure" items sit behind one collapsed row under the To confirm card.
+    private func openNotSure() {
+        let maybe = app.descendants(matching: .any)["inbox.maybe.row"]
+        let tabTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : app.frame.maxY
+        for _ in 0..<8 where !(maybe.exists && maybe.isHittable && maybe.frame.maxY < tabTop - 8) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(maybe.exists, "The Not sure row is under the To confirm card")
+        maybe.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.maybe.screen"].waitForExistence(timeout: 5))
     }
 
     private func drag(_ element: XCUIElement, right: Bool) {
@@ -164,11 +177,12 @@ final class InboxCaptureUITests: XCTestCase {
         // 2b. Confirm sheet for a not-sure, no-property item.
         launch(seed: "inbox", scheme: scheme)
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
-        // Rows carry Confirm / Not work now, so this one sits below the fold (and clear of the tab bar).
+        // 2.3 F: a Not sure item sits behind the Not sure row, so open it first.
         XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 20))
         Thread.sleep(forTimeInterval: 2.0)
-        let tabTop = app.tabBars.firstMatch.frame.minY
-        for _ in 0..<6 where !sam.exists || sam.frame.maxY > tabTop - 8 { app.swipeUp(velocity: .slow) }
+        openNotSure()
+        XCTAssertTrue(sam.waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1.0)
         sam.tap()
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet-notsure", scheme)
