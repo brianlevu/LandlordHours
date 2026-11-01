@@ -228,7 +228,11 @@ final class NudgeScheduler {
         guard await center.canDeliver(), let facts = facts(moment, cal), let profile = profileID() else { clearAll(); return }
 
         let output = NudgePolicy.plan(settings: settings, facts: facts, ledger: store.loadLedger())
-        center.removePending(identifiers: Array(pendingIDs))
+        // Replace in place: a request with the same id is overwritten by `add`, so a plan that
+        // stays never leaves the pending list (a nudge due while we rebuild is not lost). Only
+        // requests the new plan no longer holds are removed.
+        let planIDs = Set(output.plans.map(\.id))
+        center.removePending(identifiers: Array(pendingIDs.subtracting(planIDs)))
         var added: [NudgePlan] = []
         for plan in output.plans {
             do {
@@ -277,6 +281,15 @@ final class NudgeScheduler {
         let rentals = viewModel.properties.map { NudgeRental(id: $0.id, name: $0.name) }
         let care = viewModel.properties.flatMap { CareDue.source.dueItems(for: $0.id, on: now) }
         var yearHours = snapshot.yearHours
+        var now = now
+        #if DEBUG
+        // QA: pin the clock the facts are read at (a preview frame must not change with the day).
+        if let raw = UserDefaults.standard.string(forKey: "LHNudgeNow") {
+            let format = DateFormatter()
+            format.dateFormat = "yyyy-MM-dd'T'HH:mm"
+            if let pinned = format.date(from: raw) { now = pinned }
+        }
+        #endif
         #if DEBUG
         // QA: pin the year's hours so a lifecycle test can put the pace within reach (or not).
         if UserDefaults.standard.object(forKey: "LHNudgeYearHours") != nil {
@@ -287,8 +300,15 @@ final class NudgeScheduler {
             now: now, calendar: calendar, rentals: rentals,
             yearHours: yearHours, targetHours: context.targetHours,
             careItems: care,
-            carePlanUnlocked: EntitlementStore.shared.plan.allows(.carePlan)
+            carePlanUnlocked: EntitlementStore.shared.plan.allows(.carePlan),
+            carePlanUntil: careAccessEnd(EntitlementStore.shared.plan)
         )
+    }
+
+    /// A trial or Pro that will not renew ends at its expiry: care nudges stop before then.
+    static func careAccessEnd(_ plan: Plan) -> Date? {
+        guard let sub = plan.subscription, !sub.willAutoRenew else { return nil }
+        return sub.expiresAt
     }
 
     /// A switch went off: say which kind (never what the person logged).
@@ -315,6 +335,7 @@ final class NudgeScheduler {
 //   -LHNudgeCareStub 1                         one care item due for every rental
 //   -LHNudgeSeed weekly,behind,yearEnd,care    turn those kinds on at launch
 //   -LHNudgeReset 1                            clear the choices and the send history first
+//   -LHNudgeNow 2026-10-31T12:00              pin the clock the facts are read at
 //   -LHNudgeYearHours 600                     pin the year's hours the nudges and the preview read
 //   -LHNudgeFireSamples 1                      post the two example notifications (frame n2) a few seconds apart
 enum NudgeDebug {

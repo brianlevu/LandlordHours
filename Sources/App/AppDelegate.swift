@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UserNotifications
 
@@ -66,6 +67,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     // MARK: Pace and care nudges (2.3)
 
     private var nudgeObservers: [NSObjectProtocol] = []
+    private var nudgePlanWatch: AnyCancellable?
 
     /// Rebuilds the opt-in nudges at launch, on every foreground and background (so the numbers in
     /// the next weekly note are the latest), and when the time zone changes (quiet hours move).
@@ -84,6 +86,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in rebuild("background") },
             center.addObserver(forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main) { _ in rebuild("time-zone") }
         ]
+        // Pro or a trial starting or ending changes who may get a care nudge: rebuild then.
+        nudgePlanWatch = EntitlementStore.shared.$plan.dropFirst().removeDuplicates()
+            .receive(on: DispatchQueue.main).sink { _ in rebuild("plan") }
         rebuild("launch")
     }
 

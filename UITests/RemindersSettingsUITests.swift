@@ -245,7 +245,8 @@ final class RemindersSettingsUITests: XCTestCase {
         guard let dir = ProcessInfo.processInfo.environment["LH_SHOT_DIR"] else { throw XCTSkip("LH_SHOT_DIR not set") }
         let scheme = ProcessInfo.processInfo.environment["LH_SCHEME"] ?? "light"
         let size = ProcessInfo.processInfo.environment["LH_SIZE"] ?? "default"
-        var extra = ["-LHNudgeReset", "1", "-LHNudgeSeed", "weekly,yearEnd,care", "-LHNudgeYearHours", ProcessInfo.processInfo.environment["LH_YEAR_HOURS"] ?? "420"]
+        var extra = ["-LHNudgeReset", "1", "-LHNudgeSeed", "weekly,yearEnd,care", "-LHNudgeYearHours", ProcessInfo.processInfo.environment["LH_YEAR_HOURS"] ?? "420",
+                     "-LHNudgeNow", "2026-10-31T12:00"]
         if size == "xxl" { extra += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] }
         launch(extra, scheme: scheme, probe: false)
         openScreen()

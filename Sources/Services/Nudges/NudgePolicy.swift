@@ -28,6 +28,9 @@ struct NudgeFacts {
     var careItems: [CareDueItem]
     /// Care is a Pro feature (`ProFeature.carePlan`): no plan, no care nudge.
     var carePlanUnlocked: Bool
+    /// When access ends and will not renew (a trial or Pro that is cancelled): no care nudge is
+    /// planned for that moment or later. Nil when access has no end in sight.
+    var carePlanUntil: Date? = nil
 }
 
 struct NudgePlan: Equatable, Sendable {
@@ -156,6 +159,7 @@ enum NudgePolicy {
                 attempts -= 1
                 let day = cal.startOfDay(for: fire)
                 if fire > now, withinHorizon(fire, now, cal),
+                   candidate.kind != .carePlan || facts.carePlanUntil.map({ fire < $0 }) ?? true,
                    !takenDays.contains(day), monthCounts[monthKey(fire, cal), default: 0] < monthlyCap {
                     takenDays.insert(day)
                     monthCounts[monthKey(fire, cal), default: 0] += 1
@@ -204,9 +208,9 @@ enum NudgePolicy {
     static func hoursPerWeek(_ facts: NudgeFacts) -> Int {
         let remaining = max(0, facts.targetHours - facts.yearHours)
         guard remaining > 0 else { return 0 }
-        let daysLeft = max(1, daysInYear(facts) - dayOfYear(facts))
-        let weeksLeft = max(1, Int((Double(daysLeft) / 7).rounded(.up)))
-        return Int((remaining / Double(weeksLeft)).rounded(.up))
+        // Days left over 7, not whole weeks: rounding the weeks up would understate the hours needed.
+        let weeksLeft = Double(max(1, daysInYear(facts) - dayOfYear(facts))) / 7
+        return Int((remaining / weeksLeft).rounded(.up))
     }
 
     /// False when the hours a week still needed to reach the goal exceed `maxReachableHoursPerWeek`.
