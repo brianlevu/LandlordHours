@@ -41,22 +41,23 @@ final class ExportRatingPromptUITests: XCTestCase {
 
     private func openExportAndMakeReport() {
         XCTAssertTrue(app.staticTexts["Reports"].waitForExistence(timeout: 20))
-        let title = app.staticTexts["Export the record"]
-        for _ in 0..<5 where !title.exists {
-            let button = app.buttons["Export report"]
-            if button.waitForExistence(timeout: 3), button.isHittable { button.tap() }
-            _ = title.waitForExistence(timeout: 3)
-        }
-        XCTAssertTrue(title.exists, "export sheet")
         let generate = app.buttons["export.generatePDF"]
+        for _ in 0..<5 where !generate.exists {
+            let button = app.buttons["reports.export"]
+            if button.waitForExistence(timeout: 3), button.isHittable { button.tap() }
+            _ = generate.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(generate.exists, "export sheet")
         var tries = 0
         while !generate.isHittable && tries < 6 { app.swipeUp(); tries += 1 }
         generate.tap()
-        XCTAssertTrue(app.staticTexts["Report ready"].waitForExistence(timeout: 20), "report ready")
+        XCTAssertTrue(app.buttons["export.sharePDF"].waitForExistence(timeout: 20), "report ready")
     }
 
-    /// Shares through the system sheet with "Copy", which reports `completed == true`.
+    /// Shares through the system sheet with "Copy" (the system's own label), which reports `completed == true`.
     private func share(_ button: XCUIElement) {
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: button)
+        XCTAssertEqual(XCTWaiter.wait(for: [hittable], timeout: 10), .completed, "share button is tappable")
         button.tap()
         let copy = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Copy'")).firstMatch
         if !copy.waitForExistence(timeout: 15) {
