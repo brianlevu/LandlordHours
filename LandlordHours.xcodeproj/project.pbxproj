@@ -15,6 +15,7 @@
 		0288240124BEE80CFC6AF84E /* HousePreviewLaunchHook.swift in Sources */ = {isa = PBXBuildFile; fileRef = C019323AC4557CF99AE2FE0F /* HousePreviewLaunchHook.swift */; };
 		02F593E5B95B7BCE066102FF /* OnTheRecordCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E64B6E21AED248CA2261E8 /* OnTheRecordCard.swift */; };
 		03A51EB8A8E2BD88E7F540E3 /* AppViewModel+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D05C18E16E505EEE666FF7CC /* AppViewModel+Capture.swift */; };
+		0580937FFFC14C48C9946A54 /* TwoPaneHooks+Duo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A574490C3223D42A082778C0 /* TwoPaneHooks+Duo.swift */; };
 		070171E84904CCA6A5D5C0D8 /* LHComponentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0B8274FBC9C3C8703637AE /* LHComponentSheet.swift */; };
 		0734B2656BD22434F8A464DC /* FreeRentalSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72912D656759A9020F4006F /* FreeRentalSync.swift */; };
 		07601362A3AE9715A57F65FC /* TodayWindowState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0572D37F073CA07F161C11 /* TodayWindowState.swift */; };
@@ -719,6 +720,7 @@
 		A4AE17C829B162DB047783F7 /* DebugLaunchFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLaunchFixtures.swift; sourceTree = "<group>"; };
 		A53C7FC22D1797C389D87B0A /* TodayIdentityCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayIdentityCard.swift; sourceTree = "<group>"; };
 		A545C4A8D3CE5B08B76CED5F /* OnboardingStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStyle.swift; sourceTree = "<group>"; };
+		A574490C3223D42A082778C0 /* TwoPaneHooks+Duo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TwoPaneHooks+Duo.swift"; sourceTree = "<group>"; };
 		A7C7395BF58AAA18F76C388B /* ClassifierThresholds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierThresholds.swift; sourceTree = "<group>"; };
 		A7E7BE1FCB22BC25EDC53F05 /* EntrySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrySource.swift; sourceTree = "<group>"; };
 		A8516330DDCA2B7CC2050B26 /* LHRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHRow.swift; sourceTree = "<group>"; };
@@ -995,6 +997,7 @@
 				36F4858F7001ACF37C4758BE /* TwoPaneHooks.swift */,
 				CD381F2FB2E8B4F859E1CF49 /* TwoPaneLayout.swift */,
 				65132A1FE488EEF43B8B01AA /* WorkPane.swift */,
+				D2B2C07ED365535AF53FF16B /* Duo */,
 			);
 			path = Adaptive;
 			sourceTree = "<group>";
@@ -1516,6 +1519,14 @@
 				9F18BF8FE9D14E1354831416 /* Nudges */,
 			);
 			path = Services;
+			sourceTree = "<group>";
+		};
+		D2B2C07ED365535AF53FF16B /* Duo */ = {
+			isa = PBXGroup;
+			children = (
+				A574490C3223D42A082778C0 /* TwoPaneHooks+Duo.swift */,
+			);
+			path = Duo;
 			sourceTree = "<group>";
 		};
 		D4B18EE01E45BAD89C52F298 /* Shared */ = {
@@ -2133,6 +2144,7 @@
 				D9E1EEECA18442EF0130E6CF /* TrialReminderScheduler.swift in Sources */,
 				C1FF406C9FE301435BD0A6B4 /* TrialSchedule.swift in Sources */,
 				46DD51E08500F59AAA53DAB9 /* TrialStartView.swift in Sources */,
+				0580937FFFC14C48C9946A54 /* TwoPaneHooks+Duo.swift in Sources */,
 				5DCFCB9C55652F52227FB04F /* TwoPaneHooks.swift in Sources */,
 				EB7583C7D2355AFD371AA2B4 /* TwoPaneLayout.swift in Sources */,
 				8B5415BAF814ABB80005CCA7 /* UserChangeSignal.swift in Sources */,

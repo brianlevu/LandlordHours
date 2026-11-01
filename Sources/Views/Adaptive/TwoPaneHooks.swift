@@ -17,7 +17,8 @@ import SwiftUI
 //
 // Every hook defaults to "nothing", so the iPad build has no Duo code path at all. The hooks are
 // installed with `.twoPaneHooks(_:)` above `TwoPaneLayout`; `TwoPaneHooks.installed` is the value
-// the root uses, and the Duo lane sets it from its own file (`TwoPaneHooks+Duo.swift`).
+// the root uses; it returns `TwoPaneHooks.duo`, defined in `Duo/TwoPaneHooks+Duo.swift`, the one
+// file in this folder the Duo lane owns.
 
 struct TwoPaneHeroContext {
     /// The house shown (nil on "All rentals" and on an empty lot).
@@ -38,9 +39,9 @@ struct TwoPaneHooks {
     /// No hooks: the iPad, and every device until the Duo lane installs its own.
     static let none = TwoPaneHooks()
 
-    /// The hooks the app's root installs. The Duo lane replaces this one value in its own file;
-    /// nothing else in the app reads or writes it.
-    @MainActor static var installed: TwoPaneHooks = .none
+    /// The hooks the app's root installs: the Duo lane's, from `Duo/TwoPaneHooks+Duo.swift` (the one
+    /// file it owns here); `.none` until it fills that file.
+    @MainActor static var installed: TwoPaneHooks { duo }
 }
 
 private struct TwoPaneHooksKey: EnvironmentKey {
