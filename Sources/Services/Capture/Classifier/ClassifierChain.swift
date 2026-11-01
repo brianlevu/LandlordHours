@@ -207,6 +207,9 @@ struct ClassifierChain: CaptureClassifier {
         guard Self.modelKinds.contains(candidate.kind) else { return false }
         // Points away from rental work: nothing the model says brings it back.
         if rulesResult.evidence.contains(ClassifierThresholds.notRentalEvidence) { return false }
+        // 2.3 F: no rental cue, no model call. The model may move an event that has a cue, never
+        // create one (it said "yes" to 1:1s and writing blocks on the office set).
+        if candidate.kind == .calendar, !rulesResult.evidence.contains(ClassifierThresholds.rentalCueEvidence) { return false }
         guard onDevice.availability.isAvailable else { return false }
         if rulesResult.confidence >= ClassifierThresholds.skipModelAbove { return false }
         if rulesResult.confidence <= ClassifierThresholds.skipModelBelow { return false }

@@ -416,4 +416,151 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
         XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(4)], calendar: calendar), "A long day at the rental is not this event")
         XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(1, property: UUID())], calendar: calendar), "Another rental")
     }
+
+    // MARK: - Inbox quiet (2.3 package F): the positive-signal gate
+    //
+    // Synthetic look-alikes of a day job's calendar (inbox-noise report, 2026-11-01). Three context
+    // modes: "full" (a Google work calendar's invite data), "sparse" (nothing but a repeat reaches
+    // the phone) and "exchange" (the work-organizer signal fires too).
+
+    private enum Mode: CaseIterable { case full, sparse, exchange }
+
+    private func context(_ mode: Mode, attendees: Int, recurring: Bool, byOther: Bool = true) -> CalendarContext {
+        let meet = "https://meet.google.com/abc-defg-hij"
+        switch mode {
+        case .full: return CalendarContext(attendeeCount: attendees, url: meet, organizedByOther: byOther, isRecurring: recurring)
+        case .sparse: return CalendarContext(isRecurring: recurring)
+        case .exchange: return CalendarContext(attendeeCount: attendees, url: meet, organizedByOther: byOther, isWorkCalendar: true, isRecurring: recurring)
+        }
+    }
+
+    private struct LookAlike { let title: String; let attendees: Int; let recurring: Bool; let byOther: Bool }
+
+    /// The four shapes from the report: a writing block, a 1:1, a team check-in and a deck review.
+    private let lookAlikes = [
+        LookAlike(title: "Weekly updates writing", attendees: 0, recurring: true, byOther: false),
+        LookAlike(title: "Alex / Jordan", attendees: 2, recurring: true, byOther: true),
+        LookAlike(title: "[PLAT] Orion check-in", attendees: 6, recurring: true, byOther: true),
+        LookAlike(title: "2026 Deck Q4R", attendees: 4, recurring: false, byOther: true),
+    ]
+
+    private func countingYesChain() -> (ClassifierChain, FakeOnDeviceBackend) {
+        let yes = OnDeviceAnswer(isRentalWork: true, category: .repairs, propertyRef: nil, confidence: 0.95, reason: "test")
+        let backend = FakeOnDeviceBackend(answer: yes)
+        return (ClassifierChain(onDevice: OnDeviceClassifier(backend: backend)), backend)
+    }
+
+    /// What the Inbox does with the outcome: the scan's `CalendarVisibility` included.
+    private func shown(_ title: String, location: String? = nil, context: CalendarContext = CalendarContext(),
+                       chain: ClassifierChain? = nil, properties: [RentalProperty]? = nil) async -> Verdict {
+        let c = candidate(title, location: location, context: context)
+        let outcome = await (chain ?? rulesChain()).evaluate(c, properties: properties ?? self.properties)
+        guard let classification = CalendarVisibility.shown(outcome, title: title) else { return .hidden }
+        return classification.confidence >= ClassifierThresholds.likely ? .likely : .notSure
+    }
+
+    func testTheFourLookAlikesStayHiddenInEveryContextMode() async {
+        for shape in lookAlikes {
+            for mode in Mode.allCases {
+                let ctx = context(mode, attendees: shape.attendees, recurring: shape.recurring, byOther: shape.byOther)
+                let rules = await shown(shape.title, context: ctx)
+                let (chain, _) = countingYesChain()
+                let withModelYes = await shown(shape.title, context: ctx, chain: chain)
+                XCTAssertEqual(rules, .hidden, "\(shape.title), \(mode), rules")
+                XCTAssertEqual(withModelYes, .hidden, "\(shape.title), \(mode), model says yes")
+            }
+        }
+    }
+
+    func testAModelYesOnAZeroSignalEventStaysHiddenAndTheModelIsNotAsked() async {
+        for title in ["Status update draft", "Alex / Jordan", "Sam", "Focus time", "Weekly updates writing"] {
+            let (chain, backend) = countingYesChain()
+            let result = await shown(title, context: CalendarContext(isRecurring: true), chain: chain)
+            XCTAssertEqual(result, .hidden, title)
+            XCTAssertTrue(backend.requests.isEmpty, "\(title): no rental cue, so no model call")
+        }
+    }
+
+    func testTheModelStillMovesAnEventThatHasACue() async {
+        // "Install shelves" has a cue (install, 0.6) but no rules signal: the model's "yes" makes it
+        // "Not sure", so it is reachable behind the Not sure row.
+        let (chain, backend) = countingYesChain()
+        let result = await shown("Install shelves", chain: chain)
+        XCTAssertEqual(result, .notSure)
+        XCTAssertEqual(backend.requests.count, 1)
+    }
+
+    func testCheckInAndDeckAloneAreHiddenButCountWhenPaired() async {
+        let (chain, _) = countingYesChain()
+        for alone in ["Team check-in", "Check in", "Deck", "Deck review", "Q4 deck"] {
+            let rules = await shown(alone)
+            let model = await shown(alone, chain: chain)
+            XCTAssertEqual(rules, .hidden, alone)
+            XCTAssertEqual(model, .hidden, "\(alone): pairing-only, a model yes can't create it")
+        }
+        XCTAssertFalse(RulesEngine.hasRentalCue(["keyword: check in"]))
+        XCTAssertFalse(RulesEngine.hasRentalCue(["keyword: deck"]))
+        XCTAssertTrue(RulesEngine.hasRentalCue(["keyword: check in", "keyword: guest"]), "0.5 + 0.8 reaches 1.2")
+        XCTAssertTrue(RulesEngine.hasRentalCue(["keyword: deck", "keyword: repair"]))
+        for paired in ["Guest check in", "Deck repair", "Deck repair at Maple Cottage", "Check in guests at Oak Street Duplex"] {
+            let result = await shown(paired)
+            XCTAssertNotEqual(result, .hidden, paired)
+        }
+    }
+
+    func testInviteSignalsBeatTitleWordsUnderOne() async {
+        let invite = CalendarContext(attendeeCount: 4, organizedByOther: true, isRecurring: true)
+        let (chain, _) = countingYesChain()
+        for weak in ["Install review", "Paint samples", "Patch notes"] {
+            let result = await shown(weak, context: invite, chain: chain)
+            XCTAssertEqual(result, .hidden, weak)
+        }
+        // A word of 1.0 or more still carries the event against the invite.
+        for strong in ["Plumber", "Tenant call", "HOA board", "Lease signing"] {
+            let result = await shown(strong, context: invite)
+            XCTAssertNotEqual(result, .hidden, strong)
+        }
+        // CalendarVisibility brings a skipped event back only for a word of 1.0 or more.
+        XCTAssertFalse(RulesEngine.titleHasLandlordKeyword("Deck"))
+        XCTAssertFalse(RulesEngine.titleHasLandlordKeyword("Window"))
+        XCTAssertTrue(RulesEngine.titleHasLandlordKeyword("Plumber"))
+        XCTAssertTrue(RulesEngine.titleHasLandlordKeyword("Rent review"))
+    }
+
+    func testOneNameWordBesideInviteSignalsIsNotAPropertyMatch() async {
+        let atlas = RentalProperty(name: "Atlas Lofts", address: "9 Ridge Rd, Tempe, AZ", propertyType: .ltr, aliases: ["Q4R"])
+        let invite = CalendarContext(attendeeCount: 6, organizedByOther: true, isRecurring: true)
+        let checkIn = await shown("[PLAT] Atlas check-in", context: invite, properties: [atlas])
+        let deck = await shown("2026 Deck Q4R", context: CalendarContext(attendeeCount: 4, organizedByOther: true), properties: [atlas])
+        XCTAssertEqual(checkIn, .hidden)
+        XCTAssertEqual(deck, .hidden)
+        // Without invite signals the name word still finds the rental, and the full name always does.
+        let sparse = await shown("Atlas plumber", properties: [atlas])
+        let fullName = await shown("Atlas Lofts walkthrough", context: invite, properties: [atlas])
+        XCTAssertNotEqual(sparse, .hidden)
+        XCTAssertNotEqual(fullName, .hidden)
+    }
+
+    func testExistingRentalRowsStayVisibleUnderTheGate() async {
+        // The 2.2 scenarios above keep their verdicts (testScenariosClassifyAsExpected); these are
+        // more of the rental shapes from the synthetic sets, through the scan's visibility.
+        let rental: [(String, String?)] = [
+            ("Plumber", nil), ("Showing - Alex", oakAddress), ("Tenant call", nil), ("HVAC tune up", nil),
+            ("Turnover clean", nil), ("Home Depot receipt", nil), ("Sublet question", nil),
+            ("Work order 12 - kitchen light", nil), ("Lockbox code change", nil), ("Llamada con inquilino", nil),
+            ("Alex", oakAddress), ("Maple Cottage", nil), ("Escrow analysis", nil), ("Airbnb guest check in", nil),
+        ]
+        for (title, location) in rental {
+            let result = await shown(title, location: location)
+            XCTAssertNotEqual(result, .hidden, title)
+        }
+    }
+
+    func testTheModelPromptNoLongerTreatsABareNameAsRentalWork() {
+        let prompt = OnDeviceClassifier.instructions
+        XCTAssertFalse(prompt.contains("titled only with a person"))
+        XCTAssertFalse(prompt.contains("even with no other detail"))
+        for word in ["one-on-ones", "check-ins", "deck"] { XCTAssertTrue(prompt.contains(word), word) }
+    }
 }
+

@@ -383,14 +383,24 @@ final class CalendarCaptureCoordinatorTests: CalendarCaptureTestCase {
         }
     }
 
-    func testOneRecurringOccurrenceDismissedOthersStay() async {
+    /// 2.3 F: "Not rental work" on one occurrence hides the whole series, and a rescan doesn't
+    /// bring any occurrence back. Another reason (a duplicate) still dismisses only that one.
+    func testOneRecurringOccurrenceDismissedHidesTheSeries() async {
         let weekly = (0..<3).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 10), title: "Tenant call") }
         let store = makeStore()
         let coordinator = makeCoordinator(FakeCalendarSource(events: weekly), store: store)
         let first = await coordinator.scanBackfill(properties: [], entries: [])
+        XCTAssertEqual(first.added.count, 3)
         store.dismiss(key: first.added[1].sourceKey, reason: .notLandlordWork)
         _ = await coordinator.scanBackfill(properties: [], entries: [])
-        XCTAssertEqual(store.pending.count, 2)
+        XCTAssertEqual(store.pending.count, 0)
+
+        let duplicateStore = SuggestionStore(userId: profileId + "-dup", baseDirectory: baseDir)
+        let dupCoordinator = makeCoordinator(FakeCalendarSource(events: weekly), store: duplicateStore)
+        let again = await dupCoordinator.scanBackfill(properties: [], entries: [])
+        duplicateStore.dismiss(key: again.added[1].sourceKey, reason: .duplicate)
+        _ = await dupCoordinator.scanBackfill(properties: [], entries: [])
+        XCTAssertEqual(duplicateStore.pending.count, 2)
     }
 
     func testSameEventOnTwoDevicesGetsSameKeyAndEntryId() async {

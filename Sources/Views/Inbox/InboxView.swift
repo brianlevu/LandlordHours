@@ -39,12 +39,27 @@ struct InboxView: View {
     /// The background 90-day look-back (header + streaming rows).
     @ObservedObject private var backfill = BackfillJob.shared
     @ObservedObject private var toasts = LHToastCenter.shared
+    /// 2.3 F: the "Not sure" screen behind the collapsed row is pushed.
+    @State private var showMaybe = false
+    /// 2.3 F: the one-time "Stop checking this calendar?" question, when one is due.
+    @State private var quietPrompt: QuietPrompt?
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    struct QuietPrompt: Equatable {
+        var calendar: CalendarInfo
+        var dismissals: Int
+    }
+
+    /// 2.3 F: "Not sure" items, behind one collapsed row; never in the main list or its count.
+    private var maybe: [Suggestion] { InboxLogic.maybeList(model.suggestions, now: InboxClock.now()) }
+
+    /// Nothing at all to show: no main list, no "Not sure" row, no prompt.
+    private var nothingWaiting: Bool { model.visible.isEmpty && maybe.isEmpty && quietPrompt == nil }
 
     var body: some View {
         NavigationStack {
             Group {
-                if BackfillJob.showsEmptyState(visibleIsEmpty: model.visible.isEmpty, phase: backfill.phase) {
+                if BackfillJob.showsEmptyState(visibleIsEmpty: nothingWaiting, phase: backfill.phase) {
                     emptyState
                 } else {
                     list
@@ -53,6 +68,9 @@ struct InboxView: View {
             }
             // Screen anatomy: the scaffold owns the title, the top inset and the gap to content.
             .lhTabScreen(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
+            .navigationDestination(isPresented: $showMaybe) {
+                InboxMaybeScreen(model: model, onSwipeLog: swipeLog, onDismiss: dismiss)
+            }
         }
         .sheet(item: $model.sheetSuggestion) { suggestion in
             SuggestionConfirmSheet(suggestion: suggestion, model: model)
@@ -66,7 +84,19 @@ struct InboxView: View {
         }
         .sensoryFeedback(.success, trigger: logTick)
         .sensoryFeedback(.impact(weight: .light), trigger: dismissTick)
-        .onAppear { model.reload() }
+        .onAppear {
+            #if DEBUG
+            if InboxDebugSeed.has("-LHInboxQuietPrompt") {
+                // Re-arm: the seeded work calendar is checked and has three "Not rental work" answers.
+                InboxQuietCalendars.setChecked(true, calendarId: "debug-calendar")
+                model.store?.debugSeedQuietPrompt(calendar: "debug-calendar", count: 3)
+            }
+            if InboxDebugSeed.has("-LHInboxOpenMaybe") { showMaybe = true }
+            #endif
+            model.reload()
+            refreshQuietPrompt()
+        }
+        .onReceive(model.$suggestions) { _ in refreshQuietPrompt() }
         #if DEBUG
         .task { await runDebugHooks() }
         #endif
@@ -145,7 +175,17 @@ struct InboxView: View {
                         .transition(.opacity)
             }
             }
-            if model.visible.isEmpty {
+            if let quietPrompt {
+                Section {
+                    InboxQuietCalendarPrompt(calendar: quietPrompt.calendar, dismissals: quietPrompt.dismissals,
+                                             onStop: { answerQuietPrompt(stop: true) },
+                                             onKeep: { answerQuietPrompt(stop: false) })
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+            }
+            if model.visible.isEmpty && maybe.isEmpty {
                 // A stopped or blocked look-back with nothing found: the header above has the
                 // action, this says what the empty list means (no "To confirm · 0" over bare canvas).
                 Section {
@@ -168,7 +208,7 @@ struct InboxView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("inbox.empty.short")
                 }
-            } else {
+            } else if !model.visible.isEmpty {
             Section {
                 ForEach(model.sections) { section in
                     dayHeader(section.day)
@@ -184,6 +224,7 @@ struct InboxView: View {
                     .accessibilityIdentifier("inbox.section.count")
             }
             }
+            if !maybe.isEmpty { maybeSection }
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(LHMetrics.sectionGap)
@@ -210,61 +251,49 @@ struct InboxView: View {
     }
 
     private func row(_ suggestion: Suggestion, isLastOfDay: Bool) -> some View {
-        let propertyName = model.propertyName(for: suggestion)
-        let badges = model.badges(for: suggestion)
-        let quick = model.canQuickLog(suggestion)
-        let limit: InboxRowLimit = model.isWaitingOnPro(suggestion) ? .waiting : (model.needsNewRental(suggestion) ? .newPlace : .none)
-        return SuggestionRowView(
-            suggestion: suggestion,
-            propertyName: propertyName,
-            badges: badges,
-            limit: limit,
-            quick: quick,
-            confirmed: confirming.contains(suggestion.sourceKey),
-            now: InboxClock.now(),
-            onControl: { confirm(suggestion, quick: quick) },
-            onOpen: { model.sheetSuggestion = suggestion },
-            onNotWork: { dismiss(suggestion) }
-        )
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(colors.backgroundSecondary)
-        .listRowSeparator(isLastOfDay ? .hidden : .automatic, edges: .bottom)
-        .alignmentGuide(.listRowSeparatorLeading) { _ in LHRow.actionDividerInset }
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button {
-                swipeLog(suggestion)
-            } label: {
-                Label(quick ? String(localized: "inbox.swipe.confirm", defaultValue: "Confirm", table: "Inbox")
-                            : String(localized: "inbox.swipe.review", defaultValue: "Review", table: "Inbox"),
-                      systemImage: quick ? "checkmark" : "square.and.pencil")
-                    .labelStyle(.iconOnly)
-            }
-            .tint(colors.positive)
-            .accessibilityIdentifier("inbox.swipe.log")
+        InboxDecisionRow(model: model, suggestion: suggestion, isLastOfDay: isLastOfDay,
+                         confirming: confirming.contains(suggestion.sourceKey),
+                         onConfirm: confirm, onSwipeLog: swipeLog, onDismiss: dismiss)
+    }
+
+    /// 2.3 F: one collapsed row for the "Not sure" items, under the To confirm card (§1.4 browse row:
+    /// the whole row is the target and it pushes the list). Not a count of work to confirm.
+    private var maybeSection: some View {
+        Section {
+            LHRow.Browse(title: InboxQuietText.maybeTitle, meta: InboxQuietText.maybeMeta, value: "\(maybe.count)",
+                         systemImage: "questionmark", tint: .neutral, action: { showMaybe = true })
+                .accessibilityHint(InboxQuietText.maybeHint)
+                .accessibilityIdentifier("inbox.maybe.row")
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(colors.backgroundSecondary)
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button {
-                dismiss(suggestion)
-            } label: {
-                Label(String(localized: "inbox.row.notWork", defaultValue: "Not rental work", table: "Inbox"), systemImage: "xmark")
-                    .labelStyle(.iconOnly)
-            }
-            .tint(colors.textSecondary)
-            .accessibilityIdentifier("inbox.swipe.dismiss")
+    }
+
+    private func refreshQuietPrompt() {
+        guard let store = model.store, viewModel.calendarSuggestionsEnabled else {
+            quietPrompt = nil
+            return
         }
-        .contextMenu {
-            if quick {
-                Button { confirm(suggestion, quick: true) } label: {
-                    Label(String(localized: "inbox.menu.confirm", defaultValue: "Confirm", table: "Inbox"), systemImage: "checkmark")
-                }
-            }
-            Button { model.sheetSuggestion = suggestion } label: {
-                Label(String(localized: "inbox.menu.open", defaultValue: "Open", table: "Inbox"), systemImage: "arrow.up.right")
-            }
-            Button { dismiss(suggestion) } label: {
-                Label(String(localized: "inbox.row.notWork", defaultValue: "Not rental work", table: "Inbox"), systemImage: "xmark")
-            }
+        let due = store.calendarsToOfferQuieting(excluded: InboxQuietCalendars.excluded())
+        guard !due.isEmpty else {
+            quietPrompt = nil
+            return
         }
+        let calendars = InboxQuietCalendars.list()
+        quietPrompt = due.lazy.compactMap { id in
+            calendars.first { $0.id == id }.map { QuietPrompt(calendar: $0, dismissals: store.feedback(forCalendar: id).notRental) }
+        }.first
+    }
+
+    private func answerQuietPrompt(stop: Bool) {
+        guard let prompt = quietPrompt else { return }
+        model.store?.markQuietPromptShown(calendar: prompt.calendar.id)
+        if stop {
+            InboxQuietCalendars.apply(checked: false, calendarId: prompt.calendar.id)
+            UIAccessibility.post(notification: .announcement, argument: InboxQuietText.promptStoppedAnnouncement)
+        }
+        withAnimation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse) { quietPrompt = nil }
+        model.reload(animated: true)
     }
 
     /// "Confirm N likely" at the card foot (§1.3 Batch).
@@ -401,6 +430,162 @@ struct InboxView: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.empty")
+    }
+}
+
+// MARK: - One decision row (the To confirm card and the Not sure screen)
+
+/// `SuggestionRowView` with the list chrome and system swipes (§1.3, §1.3a). Shared by the Inbox's
+/// main card and the "Not sure" screen, so both rows decide the same way.
+private struct InboxDecisionRow: View {
+    @ObservedObject var model: InboxViewModel
+    let suggestion: Suggestion
+    let isLastOfDay: Bool
+    let confirming: Bool
+    /// The Not sure screen's title already says it: there the row keeps its category tag
+    /// (visual gate 2026-11-01).
+    var showsNotSureTag = true
+    let onConfirm: (Suggestion, Bool) -> Void
+    let onSwipeLog: (Suggestion) -> Void
+    let onDismiss: (Suggestion) -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var shownBadges: SuggestionBadges {
+        var badges = model.badges(for: suggestion)
+        if !showsNotSureTag { badges.notSure = false }
+        return badges
+    }
+
+    var body: some View {
+        let quick = model.canQuickLog(suggestion)
+        let limit: InboxRowLimit = model.isWaitingOnPro(suggestion) ? .waiting : (model.needsNewRental(suggestion) ? .newPlace : .none)
+        let badges = shownBadges
+        SuggestionRowView(
+            suggestion: suggestion,
+            propertyName: model.propertyName(for: suggestion),
+            badges: badges,
+            limit: limit,
+            quick: quick,
+            confirmed: confirming,
+            now: InboxClock.now(),
+            onControl: { onConfirm(suggestion, quick) },
+            onOpen: { model.sheetSuggestion = suggestion },
+            onNotWork: { onDismiss(suggestion) }
+        )
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(colors.backgroundSecondary)
+        .listRowSeparator(isLastOfDay ? .hidden : .automatic, edges: .bottom)
+        .alignmentGuide(.listRowSeparatorLeading) { _ in LHRow.actionDividerInset }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                onSwipeLog(suggestion)
+            } label: {
+                Label(quick ? String(localized: "inbox.swipe.confirm", defaultValue: "Confirm", table: "Inbox")
+                            : String(localized: "inbox.swipe.review", defaultValue: "Review", table: "Inbox"),
+                      systemImage: quick ? "checkmark" : "square.and.pencil")
+                    .labelStyle(.iconOnly)
+            }
+            .tint(colors.positive)
+            .accessibilityIdentifier("inbox.swipe.log")
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button {
+                onDismiss(suggestion)
+            } label: {
+                Label(String(localized: "inbox.row.notWork", defaultValue: "Not rental work", table: "Inbox"), systemImage: "xmark")
+                    .labelStyle(.iconOnly)
+            }
+            .tint(colors.textSecondary)
+            .accessibilityIdentifier("inbox.swipe.dismiss")
+        }
+        .contextMenu {
+            if quick {
+                Button { onConfirm(suggestion, true) } label: {
+                    Label(String(localized: "inbox.menu.confirm", defaultValue: "Confirm", table: "Inbox"), systemImage: "checkmark")
+                }
+            }
+            Button { model.sheetSuggestion = suggestion } label: {
+                Label(String(localized: "inbox.menu.open", defaultValue: "Open", table: "Inbox"), systemImage: "arrow.up.right")
+            }
+            Button { onDismiss(suggestion) } label: {
+                Label(String(localized: "inbox.row.notWork", defaultValue: "Not rental work", table: "Inbox"), systemImage: "xmark")
+            }
+        }
+    }
+}
+
+// MARK: - The "Not sure" screen (2.3 F)
+
+/// The items behind the collapsed row: the same rows and swipes, grouped by day (§1.15a), in one
+/// card. No batch action: nothing here is sure. Nothing here is counted or notified.
+private struct InboxMaybeScreen: View {
+    @ObservedObject var model: InboxViewModel
+    let onSwipeLog: (Suggestion) -> Void
+    let onDismiss: (Suggestion) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var items: [Suggestion] { InboxLogic.maybeList(model.suggestions, now: InboxClock.now()) }
+
+    private var days: [InboxSection] {
+        let byDay = Dictionary(grouping: items) { Calendar.current.startOfDay(for: $0.start) }
+        return byDay.keys.sorted(by: >).map { InboxSection(day: $0, items: (byDay[$0] ?? []).sorted { $0.start < $1.start }) }
+    }
+
+    var body: some View {
+        List {
+            if items.isEmpty {
+                Section {
+                    Text(InboxQuietText.maybeEmpty)
+                        .font(.body)
+                        .foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .accessibilityIdentifier("inbox.maybe.empty")
+                }
+            } else {
+                Section {
+                    ForEach(days) { day in
+                        LHSectionHeader(InboxFormat.dayHeader(day.day, now: InboxClock.now()), style: .day)
+                            .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(colors.backgroundSecondary)
+                            .listRowSeparator(.hidden)
+                        ForEach(Array(day.items.enumerated()), id: \.element.sourceKey) { index, suggestion in
+                            InboxDecisionRow(model: model, suggestion: suggestion, isLastOfDay: index == day.items.count - 1,
+                                             confirming: false, showsNotSureTag: false,
+                                             onConfirm: { s, _ in model.sheetSuggestion = s },
+                                             onSwipeLog: onSwipeLog, onDismiss: onDismiss)
+                        }
+                    }
+                } header: {
+                    LHSectionHeader(InboxQuietText.maybeSection, count: items.count, leadsList: true)
+                        .textCase(nil)
+                        .accessibilityIdentifier("inbox.maybe.count")
+                } footer: {
+                    Text(InboxQuietText.maybeFooter)
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(LHMetrics.sectionGap)
+        .scrollContentBackground(.hidden)
+        .lhListGutter()
+        .animation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse, value: items.map(\.sourceKey))
+        .background { LHCanvas() }
+        .lhDetailScreen(InboxQuietText.maybeTitle,
+                        back: LHBackAction(label: String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"),
+                                           identifier: "inbox.maybe.back") { dismiss() })
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("inbox.maybe.screen")
     }
 }
 

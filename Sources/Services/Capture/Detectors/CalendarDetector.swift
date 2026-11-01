@@ -40,19 +40,36 @@ final class CalendarDetector: CaptureDetector {
     private let clock: () -> Date
     private let calendar: Calendar
     private let calendarIds: () -> Set<String>?
+    private let excludedCalendars: () -> Set<String>
     private(set) var lastSkipCounts = CalendarSkipCounts()
 
+    /// `calendarIds`: an explicit set to scan (nil: decide from `excludedCalendars`).
+    /// `excludedCalendars`: the calendars the user turned off in Settings › Calendars (2.3 F).
     init(
         source: CalendarEventSource,
         calendarIds: @escaping () -> Set<String>? = { nil },
+        excludedCalendars: @escaping () -> Set<String> = { InboxQuietCalendars.excluded() },
         clock: @escaping () -> Date = Date.init,
         calendar: Calendar = .current
     ) {
         self.calendar = calendar
         self.source = source
         self.calendarIds = calendarIds
+        self.excludedCalendars = excludedCalendars
         self.clock = clock
     }
+
+    /// The calendars a scan reads: the explicit set, else every calendar but the turned-off ones
+    /// (nil when none is off, so a new calendar is checked from the start).
+    func scannedCalendarIds() -> Set<String>? {
+        if let explicit = calendarIds() { return explicit }
+        let excluded = excludedCalendars()
+        guard !excluded.isEmpty else { return nil }
+        return Set(source.calendars().map(\.id)).subtracting(excluded)
+    }
+
+    /// The device's event calendars (Settings › Calendars).
+    func calendars() -> [CalendarInfo] { source.calendars() }
 
     var access: CalendarAccess { source.accessState() }
 
@@ -80,7 +97,7 @@ final class CalendarDetector: CaptureDetector {
         var counts = CalendarSkipCounts()
         var candidates: [CaptureCandidate] = []
 
-        for event in source.events(in: interval, calendarIds: calendarIds()) {
+        for event in source.events(in: interval, calendarIds: scannedCalendarIds()) {
             // Only events that start inside the window; others belong to a neighbouring scan.
             guard event.start >= interval.start, event.start < interval.end else { continue }
             if event.isCanceled { counts.canceled += 1; continue }
@@ -137,5 +154,25 @@ final class CalendarDetector: CaptureDetector {
         }
         lastSkipCounts = counts
         return candidates.sorted { $0.start < $1.start }
+    }
+}
+
+// MARK: - Which calendars are checked (2.3 F)
+//
+// The calendars the user turned off, per profile, on this device only (UserDefaults; never
+// synced). Stored as the OFF set so a calendar added later is checked by default.
+enum InboxQuietCalendars {
+    static let keyPrefix = "LandlordHours.inboxQuiet.excludedCalendars."
+
+    static func excluded(profileId: String? = UserScope.userId, defaults: UserDefaults = .standard) -> Set<String> {
+        guard let profileId else { return [] }
+        return Set(defaults.stringArray(forKey: keyPrefix + profileId) ?? [])
+    }
+
+    static func setChecked(_ checked: Bool, calendarId: String, profileId: String? = UserScope.userId, defaults: UserDefaults = .standard) {
+        guard let profileId else { return }
+        var off = excluded(profileId: profileId, defaults: defaults)
+        if checked { off.remove(calendarId) } else { off.insert(calendarId) }
+        defaults.set(off.sorted(), forKey: keyPrefix + profileId)
     }
 }

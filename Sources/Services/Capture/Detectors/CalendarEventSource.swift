@@ -110,6 +110,47 @@ protocol CalendarEventSource {
     func requestFullAccess() async -> CalendarAccess
     /// Events overlapping `interval`. `calendarIds` nil means every calendar.
     func events(in interval: DateInterval, calendarIds: Set<String>?) -> [CalendarEventSnapshot]
+    /// The event calendars on this device (2.3 F: the Settings › Calendars list).
+    func calendars() -> [CalendarInfo]
+}
+
+extension CalendarEventSource {
+    func calendars() -> [CalendarInfo] { [] }
+}
+
+/// One event calendar, as the Calendars list shows it. Local only.
+struct CalendarInfo: Identifiable, Equatable {
+    var id: String
+    var title: String
+    /// The account it belongs to ("iCloud", "name@company.com").
+    var account: String
+    /// The calendar's colour as sRGB components, for the row's dot.
+    var color: [Double]?
+    var isWork: Bool
+}
+
+// MARK: - Work calendars (2.3 F)
+//
+// 2.2 counted only Exchange as a work calendar, so a day job on Google Workspace never got the
+// "organized by someone else on a work calendar" signal. An account named by an email address
+// whose domain isn't a consumer mail service is a work (or business) account.
+enum WorkCalendarRule {
+    static let consumerDomains: Set<String> = [
+        "gmail.com", "googlemail.com", "icloud.com", "me.com", "mac.com", "yahoo.com", "ymail.com",
+        "outlook.com", "hotmail.com", "live.com", "msn.com", "aol.com", "proton.me", "protonmail.com",
+        "pm.me", "fastmail.com", "fastmail.fm", "hey.com", "zoho.com", "gmx.com", "gmx.net", "gmx.de",
+        "web.de", "yandex.com", "yandex.ru", "mail.com", "comcast.net", "att.net", "verizon.net",
+        "sbcglobal.net", "bellsouth.net", "cox.net", "charter.net", "earthlink.net", "qq.com", "163.com",
+        "naver.com", "yahoo.co.uk", "yahoo.co.jp", "hotmail.co.uk", "outlook.de", "orange.fr", "free.fr",
+    ]
+
+    static func isWork(sourceIsExchange: Bool, accountTitle: String?) -> Bool {
+        if sourceIsExchange { return true }
+        guard let accountTitle, let at = accountTitle.lastIndex(of: "@") else { return false }
+        let domain = accountTitle[accountTitle.index(after: at)...].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard domain.contains("."), !domain.contains(" ") else { return false }
+        return !consumerDomains.contains(domain)
+    }
 }
 
 /// Production adapter over EventKit (iOS 17+).
@@ -139,6 +180,22 @@ final class EventKitCalendarSource: CalendarEventSource {
         return accessState()
     }
 
+    static func isWork(_ calendar: EKCalendar) -> Bool {
+        WorkCalendarRule.isWork(sourceIsExchange: calendar.type == .exchange || calendar.source?.sourceType == .exchange,
+                                accountTitle: calendar.source?.title)
+    }
+
+    func calendars() -> [CalendarInfo] {
+        guard accessState().canReadEvents else { return [] }
+        return store.calendars(for: .event).map { calendar in
+            let components = calendar.cgColor.flatMap { $0.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil)?.components }
+            return CalendarInfo(id: calendar.calendarIdentifier, title: calendar.title,
+                                account: calendar.source?.title ?? "", color: components.map { $0.map(Double.init) },
+                                isWork: Self.isWork(calendar))
+        }
+        .sorted { ($0.account, $0.title) < ($1.account, $1.title) }
+    }
+
     func events(in interval: DateInterval, calendarIds: Set<String>?) -> [CalendarEventSnapshot] {
         guard accessState().canReadEvents else { return [] }
         var calendars: [EKCalendar]?
@@ -160,8 +217,7 @@ final class EventKitCalendarSource: CalendarEventSource {
             // Rooms, resources and groups are not people on the invite.
             let people = attendees.filter { $0.participantType == .person || $0.participantType == .unknown }.count
             let organizedByOther = event.organizer.map { !$0.isCurrentUser } ?? false
-            let source = event.calendar.source
-            let isWork = event.calendar.type == .exchange || source?.sourceType == .exchange
+            let isWork = Self.isWork(event.calendar)
             return CalendarEventSnapshot(
                 externalId: sharedId,
                 eventIdentifier: event.eventIdentifier,

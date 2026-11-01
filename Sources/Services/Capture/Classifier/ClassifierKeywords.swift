@@ -58,6 +58,11 @@ enum ClassifierKeywords {
         .init("lease",              2.5, .leasing),
         .init("leasing",            2.5, .leasing),
         .init("sublease",           2.5, .leasing),
+        // 2.3 F: cues only the model caught on the hard set (inbox-noise report §3).
+        .init("sublet",             2.0, .leasing),
+        .init("inquilin",           2.5, .leasing, categoryWeight: 1),   // inquilino/a(s): tenant
+        .init("arrendatari",        2.5, .leasing, categoryWeight: 1),   // arrendatario/a(s): tenant
+        .init("lockbox",            1.5, .leasing),
         .init("rent",               2.5, .leasing, wholeWord: true),
         .init("rents",              2.5, .leasing, wholeWord: true),
         .init("rental",             2.5, .leasing, categoryWeight: 0.5),
@@ -119,6 +124,9 @@ enum ClassifierKeywords {
         .init("property management", 2.5, .management, categoryWeight: 3),
         .init("manage",             1.0, .management),
         .init("maintenance request", 2.0, .management, categoryWeight: 4),
+        .init("work order",         2.0, .repairs, categoryWeight: 2),
+        .init("wo",                 0.8, .repairs, wholeWord: true),       // "WO #77": a work order number
+        .init("gc",                 0.8, .renovations, wholeWord: true),   // general contractor; under 1.0, so an invite beats it
         .init("pest",               1.5, .repairs),
         .init("exterminat",         1.5, .repairs),
         .init("landscap",           1.2, .repairs),
@@ -265,6 +273,7 @@ enum ClassifierKeywords {
         .init("loan",               0.8, .financing),
         .init("appraisal",          1.5, .financing, categoryWeight: 3),
         .init("closing",            1.0, .financing),
+        .init("escrow",             1.0, .financing, categoryWeight: 2),
 
         // Investing (investor-level)
         .init("deal",               0.8, .investing, categoryWeight: 1.5),

@@ -249,10 +249,11 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(rules("Check for mold", kind: .calendar).band, .notSure)
         XCTAssertEqual(rules("Lunch near Oak Street Duplex", kind: .calendar).band, .notSure)
 
-        // A model "yes" rescues an item into "Not sure" only at confidence >= 0.5.
+        // A model "yes" rescues an item into "Not sure" only at confidence >= 0.5, and (2.3 F) only
+        // when the rules found a rental cue ("install", 0.6): it can move an item, never create one.
         let weakYes = ClassifierChain(onDevice: OnDeviceClassifier(backend: FakeOnDeviceBackend(answer: answer(true, 0.45))))
         let strongYes = ClassifierChain(onDevice: OnDeviceClassifier(backend: FakeOnDeviceBackend(answer: answer(true, 0.6))))
-        let title = "Prep paperwork for Friday"
+        let title = "Install shelves for Friday"
         let a = await weakYes.classify(candidate(title), properties: properties)
         let b = await strongYes.classify(candidate(title), properties: properties)
         XCTAssertEqual(a.band, .unlikely)
@@ -272,8 +273,8 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(viaChain.tier, .rules)
         _ = try await chain.classifyBatch([email, candidate("Vrbo: Payout sent", kind: .gmail)], properties: properties)
         XCTAssertTrue(backend.requests.isEmpty, "Gmail stays rules-only until the v2 prompt and aliases are validated")
-        // Calendar still asks the model.
-        _ = await chain.classify(candidate("Prep paperwork for Friday"), properties: properties)
+        // Calendar still asks the model (about an event with a rental cue, 2.3 F).
+        _ = await chain.classify(candidate("Install shelves for Friday"), properties: properties)
         XCTAssertEqual(backend.requests.count, 1)
     }
 

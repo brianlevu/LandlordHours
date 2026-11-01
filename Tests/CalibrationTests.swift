@@ -98,13 +98,23 @@ final class CalibrationTests: XCTestCase {
         _ fixture: CalibrationFixture,
         split: String?,
         likely: Double = ClassifierThresholds.likely,
+        kind: Suggestion.Kind = .gmail,
         classify: (CaptureCandidate, [RentalProperty]) async -> CaptureClassification
     ) async -> CalibrationScore {
         let byKey = fixture.rentalProperties()
         let list = fixture.properties.compactMap { byKey[$0.key] }
         var s = CalibrationScore()
         for item in fixture.items where split == nil || item.split == split {
-            let c = await classify(candidate(item.title, kind: .gmail, location: item.location), list)
+            let probe = candidate(item.title, kind: kind, location: item.location)
+            var c = await classify(probe, list)
+            if kind == .calendar {
+                // What the calendar scan shows: the chain's band, then `CalendarVisibility` (2.3 F).
+                let outcome: ClassifierOutcome = c.band == .unlikely ? .skip(c) : .suggest(c)
+                if let shown = CalendarVisibility.shown(outcome, title: item.title) { c = shown } else {
+                    c.confidence = min(c.confidence, ClassifierThresholds.notSure - 0.01)
+                    c.evidence.append(ClassifierThresholds.notRentalEvidence)
+                }
+            }
             let saysYes = c.confidence >= likely
             s.total += 1
             if saysYes == item.landlord { s.correct += 1 }
@@ -152,33 +162,60 @@ final class CalibrationTests: XCTestCase {
         }
         print(String(format: "CALIBRATION best likely=%.2f acc=%.3f (committed %.2f)", best.threshold, best.accuracy, ClassifierThresholds.likely))
 
-        // The committed thresholds must keep meeting their targets on all data and held-out data.
+        // Score every split FIRST, then assert in one synchronous block. On Xcode 27 an XCTest
+        // failure recorded after a real `await` suspension is silently dropped once the test has
+        // already failed (probed 2026-10-31: the first failure records, later ones after a
+        // suspension vanish). That hid the old "within 0.02 of best" guard for as long as another
+        // assertion was red, so no assertion below may follow an `await`.
         let all = await score(fixture, split: nil, classify: classify)
         let holdout = await score(fixture, split: "holdout", classify: classify)
-        XCTAssertGreaterThanOrEqual(all.precision, ClassifierThresholds.targetPrecisionAtLikely)
-        XCTAssertGreaterThanOrEqual(all.accuracy, ClassifierThresholds.targetAccuracyAtLikely)
-        XCTAssertGreaterThanOrEqual(all.visibleRecall, ClassifierThresholds.targetVisibleRecall)
-        XCTAssertGreaterThanOrEqual(holdout.accuracy, ClassifierThresholds.targetAccuracyAtLikely)
-        XCTAssertGreaterThanOrEqual(holdout.precision, ClassifierThresholds.targetPrecisionAtLikely)
-        XCTAssertGreaterThanOrEqual(all.propertyAccuracy, 0.9)
-        // Category floors (asserted, not just printed).
         let tuning = await score(fixture, split: "tuning", classify: classify)
-        XCTAssertGreaterThanOrEqual(tuning.categoryAccuracy, ClassifierThresholds.targetRulesCategoryTuning, "rules category, tuning")
-        XCTAssertGreaterThanOrEqual(holdout.categoryAccuracy, ClassifierThresholds.targetRulesCategoryHoldout, "rules category, held-out")
         // Classifier v2: the synthetic real-world failure patterns (platform marketing, mailing
         // lists, social events at an owner-occupied home, street collisions, alias matches).
         let realworld = await score(fixture, split: "realworld", classify: classify)
+        let deals = await score(fixture, split: "deals", classify: classify)
+        // 2.3 F: the same titles as calendar events through the positive-signal gate and the scan's
+        // visibility (no invite data: the gate and the D2 rescue are what changes). Printed for the
+        // record; floors below.
+        let calendarAll = await score(fixture, split: nil, kind: .calendar, classify: classify)
+        let calendarHoldout = await score(fixture, split: "holdout", kind: .calendar, classify: classify)
+        print("CALIBRATION rules(calendar, gate) split=all \(calendarAll.summary)")
+        print("CALIBRATION rules(calendar, gate) split=holdout \(calendarHoldout.summary)")
+
+        // The committed thresholds must keep meeting their targets on all data and held-out data.
+        // `likely` is 0.70 for fewer false suggestions (owner's call, 2026-10-27), so accuracy and
+        // recall sit below the 0.60 values (0.955 / 0.933). Precision is where the choice pays and
+        // it is NOT relaxed; see the targets' notes in ClassifierThresholds.
+        XCTAssertGreaterThanOrEqual(all.precision, ClassifierThresholds.targetPrecisionAtLikely, "precision, all data")
+        XCTAssertGreaterThanOrEqual(all.accuracy, ClassifierThresholds.targetAccuracyAtLikely, "accuracy, all data")
+        XCTAssertGreaterThanOrEqual(all.recall, ClassifierThresholds.targetRecallAtLikely, "recall, all data")
+        XCTAssertGreaterThanOrEqual(all.visibleRecall, ClassifierThresholds.targetVisibleRecall, "visible recall, all data")
+        XCTAssertGreaterThanOrEqual(holdout.accuracy, ClassifierThresholds.targetAccuracyHoldoutAtLikely, "accuracy, held-out")
+        XCTAssertGreaterThanOrEqual(holdout.precision, ClassifierThresholds.targetPrecisionAtLikely, "precision, held-out")
+        XCTAssertGreaterThanOrEqual(all.propertyAccuracy, 0.9)
+        // Category floors (asserted, not just printed).
+        XCTAssertGreaterThanOrEqual(tuning.categoryAccuracy, ClassifierThresholds.targetRulesCategoryTuning, "rules category, tuning")
+        XCTAssertGreaterThanOrEqual(holdout.categoryAccuracy, ClassifierThresholds.targetRulesCategoryHoldout, "rules category, held-out")
         XCTAssertGreaterThanOrEqual(realworld.precision, ClassifierThresholds.targetPrecisionAtLikely, "real-world patterns precision")
         XCTAssertGreaterThanOrEqual(realworld.visibleRecall, ClassifierThresholds.targetVisibleRecall, "real-world patterns visible recall")
         XCTAssertGreaterThanOrEqual(realworld.propertyAccuracy, 0.9, "real-world patterns property")
         // Deal titles (buy, sell, finance, negotiate): every one gets its non-countable category.
         // (Two of the 14 have no landlord keyword and stay hidden; that is a recall gap, not a
         // counting error.)
-        let deals = await score(fixture, split: "deals", classify: classify)
         XCTAssertEqual(deals.categoryAccuracy, 1, "deal titles get their non-countable category")
-        // The committed value must sit within 0.02 of the best accuracy on the sweep.
-        XCTAssertGreaterThanOrEqual(all.accuracy, best.accuracy - 0.02)
+        XCTAssertGreaterThan(deals.landlord, 0, "the deals split must exist, or the line above is vacuous")
+        // What the precision choice may cost: the committed value must sit within
+        // `maxAccuracyGivenUpForPrecision` of the best accuracy on the sweep. (The old 0.02 could
+        // never hold at 0.70: the sweep's best is 0.968 at 0.25, 0.045 above the committed 0.923.)
+        XCTAssertLessThanOrEqual(best.accuracy - all.accuracy, ClassifierThresholds.maxAccuracyGivenUpForPrecision,
+                                 "accuracy given up for precision (best \(best.accuracy) at \(best.threshold))")
         XCTAssertLessThan(ClassifierThresholds.notSure, ClassifierThresholds.likely)
+        // 2.3 F calendar path. Precision keeps the shared target; visible recall (main list or Not
+        // sure) has its own floor, see `targetCalendarVisibleRecall`.
+        XCTAssertGreaterThanOrEqual(calendarAll.precision, ClassifierThresholds.targetPrecisionAtLikely, "calendar precision, all data")
+        XCTAssertGreaterThanOrEqual(calendarHoldout.precision, ClassifierThresholds.targetPrecisionAtLikely, "calendar precision, held-out")
+        XCTAssertGreaterThanOrEqual(calendarAll.visibleRecall, ClassifierThresholds.targetCalendarVisibleRecall, "calendar visible recall, all data")
+        XCTAssertGreaterThan(calendarAll.landlord, 0)
     }
 
     /// Runs Apple's on-device model over the fixture when this simulator/device has it.
@@ -236,13 +273,14 @@ final class CalibrationTests: XCTestCase {
         }
         let heldAccuracy = Double(heldCategory) / Double(max(heldLandlord, 1))
         print(String(format: "CALIBRATION model-only holdout category=%.3f", heldAccuracy))
-        XCTAssertGreaterThanOrEqual(heldAccuracy, ClassifierThresholds.targetModelCategoryHoldout)
         // The model must not make shipped calendar suggestions worse than rules alone.
         let rulesHoldout = await score(fixture, split: "holdout") { c, props in
             var cal = c
             cal.kind = .calendar
             return await RulesClassifier().classify(cal, properties: props)
         }
+        // Every assertion after the last `await` (Xcode 27 drops post-await failures once a test failed).
+        XCTAssertGreaterThanOrEqual(heldAccuracy, ClassifierThresholds.targetModelCategoryHoldout)
         XCTAssertGreaterThanOrEqual(chainHoldout.precision, rulesHoldout.precision, "chain precision vs rules, held-out")
         XCTAssertGreaterThanOrEqual(chainHoldout.propertyAccuracy, rulesHoldout.propertyAccuracy - 0.05, "chain property vs rules, held-out")
         XCTAssertGreaterThanOrEqual(chainHoldout.visibleRecall, ClassifierThresholds.targetVisibleRecall)

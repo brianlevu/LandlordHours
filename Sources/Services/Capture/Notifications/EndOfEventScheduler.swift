@@ -29,9 +29,9 @@ final class EndOfEventScheduler: CaptureNotifier {
         var quietStartHour = 21
         var quietEndHour = 8
         var delayAfterEnd: TimeInterval = 5 * 60
-        /// Same value as WP2's `ClassifierThresholds.likely`; switch to that constant once the
-        /// classifier is merged into release/2.0.
-        var likelyThreshold = 0.60
+        /// The classifier's "likely" line. Below it an item is "Not sure" (2.3 F): it sits behind the
+        /// Inbox's collapsed row and is never notified. (Was a 0.60 copy, which let 0.60–0.70 items ping.)
+        var likelyThreshold = ClassifierThresholds.likely
     }
 
     nonisolated static let identifierPrefix = "capture.end."
