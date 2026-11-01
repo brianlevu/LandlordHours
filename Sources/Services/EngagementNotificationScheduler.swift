@@ -352,7 +352,7 @@ enum NudgeDebug {
             (NudgeCopy.care(rental: "Pine Cabin", item: "Clear the gutters"), NudgeNotification.careThread, delay + 3)
         ]
         // Start clean: earlier runs must not stack behind the two samples.
-        center.removeAllDeliveredNotifications()
+        center.removeDeliveredNotifications(withIdentifiers: ["debug.nudge.sample.weeklyPace", "debug.nudge.sample.carePlan"])
         // Built by the real request builder, so the sample is what the scheduler would send.
         for (index, note) in notes.enumerated() {
             let kind: NudgeKind = index == 0 ? .weeklyPace : .carePlan
