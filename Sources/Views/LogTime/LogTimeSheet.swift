@@ -139,6 +139,15 @@ struct LogTimeSheet: View {
             } footer: {
                 footerContent
             }
+            .task {
+                // A care row at accessibility sizes: How long and its chips would sit below the fold,
+                // so bring them up (what's left to fill is the hours).
+                guard case .care = route, isAX else { return }
+                try? await Task.sleep(for: .milliseconds(450))
+                withAnimation(reduceMotion ? AppAnimation.reduced : AppAnimation.reveal) {
+                    proxy.scrollTo(LogField.hours.rowID, anchor: .center)
+                }
+            }
             .onChange(of: expanded) { _, field in
                 guard let field else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
