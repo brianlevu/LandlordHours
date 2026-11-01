@@ -69,7 +69,7 @@ final class SurfacesNotificationUITests: XCTestCase {
         let scheme = ProcessInfo.processInfo.environment["LH_SCHEME"] ?? "light"
         let app = XCUIApplication()
         app.launchArguments = [
-            "-LHMockScenario", "occasional", "-LHNudgeFireSamples", "1", "-LHDebugNotificationDelay", "10",
+            "-LHMockScenario", "occasional", "-LHNudgeFireSamples", "1", "-LHDebugNotificationDelay", "16",
             "-LHColorScheme", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()

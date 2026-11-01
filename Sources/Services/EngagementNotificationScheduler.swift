@@ -232,7 +232,11 @@ final class NudgeScheduler {
         // stays never leaves the pending list (a nudge due while we rebuild is not lost). Only
         // requests the new plan no longer holds are removed.
         let planIDs = Set(output.plans.map(\.id))
-        center.removePending(identifiers: Array(pendingIDs.subtracting(planIDs)))
+        // Care comes from a source that is empty until Today has appeared in this launch. While it
+        // is unready its silence must not cancel a care nudge that is already pending.
+        let keepCare = settings.carePlan && facts.carePlanUnlocked && !facts.careSourceReady
+        let keptCareIDs = keepCare ? pendingIDs.filter { $0.hasPrefix("\(NudgePolicy.idPrefix)\(NudgeKind.carePlan.rawValue).") } : []
+        center.removePending(identifiers: Array(pendingIDs.subtracting(planIDs).subtracting(keptCareIDs)))
         var added: [NudgePlan] = []
         for plan in output.plans {
             do {
@@ -244,8 +248,11 @@ final class NudgeScheduler {
         }
         // Only what the system accepted counts toward the daily and monthly caps.
         let addedKeys = Set(added.map { "\($0.kind.rawValue)|\($0.itemID)|\($0.fireDate.timeIntervalSince1970)" })
-        let kept = output.ledger.filter { entry in
+        var kept = output.ledger.filter { entry in
             entry.fireDate <= moment || addedKeys.contains("\(entry.kind.rawValue)|\(entry.itemID)|\(entry.fireDate.timeIntervalSince1970)")
+        }
+        if !keptCareIDs.isEmpty {
+            kept += store.loadLedger().filter { $0.kind == .carePlan && $0.fireDate > moment }
         }
         store.saveLedger(kept)
         for plan in added where !pendingIDs.contains(plan.id) {
@@ -301,7 +308,8 @@ final class NudgeScheduler {
             yearHours: yearHours, targetHours: context.targetHours,
             careItems: care,
             carePlanUnlocked: EntitlementStore.shared.plan.allows(.carePlan),
-            carePlanUntil: careAccessEnd(EntitlementStore.shared.plan)
+            carePlanUntil: careAccessEnd(EntitlementStore.shared.plan),
+            careSourceReady: !CareDue.snapshot.rentals.isEmpty
         )
     }
 

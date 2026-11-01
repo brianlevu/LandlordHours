@@ -345,6 +345,7 @@ final class NudgeSchedulerTests: XCTestCase {
     private var scope = "profile-a"
     private var proUnlocked = true
     private var careUntil: Date?
+    private var careReady = true
 
     override func setUp() async throws {
         suiteName = "nudge-tests-\(UUID().uuidString)"
@@ -355,6 +356,7 @@ final class NudgeSchedulerTests: XCTestCase {
         scope = "profile-a"
         proUnlocked = true
         careUntil = nil
+        careReady = true
     }
 
     override func tearDown() async throws {
@@ -370,7 +372,8 @@ final class NudgeSchedulerTests: XCTestCase {
         NudgeScheduler(center: center, store: store ?? makeStore(), now: { [unowned self] in self.clock }, calendar: { utc },
                        facts: { [unowned self] now, cal in
                            NudgeFacts(now: now, calendar: cal, rentals: [pine, lake], yearHours: 500, targetHours: 750,
-                                      careItems: self.care, carePlanUnlocked: self.proUnlocked, carePlanUntil: self.careUntil)
+                                      careItems: self.care, carePlanUnlocked: self.proUnlocked, carePlanUntil: self.careUntil,
+                                      careSourceReady: self.careReady)
                        },
                        profileID: { [unowned self] in self.scope })
     }
@@ -467,6 +470,38 @@ final class NudgeSchedulerTests: XCTestCase {
         await scheduler.rebuild(reason: "foreground")
         XCTAssertEqual(Set(center.pending.keys), before)
         XCTAssertTrue(center.removed.isEmpty, "nothing that stays was removed: \(center.removed)")
+    }
+
+    /// Review finding: a cold launch runs before Today's care slot fills package B's source, so the
+    /// source is briefly empty. That silence must not cancel a care nudge that is already pending.
+    func testAnUnreadyCareSourceLeavesPendingCareNudgesAlone() async {
+        care = [gutters()]
+        turnOn(.weeklyPace, .carePlan)
+        let scheduler = makeScheduler()
+        await scheduler.rebuild(reason: "foreground")
+        let careIDs = Set(center.pending.keys.filter { $0.hasPrefix("nudge.carePlan.") })
+        XCTAssertEqual(careIDs.count, 1)
+
+        care = []; careReady = false                      // cold launch: the source has nothing yet
+        var scheduled = 0
+        Analytics.testSpy = { name, _ in if name == "nudge_scheduled" { scheduled += 1 } }
+        await scheduler.rebuild(reason: "launch")
+        XCTAssertEqual(Set(center.pending.keys.filter { $0.hasPrefix("nudge.carePlan.") }), careIDs, "care stays pending")
+        XCTAssertEqual(scheduled, 0)
+
+        care = []; careReady = true                       // ready and really nothing due: now it goes
+        await scheduler.rebuild(reason: "foreground")
+        XCTAssertTrue(center.pending.keys.filter { $0.hasPrefix("nudge.carePlan.") }.isEmpty)
+    }
+
+    func testAnUnreadyCareSourceDoesNotKeepCareForSomeoneWhoTurnedItOffOrLostPro() async {
+        care = [gutters()]
+        turnOn(.weeklyPace, .carePlan)
+        let scheduler = makeScheduler()
+        await scheduler.rebuild(reason: "foreground")
+        care = []; careReady = false; proUnlocked = false
+        await scheduler.rebuild(reason: "launch")
+        XCTAssertTrue(center.pending.keys.filter { $0.hasPrefix("nudge.carePlan.") }.isEmpty, "no Pro, no care nudge")
     }
 
     func testSurvivesRelaunch() async {

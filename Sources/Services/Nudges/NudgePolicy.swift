@@ -31,6 +31,9 @@ struct NudgeFacts {
     /// When access ends and will not renew (a trial or Pro that is cancelled): no care nudge is
     /// planned for that moment or later. Nil when access has no end in sight.
     var carePlanUntil: Date? = nil
+    /// False until package B's care source has been filled in this launch (Today's care slot has
+    /// appeared). An unready source says nothing, which is not the same as "nothing is due".
+    var careSourceReady: Bool = true
 }
 
 struct NudgePlan: Equatable, Sendable {
