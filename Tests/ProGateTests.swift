@@ -471,12 +471,25 @@ final class InboxAtLimitViewModelTests: CaptureTestCase {
 /// otherwise, on a freshly created simulator, the host app's launch-time calls bound it to the
 /// Sandbox store, `buyProduct` came back as transaction 0 that never reached the app, and
 /// `AppStore.sync()` waited on a sign-in forever.
+///
+/// Never call `resetToDefaultState()` on it between tests. A purchase made right after a reset
+/// can be lost: storekitd holds the transaction (`allTransactions()`), but the app never sees it
+/// (not in `Transaction.all`, `latest` or `unfinished`, 10 s later), so the founding purchase in
+/// SubscriptionStoreKitTests stayed free. Probes lost 9 of 360 purchases made after a reset and
+/// 1 of 1,600 without one. The few settings tests change are set back by name here and in each
+/// class's tearDown instead.
 enum SharedStoreKitTestSession {
     nonisolated(unsafe) private static var shared: SKTestSession?
     @MainActor
     static func session() throws -> SKTestSession {
         if let shared { return shared }
         let made = try SKTestSession(configurationFileNamed: "LandlordHours")
+        // A crashed earlier run on this simulator can leave these on.
+        made.disableDialogs = true
+        made.askToBuyEnabled = false
+        made.failTransactionsEnabled = false
+        made.timeRate = .realTime
+        made.clearTransactions()
         shared = made
         SubscriptionManager.shared.attachStoreKit()
         return made
@@ -494,7 +507,6 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         // one, detaches the StoreKit test environment, so later purchases come back empty
         // (transaction id 0) and the suite turned order-dependent.
         session = try SharedStoreKitTestSession.session()
-        session.resetToDefaultState()
         session.disableDialogs = true
         session.clearTransactions()
         resetScoped()

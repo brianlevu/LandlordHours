@@ -19,8 +19,8 @@ final class SubscriptionStoreKitTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         session = try SharedStoreKitTestSession.session()
-        session.resetToDefaultState()
         session.disableDialogs = true
+        session.timeRate = .realTime
         session.clearTransactions()
         suite = "sub-storekit-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
@@ -77,7 +77,13 @@ final class SubscriptionStoreKitTests: XCTestCase {
         defer { session.timeRate = .realTime }
         let fact = try await buy(ProductIDs.yearly)
         try session.disableAutoRenewForTransaction(identifier: UInt(fact.transactionID))
-        let cancelled = await client.renewalState(for: ProductIDs.yearly)
+        // The cancel reaches the app's renewal info a moment later, as the purchase does.
+        var cancelled = await client.renewalState(for: ProductIDs.yearly)
+        let deadline = Date().addingTimeInterval(5)
+        while cancelled?.willAutoRenew != false && Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            cancelled = await client.renewalState(for: ProductIDs.yearly)
+        }
         XCTAssertEqual(cancelled?.willAutoRenew, false, "a cancelled trial maps to willAutoRenew false")
         let plan = await waitForPlan(makeStore(), seconds: 15) { $0 == .free }
         let renewal = await client.renewalState(for: ProductIDs.yearly)
@@ -107,8 +113,20 @@ final class SubscriptionStoreKitTests: XCTestCase {
         XCTAssertEqual(plan, .free)
     }
 
+    /// Buys, then waits until the app sees the purchase. `buyProduct` returns before the
+    /// transaction reaches `Transaction.latest` (it was still nil 10–30 ms later in most runs), so
+    /// a read straight after it, like the lapsed test's renewal state, saw nothing.
     private func buy(_ id: String) async throws -> EntitlementFact {
-        StoreKit2Client.fact(try await session.buyProduct(identifier: id))
+        let fact = StoreKit2Client.fact(try await session.buyProduct(identifier: id))
+        let deadline = Date().addingTimeInterval(5)
+        while await client.latestTransaction(for: id)?.transactionID != fact.transactionID {
+            guard Date() < deadline else {
+                XCTFail("purchase \(fact.transactionID) of \(id) never reached the app")
+                return fact
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return fact
     }
 
     /// StoreKit test actions land asynchronously; poll briefly.
