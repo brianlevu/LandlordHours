@@ -87,6 +87,8 @@ struct InboxView: View {
         .onAppear {
             #if DEBUG
             if InboxDebugSeed.has("-LHInboxQuietPrompt") {
+                // Re-arm: the seeded work calendar is checked and has three "Not rental work" answers.
+                InboxQuietCalendars.setChecked(true, calendarId: "debug-calendar")
                 model.store?.debugSeedQuietPrompt(calendar: "debug-calendar", count: 3)
             }
             if InboxDebugSeed.has("-LHInboxOpenMaybe") { showMaybe = true }

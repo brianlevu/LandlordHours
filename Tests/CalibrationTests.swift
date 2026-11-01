@@ -98,13 +98,23 @@ final class CalibrationTests: XCTestCase {
         _ fixture: CalibrationFixture,
         split: String?,
         likely: Double = ClassifierThresholds.likely,
+        kind: Suggestion.Kind = .gmail,
         classify: (CaptureCandidate, [RentalProperty]) async -> CaptureClassification
     ) async -> CalibrationScore {
         let byKey = fixture.rentalProperties()
         let list = fixture.properties.compactMap { byKey[$0.key] }
         var s = CalibrationScore()
         for item in fixture.items where split == nil || item.split == split {
-            let c = await classify(candidate(item.title, kind: .gmail, location: item.location), list)
+            let probe = candidate(item.title, kind: kind, location: item.location)
+            var c = await classify(probe, list)
+            if kind == .calendar {
+                // What the calendar scan shows: the chain's band, then `CalendarVisibility` (2.3 F).
+                let outcome: ClassifierOutcome = c.band == .unlikely ? .skip(c) : .suggest(c)
+                if let shown = CalendarVisibility.shown(outcome, title: item.title) { c = shown } else {
+                    c.confidence = min(c.confidence, ClassifierThresholds.notSure - 0.01)
+                    c.evidence.append(ClassifierThresholds.notRentalEvidence)
+                }
+            }
             let saysYes = c.confidence >= likely
             s.total += 1
             if saysYes == item.landlord { s.correct += 1 }
@@ -164,6 +174,13 @@ final class CalibrationTests: XCTestCase {
         // lists, social events at an owner-occupied home, street collisions, alias matches).
         let realworld = await score(fixture, split: "realworld", classify: classify)
         let deals = await score(fixture, split: "deals", classify: classify)
+        // 2.3 F: the same titles as calendar events through the positive-signal gate and the scan's
+        // visibility (no invite data: the gate and the D2 rescue are what changes). Printed for the
+        // record; floors below.
+        let calendarAll = await score(fixture, split: nil, kind: .calendar, classify: classify)
+        let calendarHoldout = await score(fixture, split: "holdout", kind: .calendar, classify: classify)
+        print("CALIBRATION rules(calendar, gate) split=all \(calendarAll.summary)")
+        print("CALIBRATION rules(calendar, gate) split=holdout \(calendarHoldout.summary)")
 
         // The committed thresholds must keep meeting their targets on all data and held-out data.
         // `likely` is 0.70 for fewer false suggestions (owner's call, 2026-10-27), so accuracy and
@@ -193,6 +210,12 @@ final class CalibrationTests: XCTestCase {
         XCTAssertLessThanOrEqual(best.accuracy - all.accuracy, ClassifierThresholds.maxAccuracyGivenUpForPrecision,
                                  "accuracy given up for precision (best \(best.accuracy) at \(best.threshold))")
         XCTAssertLessThan(ClassifierThresholds.notSure, ClassifierThresholds.likely)
+        // 2.3 F calendar path. Precision keeps the shared target; visible recall (main list or Not
+        // sure) has its own floor, see `targetCalendarVisibleRecall`.
+        XCTAssertGreaterThanOrEqual(calendarAll.precision, ClassifierThresholds.targetPrecisionAtLikely, "calendar precision, all data")
+        XCTAssertGreaterThanOrEqual(calendarHoldout.precision, ClassifierThresholds.targetPrecisionAtLikely, "calendar precision, held-out")
+        XCTAssertGreaterThanOrEqual(calendarAll.visibleRecall, ClassifierThresholds.targetCalendarVisibleRecall, "calendar visible recall, all data")
+        XCTAssertGreaterThan(calendarAll.landlord, 0)
     }
 
     /// Runs Apple's on-device model over the fixture when this simulator/device has it.

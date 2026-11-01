@@ -137,11 +137,20 @@ final class InboxQuietUITests: XCTestCase {
         XCTAssertTrue(scrollTo(calendars, maxSwipes: 10), "Settings › Auto-capture lists Calendars")
         calendars.tap()
         XCTAssertTrue(element("calendars.sheet").waitForExistence(timeout: 5))
-        let work = app.switches["calendars.toggle.debug-calendar"].firstMatch
-        XCTAssertTrue(work.waitForExistence(timeout: 5))
-        XCTAssertEqual(work.value as? String, "1", "Every calendar starts checked")
-        work.switches.firstMatch.exists ? work.switches.firstMatch.tap() : work.tap()
-        XCTAssertEqual(work.value as? String, "0")
+        // "Home" is never turned off by another test (the prompt test turns off the work calendar).
+        let home = app.switches["calendars.toggle.debug-home"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 5))
+        XCTAssertEqual(home.value as? String, "1", "A calendar is checked until the user turns it off")
+        tapSwitch(home)
+        XCTAssertEqual(home.value as? String, "0")
+        tapSwitch(home)   // leave it as found: the choice is stored per profile on the device
+        XCTAssertEqual(home.value as? String, "1")
+    }
+
+    private func tapSwitch(_ element: XCUIElement) {
+        let inner = element.switches.firstMatch
+        (inner.exists ? inner : element).coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        Thread.sleep(forTimeInterval: 0.5)
     }
 
     // MARK: Frames for the gates (LH_CAPTURE_DIR)

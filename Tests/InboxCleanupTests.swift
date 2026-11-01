@@ -139,10 +139,11 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
     }
 
     func testCleanupFloorBranchKeepsAHiddenItemWithATitleKeywordAtNotSure() async throws {
-        // "Paint" is a landlord word; the wedding noise would drop it, so the rules call it hidden.
-        let arch = snapshot("W", "Paint wedding arch", hour: 10, location: "Garden Hall, 3 Rose Ln")
+        // "Repair" is a landlord word of 1.0+; the wedding noise would drop it, so the rules call it
+        // hidden. (2.3 F: a weaker word, "Paint" at 0.8, no longer protects an item in the cleanup.)
+        let arch = snapshot("W", "Repair wedding arch", hour: 10, location: "Garden Hall, 3 Rose Ln")
         let outcome = await chain().evaluate(
-            CaptureCandidate(sourceKey: "cal:W", kind: .calendar, start: arch.start, end: arch.end, title: "Paint wedding arch",
+            CaptureCandidate(sourceKey: "cal:W", kind: .calendar, start: arch.start, end: arch.end, title: "Repair wedding arch",
                              location: arch.location, detectedAt: arch.start),
             properties: [oak])
         guard case .skip = outcome else { return XCTFail("Setup: the rules should call this hidden, got \(outcome)") }
@@ -162,7 +163,7 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
             snapshot("S", "Team sync", hour: 9, attendees: 6),
             snapshot("P", "Plumber", hour: 10),
             snapshot("A", "Alex", hour: 11, attendees: 4),
-            snapshot("W", "Paint wedding arch", hour: 12, location: "Garden Hall, 3 Rose Ln"),
+            snapshot("W", "Repair wedding arch", hour: 12, location: "Garden Hall, 3 Rose Ln"),
             snapshot("H", "HOA meeting", hour: 13, attendees: 8, location: "Community Hall, 55 Pine Rd"),
         ]
         // Live scan on an empty store, cleanup on a store holding the old scanner's pending copies.
@@ -177,7 +178,7 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
             .cleanUpPendingOnce(chain: chain(), properties: [oak], entries: [])
         XCTAssertEqual(Set(old.pending.map(\.title)), liveTitles)
         XCTAssertFalse(liveTitles.contains("Team sync"))
-        XCTAssertTrue(liveTitles.isSuperset(of: ["Plumber", "Alex", "Paint wedding arch", "HOA meeting"]))
+        XCTAssertTrue(liveTitles.isSuperset(of: ["Plumber", "Alex", "Repair wedding arch", "HOA meeting"]))
     }
 
     /// The same event a week later, inside the 7-day window.
@@ -323,7 +324,6 @@ final class InboxCleanupTests: CalendarCaptureTestCase {
         for item in items.prefix(3) { store.dismiss(key: item.sourceKey, reason: .notLandlordWork) }
         XCTAssertEqual(store.feedback(forCalendar: "WORK").confirmed, 1)
         XCTAssertTrue(store.calendarsToOfferQuieting(excluded: []).isEmpty)
-        // A mute is not a "Not rental work" answer.
         XCTAssertEqual(store.feedback(forCalendar: "WORK").notRental, 3)
     }
 

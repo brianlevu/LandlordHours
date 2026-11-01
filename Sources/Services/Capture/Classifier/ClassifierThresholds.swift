@@ -63,6 +63,22 @@ enum ClassifierThresholds {
     static let maxAccuracyGivenUpForPrecision = 0.05
     /// Share of real landlord items that must stay visible (≥ notSure).
     static let targetVisibleRecall = 0.95
+    /// 2.3 F: the same share for the fixture's titles as calendar events, through the positive-
+    /// signal gate and the scan's visibility (main list or the Not sure row).
+    ///
+    /// Re-baseline, 2026-11-01 (package F owns this file and CalibrationTests from package E):
+    /// - The email path (the targets above) does not change under F: the gate, D2 and the rescue
+    ///   are calendar-only, and the new cue words (sublet, inquilino, arrendatario, lockbox, work
+    ///   order, WO, GC, escrow) touch no fixture title. Measured at 0.70 after F: all-data accuracy
+    ///   .923, precision .994, recall .882, visible .954; held-out .925 / .958; real-world 1.0. E's
+    ///   retarget (2026-10-31) is kept as written.
+    /// - New, the calendar path: all-data precision .972, visible recall .990 (held-out .958 /
+    ///   1.0). The landlord titles the gate hides have no rental cue of their own; the rescue keeps
+    ///   weak words that passed the gate. 193 of 195 are visible; the floor (192) leaves one item of slack.
+    /// - Measured outside this test: the synthetic office set and the 980-event hard set
+    ///   (package F hand-off): main-list noise 1 of 200 / 1.5%, rental reachable
+    ///   100% / 94%.
+    static let targetCalendarVisibleRecall = 0.98
     /// Category accuracy floors (landlord items). Rules on the held-out set are honest-low.
     /// Model floor: the first real run (2026-10-21, slim sim with Siri & Intelligence kept on,
     /// and the host Mac's model via scripts/clf-eval-host) scored 0.44 with the old prompt; the

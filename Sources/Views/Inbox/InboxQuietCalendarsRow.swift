@@ -75,7 +75,9 @@ struct InboxQuietCalendarsSheet: View {
                 Text(InboxQuietText.sheetIntro)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // On the section headers' 16pt line, inside the row (a 0 inset clipped the first glyph).
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .accessibilityIdentifier("calendars.intro")

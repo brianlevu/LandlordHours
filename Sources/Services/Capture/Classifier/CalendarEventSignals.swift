@@ -325,12 +325,25 @@ enum CalendarVisibility {
             return classification
         case .skip(var classification):
             guard keepKeywordTitles || !classification.evidence.contains(ClassifierThresholds.notRentalEvidence),
-                  RulesEngine.titleHasLandlordKeyword(title) else { return nil }
+                  rescues(title: title, evidence: classification.evidence, keepKeywordTitles: keepKeywordTitles) else { return nil }
             classification.confidence = max(classification.confidence, ClassifierThresholds.notSure)
             classification.evidence.append(ClassifierThresholds.landlordSignalEvidence)
             return classification
         case .muted:
             return nil
         }
+    }
+
+    /// Whether a skipped event comes back as "Not sure" (2.3 F, D2). A title word of 1.0 or more
+    /// always does. A weaker word ("Guest check in", "Home Depot run") does only when the event
+    /// passed the positive-signal gate and nothing on the invite argued against it: invite signals
+    /// beat words under 1.0, and an item they beat is already marked not rental. The cleanup keeps
+    /// only titles of 1.0 or more.
+    static func rescues(title: String, evidence: [String], keepKeywordTitles: Bool = false) -> Bool {
+        let words = RulesEngine.titleKeywords(title)
+        if words.carries { return true }
+        guard !keepKeywordTitles, evidence.contains(ClassifierThresholds.rentalCueEvidence),
+              !evidence.contains(where: { $0.hasPrefix("not rental: ") }) else { return false }
+        return words.vouches
     }
 }
