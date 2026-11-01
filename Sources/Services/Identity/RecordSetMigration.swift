@@ -444,6 +444,12 @@ final class RecordSetMigration {
         case pushFailed(String)
     }
 
+    /// A groups.json write failed (a full disk). The same words as AppViewModel.saveFailureMessage
+    /// (one catalog key).
+    static var saveFailureProblem: String {
+        String(localized: "Couldn’t save your last change. Your iPhone may be out of space.", table: "Identity")
+    }
+
     struct CloudStats: Equatable {
         var stale = 0, unparsed = 0, untaggedAdopted = 0, r5Removed = 0, bulkHeld = 0, captureDedupe = 0, deltaAbandoned = false
     }
@@ -508,11 +514,9 @@ final class RecordSetMigration {
             // A groups file that can't be saved (a full disk) stops here, before the live set
             // changes: the step stays put and the next run merges again from the saved read.
             guard let merged = resolveAndMergeCloud(snapshot) else {
-                // The same words as AppViewModel.saveFailureMessage (one catalog key).
-                let problem = String(localized: "Couldn’t save your last change. Your iPhone may be out of space.", table: "Identity")
-                defaults.set(problem, forKey: IdentityKeys.lastSyncProblem)
+                defaults.set(Self.saveFailureProblem, forKey: IdentityKeys.lastSyncProblem)
                 onChange?()
-                return .incomplete(problem)
+                return .incomplete(Self.saveFailureProblem)
             }
             stats = merged
             if crashAt == "S7" { return .notReady }
@@ -549,7 +553,12 @@ final class RecordSetMigration {
         if step < .deltaPulled {
             do {
                 let delta = try await source.deltaPull(from: defaults.data(forKey: IdentityKeys.migrationZoneToken))
-                _ = applyPull(delta)
+                if applyPull(delta).saveFailed {
+                    // Nothing applied: the step and the token stay, and the next run pulls again.
+                    defaults.set(Self.saveFailureProblem, forKey: IdentityKeys.lastSyncProblem)
+                    onChange?()
+                    return .incomplete(Self.saveFailureProblem)
+                }
                 // Applied first; the token moves only past a complete delta, so a record CloudKit
                 // couldn't hand over comes again on the next pull.
                 if !delta.incomplete { defaults.set(delta.tokenData, forKey: IdentityKeys.migrationZoneToken) }
@@ -1120,6 +1129,9 @@ final class RecordSetMigration {
         var settingsApplied = false
         var dedupedByKey = 0
         var unparsed = 0
+        /// groups.json couldn't be saved: the live set, the baselines and the settings are
+        /// untouched, so the caller must keep its change token and pull the delta again.
+        var saveFailed = false
     }
 
     func routingContext() -> MergeRules.RoutingContext {
@@ -1149,6 +1161,7 @@ final class RecordSetMigration {
         let context = routingContext()
         var entries = live.liveEntries, properties = live.liveProperties, categories = live.liveCategories
         var groups = GroupsFile.load(root: root) ?? GroupsFile(createdAt: now(), primaryId: nil, groups: [])
+        let groupsBefore = groups
         var pulledForBaseline: [ZoneRecord] = []
         var household: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var mirror: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
@@ -1227,6 +1240,12 @@ final class RecordSetMigration {
                 earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
                               categories: record.category.map { [$0] } ?? [], unparsed: record.isParseable ? [] : [record],
                               to: id, status: held == .pending ? .pending : .aside, source: .iCloud, now: now())
+                // A held set whose question never reached groups.json (its write failed, or the app
+                // stopped between the two writes) is asked about now.
+                if held == .pending, groups.group(id) == nil, !LegacyInventory.isIgnoredId(id) {
+                    groups.upsert(GroupRecord(id: id, status: .pending, source: .iCloud, entryCount: 0, propertyCount: 0, hours: 0, lastEntryDate: nil))
+                    outcome.newGroups.append(id)
+                }
                 outcome.archived += 1
             case .newGroup(let owner):
                 guard !LegacyInventory.isIgnoredId(owner) else { continue }
@@ -1265,7 +1284,9 @@ final class RecordSetMigration {
             noteDeleted(liveDeletes)
             outcome.removed = liveDeletes.count
         }
-        // Deletes of archived records: out of the archive, into Recently removed.
+        // Deletes of archived records: out of the archive, into Recently removed. A group left
+        // empty is removed only after groups.json is saved, so a failed save finds it again.
+        var emptiedGroups: [String] = []
         for (name, _) in delta.deleted where !liveNames.contains(name) {
             guard let groupId = earlier.groupId(containing: name), let group = earlier.group(groupId) else { continue }
             var g = group
@@ -1278,18 +1299,31 @@ final class RecordSetMigration {
             // One durable write of the trimmed group (never delete-then-rewrite: a crash between
             // the two would lose the rest of the group).
             if g.isEmpty {
-                earlier.removeGroup(groupId)
+                emptiedGroups.append(groupId)
                 // Nothing left to ask about: never a question in groups.json, never a held push.
                 if var record = groups.group(groupId), record.status == .pending {
                     record.status = .notNeeded; record.entryCount = 0; record.propertyCount = 0; record.hours = 0
                     groups.upsert(record)
                 }
-                if defaults.string(forKey: IdentityKeys.householdHeldFor) == groupId { dropHold() }
             } else {
                 try? earlier.replace(g)
             }
         }
 
+        // The groups file first: a new set to ask about must never be lost behind a moved token.
+        if groups != groupsBefore {
+            do {
+                try groups.save(root: root)
+            } catch {
+                migrationLogger.error("Pull groups write failed: \(error.localizedDescription, privacy: .public)")
+                outcome.saveFailed = true
+                return outcome
+            }
+        }
+        for groupId in emptiedGroups {
+            earlier.removeGroup(groupId)
+            if defaults.string(forKey: IdentityKeys.householdHeldFor) == groupId { dropHold() }
+        }
         if outcome.liveChanged > 0 || outcome.removed > 0 {
             live.replaceLive(entries: entries, properties: properties, categories: categories)
         }
@@ -1299,7 +1333,6 @@ final class RecordSetMigration {
             earlier.takeRemoved(putBackElsewhere)
             forgetDeleted(putBackElsewhere)
         }
-        try? groups.save(root: root)
 
         // Settings: only the household pair and the 2.0 mirror (§3.3). Another set's pair (kept with
         // this iCloud after an account change) is never applied.

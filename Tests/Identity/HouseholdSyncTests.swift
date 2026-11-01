@@ -566,6 +566,38 @@ final class HouseholdSyncTests: XCTestCase {
         XCTAssertTrue(h.earlier.pendingGroups.isEmpty)
     }
 
+    /// The same full disk on a later pull: a new owner's records went to Earlier records, the
+    /// groups.json that asks about them was lost, and the caller still moved its change token, so
+    /// the question never came back. Now nothing is applied and the delta is pulled again.
+    func testAPullWhoseGroupsFileCantBeSavedAppliesNothing() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        let first = await h.cloud()
+        XCTAssertEqual(first, .done)
+        let liveBefore = h.entries.map(\.id)
+        let propertyId = try XCTUnwrap(h.properties.first?.id)
+        let newOwner = "001234.new-owner.0404"
+        let theirs = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .management, hours: 3, date: Date(), notes: "another set")
+        let mine = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .management, hours: 1.5, date: Date(), notes: "this set")
+        let delta = ZoneDelta(changed: [
+            ZoneRecord(CloudKitSyncService.record(for: theirs, zoneID: IdentityZone.zoneID, appUserId: newOwner)),
+            ZoneRecord(CloudKitSyncService.record(for: mine, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId))
+        ], deleted: [:], tokenData: nil, incomplete: false)
+
+        let dir = MigrationFiles.migrationDirectory(root: sandbox.root)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path)
+        h.engine.applyPull(delta)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+        XCTAssertEqual(h.entries.map(\.id), liveBefore, "nothing reaches the live set while the question can't be saved")
+        XCTAssertNil(h.groups?.group(newOwner))
+
+        h.engine.applyPull(delta)
+        XCTAssertEqual(h.groups?.group(newOwner)?.status, .pending, "asked about once the disk has room")
+        XCTAssertTrue(h.entries.contains { $0.id == mine.id })
+        XCTAssertFalse(h.entries.contains { $0.id == theirs.id })
+    }
+
     // MARK: Per-type push (diagnosis §7.3)
 
     func testOneFailingRecordTypeNeverBlocksTheOthers() async throws {
