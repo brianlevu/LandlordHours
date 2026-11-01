@@ -130,7 +130,9 @@ final class PricingJourneyUITests: XCTestCase {
         let stepper = app.descendants(matching: .any)["record.hours.stepper"].firstMatch
         XCTAssertTrue(stepper.waitForExistence(timeout: 5))
         let before = stepper.value as? String ?? ""
-        stepper.increment()
+        // LHStepper is one adjustable element: its plus sits at the trailing end (as InboxUITests taps it).
+        stepper.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        XCTAssertNotEqual(stepper.value as? String ?? "", before, "The plus raised the hours")
         tap(app.buttons["entry.save"])
         let refused = app.descendants(matching: .any)["entry.refused"]
         XCTAssertTrue(refused.waitForExistence(timeout: 5), "Raising hours at a view-only rental is refused, with the reason")
@@ -139,7 +141,7 @@ final class PricingJourneyUITests: XCTestCase {
         // Lowering is allowed: a typo can be fixed.
         tap(edit)
         XCTAssertEqual(stepper.value as? String ?? "", before, "The refused hours were put back")
-        stepper.decrement()
+        stepper.coordinate(withNormalizedOffset: CGVector(dx: 0.07, dy: 0.5)).tap()   // minus, at the leading end
         tap(app.buttons["entry.save"])
         XCTAssertTrue(edit.waitForExistence(timeout: 5))
         XCTAssertFalse(refused.exists, "Lowering hours saves")
