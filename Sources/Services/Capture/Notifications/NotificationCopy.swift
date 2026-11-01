@@ -150,11 +150,11 @@ enum NudgeCopy {
             body: NudgeStrings.f("nudge.behind.body", "About %lldh behind the pace for %lld by Dec 31.", hoursBehind, target))
     }
 
-    /// "Year end" / "612 hours logged in 2026. Add anything missing before Dec 31."
+    /// "Year end" / "Your 2026 total is 612h. Add anything missing before Dec 31."
     static func yearEnd(year: Int, hours: Int) -> NotificationText {
         NotificationText(
             title: NudgeStrings.t("nudge.yearEnd.title", "Year end"),
-            body: NudgeStrings.f("nudge.yearEnd.body", "%lld hours logged in %lld. Add anything missing before Dec 31.", hours, year))
+            body: NudgeStrings.f("nudge.yearEnd.body", "Your %lld total is %lldh. Add anything missing before Dec 31.", year, hours))
     }
 
     /// The rental is the title; the body names the one care item. No hours.

@@ -74,7 +74,9 @@ enum NudgePolicy {
 
         // "Behind" fires once per time behind. Catching up clears it.
         let behind = isBehind(facts)
-        if !behind { sent.removeAll { $0.kind == .behindPace } }
+        if !behind {
+            for index in sent.indices where sent[index].kind == .behindPace { sent[index].released = true }
+        }
 
         guard settings.anyKindOn else { return NudgeOutput(plans: [], ledger: sent) }
 
@@ -104,7 +106,7 @@ enum NudgePolicy {
             }
         }
 
-        if settings.behindPace, behind, !sent.contains(where: { $0.kind == .behindPace }) {
+        if settings.behindPace, behind, !sent.contains(where: { $0.kind == .behindPace && $0.released != true }) {
             let today = cal.startOfDay(for: now)
             var fire = at(hour: morningHour, on: today, cal) ?? now
             if fire <= now { fire = at(hour: morningHour, on: cal.date(byAdding: .day, value: 1, to: today) ?? today, cal) ?? fire }

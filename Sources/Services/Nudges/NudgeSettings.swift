@@ -61,6 +61,9 @@ struct NudgeLedgerEntry: Equatable, Codable, Sendable {
     /// The care item id, or a day key for the other kinds.
     var itemID: String
     var fireDate: Date
+    /// Behind pace only: the person caught up, so the next time behind may nudge again. The entry
+    /// stays, because it still counts toward the daily and monthly limits.
+    var released: Bool? = nil
 }
 
 final class NudgeSettingsStore {

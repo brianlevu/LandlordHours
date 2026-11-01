@@ -175,9 +175,31 @@ final class NudgePolicyTests: XCTestCase {
         XCTAssertTrue(second.plans.isEmpty, "once only while behind")
         // Caught up clears it; falling behind again may fire again.
         let caughtUp = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 10, 1), hours: 700), ledger: first.ledger)
-        XCTAssertFalse(caughtUp.ledger.contains { $0.kind == .behindPace })
+        XCTAssertTrue(caughtUp.ledger.filter { $0.kind == .behindPace }.allSatisfy { $0.released == true },
+                      "catching up releases the latch but keeps the entry for the caps")
         let again = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 11, 20), hours: 300), ledger: caughtUp.ledger)
         XCTAssertEqual(again.plans.map(\.kind), [.behindPace])
+    }
+
+    /// Review finding: catching up used to erase the sent behind nudge, so the same day could take a
+    /// second nudge and the month could pass its cap.
+    func testCatchingUpKeepsASentBehindNudgeCountingTowardTheDailyLimit() {
+        var s = NudgeSettings(); s.behindPace = true; s.weeklyPace = true
+        let sunday = date(2026, 11, 8, 10)
+        let sent = [NudgeLedgerEntry(kind: .behindPace, itemID: "2026-11-08", fireDate: sunday)]
+        // That Sunday at noon the person has caught up: the 6 PM weekly note must not be a second nudge.
+        let out = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 11, 8, 12), hours: 740), ledger: sent)
+        XCTAssertFalse(out.plans.contains { utc.isDate($0.fireDate, inSameDayAs: sunday) }, "one a day")
+        XCTAssertEqual(out.ledger.filter { $0.kind == .behindPace }.count, 1)
+    }
+
+    func testCatchingUpKeepsSentBehindNudgesCountingTowardTheMonthlyCap() {
+        var s = NudgeSettings(); s.weeklyPace = true
+        let sent = (0..<NudgePolicy.monthlyCap).map {
+            NudgeLedgerEntry(kind: .behindPace, itemID: "k\($0)", fireDate: date(2026, 11, 1 + $0, 10), released: true)
+        }
+        let out = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 11, 7, 12), hours: 740), ledger: sent)
+        XCTAssertTrue(out.plans.allSatisfy { utc.component(.month, from: $0.fireDate) != 11 })
     }
 
     func testNotBehindEarlyInTheYearOrWithNoHours() {

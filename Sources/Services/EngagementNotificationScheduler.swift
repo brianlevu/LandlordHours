@@ -249,7 +249,7 @@ final class NudgeScheduler {
         }
     }
 
-    static func request(for plan: NudgePlan, profileID: String, calendar: Calendar) -> UNNotificationRequest {
+    static func request(for plan: NudgePlan, profileID: String?, calendar: Calendar) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = plan.title
         content.body = plan.body
@@ -258,12 +258,12 @@ final class NudgeScheduler {
         content.categoryIdentifier = NudgeNotification.category
         var info: [String: Any] = [
             NudgeNotification.kindKey: plan.kind.rawValue,
-            NotificationPayload.destinationKey: LandlordHoursIntentDestination.home.rawValue,
-            NotificationPayload.profileIdKey: profileID
+            NotificationPayload.destinationKey: LandlordHoursIntentDestination.home.rawValue
         ]
+        if let profileID { info[NotificationPayload.profileIdKey] = profileID }
         if let rental = plan.rentalID { info[NudgeNotification.rentalIDKey] = rental.uuidString }
         content.userInfo = info
-        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: plan.fireDate)
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: plan.fireDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
         return UNNotificationRequest(identifier: plan.id, content: content, trigger: trigger)
     }
@@ -351,17 +351,13 @@ enum NudgeDebug {
             (NudgeCopy.weekly(hours: 420, target: 750, perWeek: 38), NudgeNotification.paceThread, delay),
             (NudgeCopy.care(rental: "Pine Cabin", item: "Clear the gutters"), NudgeNotification.careThread, delay + 3)
         ]
+        // Built by the real request builder, so the sample is what the scheduler would send.
         for (index, note) in notes.enumerated() {
-            let content = UNMutableNotificationContent()
-            content.title = note.0.title
-            content.body = note.0.body
-            content.threadIdentifier = note.1
-            content.categoryIdentifier = NudgeNotification.category
-            content.userInfo = [NudgeNotification.kindKey: index == 0 ? "weeklyPace" : "carePlan",
-                                NotificationPayload.destinationKey: "home"]
-            let request = UNNotificationRequest(identifier: "debug.nudge.sample.\(index)", content: content,
-                                                trigger: UNTimeIntervalNotificationTrigger(timeInterval: note.2, repeats: false))
-            try? await center.add(request)
+            let kind: NudgeKind = index == 0 ? .weeklyPace : .carePlan
+            let plan = NudgePlan(id: "debug.nudge.sample.\(kind.rawValue)", kind: kind,
+                                 fireDate: Date().addingTimeInterval(note.2), title: note.0.title, body: note.0.body,
+                                 rentalID: nil, itemID: "debug")
+            try? await center.add(NudgeScheduler.request(for: plan, profileID: UserScope.userId, calendar: .current))
         }
     }
 

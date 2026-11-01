@@ -25,6 +25,11 @@ final class RemindersSettingsUITests: XCTestCase {
         if probe { args.append("-LHNudgeProbe") }
         app.launchArguments = args + extra
         app.launch()
+        // A freshly booted simulator sometimes opens on Today despite -LHInitialTab: launch once more.
+        if !element("settings.paceReminders").waitForExistence(timeout: 25), !element("settings.reminders").exists {
+            app.terminate()
+            app.launch()
+        }
     }
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
@@ -99,7 +104,6 @@ final class RemindersSettingsUITests: XCTestCase {
 
     func testSettingsRowOpensTheScreenWithEverythingOff() {
         launch(["-LHNudgeReset", "1"])
-        XCTAssertTrue(element("settings.paceReminders").waitForExistence(timeout: 20) || true)
         openScreen()
         for id in ["reminders.weekly", "reminders.behind", "reminders.yearEnd", "reminders.care"] {
             XCTAssertTrue(toggle(id).waitForExistence(timeout: 5), id)
