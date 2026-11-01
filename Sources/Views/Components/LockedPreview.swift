@@ -284,6 +284,9 @@ struct PlanMomentsHost: View {
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var moment: PlanMoment?
+    /// "See Pro" closed the pick sheet: not a swipe, so no default is kept (the sheet comes back
+    /// if the paywall closes without a purchase).
+    @State private var leavingForPaywall = false
 
     static let lastPlanKey = "pricing.lastPlan.v1"
 
@@ -318,6 +321,7 @@ struct PlanMomentsHost: View {
                         .environmentObject(viewModel)
                 case .pickFree(let reason):
                     PickFreeRentalSheet(reason: reason, onSeePro: {
+                        leavingForPaywall = true
                         self.moment = nil
                         Task { @MainActor in
                             try? await Task.sleep(for: .milliseconds(450))
@@ -347,13 +351,23 @@ struct PlanMomentsHost: View {
         // for them, so a seed with two free rentals doesn't cover every other screen's test.
         guard PricingDebugLaunch.allowsAutomaticMoments else { return }
         #endif
-        moment = PlanMoment.next(plan: plan, shouldShowDay12: store.shouldShowDay12Reminder(),
-                                 needsPick: store.needsFreeRentalPick(rentals: viewModel.rentalUsages),
-                                 lastPlanKind: lastPlanKind)
+        let next = PlanMoment.next(plan: plan, shouldShowDay12: store.shouldShowDay12Reminder(),
+                                   needsPick: store.needsFreeRentalPick(rentals: viewModel.rentalUsages),
+                                   lastPlanKind: lastPlanKind)
+        guard case .pickFree? = next else { moment = next; return }
+        // Before asking, read iCloud once: a pick made on another device wins over a new one
+        // here (and keeps its month clock).
+        Task { @MainActor in
+            await FreeRentalSync.shared.syncNow()
+            guard presenter.request == nil, moment == nil,
+                  store.needsFreeRentalPick(rentals: viewModel.rentalUsages) else { return }
+            moment = next
+        }
     }
 
     /// A swipe-down on the pick sheet keeps the most-used rental (without using up the pick).
     private func dismissed() {
+        if leavingForPaywall { leavingForPaywall = false; return }
         if store.needsFreeRentalPick(rentals: viewModel.rentalUsages) {
             store.keepDefaultFreeRental(rentals: viewModel.rentalUsages)
             FreeRentalSync.shared.localPickChanged()

@@ -246,6 +246,16 @@ final class ViewOnlyRentalSaveTests: CaptureTestCase {
         moved.propertyId = oak
         vm.updateTimeEntry(moved)
         XCTAssertEqual(vm.timeEntries[0].propertyId, pine, "an edit can't move hours onto a view-only rental")
+        // At the view-only rental itself: no counted change, but notes stay editable.
+        let oakIndex = vm.timeEntries.firstIndex { $0.propertyId == oak }!
+        var more = vm.timeEntries[oakIndex]
+        more.hours = 50
+        vm.updateTimeEntry(more)
+        XCTAssertEqual(vm.timeEntries[oakIndex].hours, 5, "hours at a view-only rental can't grow")
+        var noted = vm.timeEntries[oakIndex]
+        noted.notes = "fixed the gate"
+        vm.updateTimeEntry(noted)
+        XCTAssertEqual(vm.timeEntries[oakIndex].notes, "fixed the gate", "notes stay editable")
         let store = makeStore()
         let suggestion = calendarSuggestion(start: Date().addingTimeInterval(-3600), propertyId: oak)
         store.ingest([suggestion], existingEntries: vm.timeEntries, calendar: calendar)

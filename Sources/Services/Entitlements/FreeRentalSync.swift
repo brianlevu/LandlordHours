@@ -71,6 +71,8 @@ final class FreeRentalSync {
 
     /// Set by `CloudKitSyncService` once iCloud is reachable for this record set.
     var cloud: FreeRentalCloudStore?
+    /// The rentals on this device (a pick whose rental is gone never wins). Nil = don't filter.
+    var knownRentals: () -> Set<UUID>? = { nil }
     let local: FreeRentalLocalStore
     private var running: Task<Void, Never>?
 
@@ -81,8 +83,14 @@ final class FreeRentalSync {
 
     // MARK: Rules
 
-    /// The pick both devices keep.
-    nonisolated static func merge(local: FreeRentalSelection?, remote: FreeRentalSelection?) -> FreeRentalSelection? {
+    /// The pick both devices keep. With `known`, a pick whose rental no longer exists loses to one
+    /// whose rental does (a deleted pick never keeps the sheet coming back).
+    nonisolated static func merge(local: FreeRentalSelection?, remote: FreeRentalSelection?,
+                                  known: Set<UUID>? = nil) -> FreeRentalSelection? {
+        if let known, let local, let remote {
+            let l = known.contains(local.rentalID), r = known.contains(remote.rentalID)
+            if l != r { return l ? local : remote }
+        }
         guard let local else { return remote }
         guard let remote else { return local }
         if local.source != remote.source {
@@ -123,16 +131,18 @@ final class FreeRentalSync {
         for _ in 0..<3 {
             do {
                 let remote = try await cloud.fetch()
-                guard let winner = Self.merge(local: local.selection, remote: remote) else { return }
+                guard let winner = Self.merge(local: local.selection, remote: remote, known: knownRentals()) else { return }
                 if winner != local.selection { local.adopt(winner) }
                 if winner != remote {
                     try await cloud.save(winner)
                 }
-                local.isDirty = false
+                // A pick made while the save ran stays dirty, so it is sent next.
+                if local.selection == winner { local.isDirty = false }
                 return
             } catch FreeRentalCloudError.conflict(let server) {
                 // Another device saved between our read and write: fold theirs in and go again.
-                if let merged = Self.merge(local: local.selection, remote: server), merged != local.selection {
+                if let merged = Self.merge(local: local.selection, remote: server, known: knownRentals()),
+                   merged != local.selection {
                     local.adopt(merged)
                 }
                 continue

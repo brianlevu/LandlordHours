@@ -34,6 +34,13 @@ private final class FakeCloud: FreeRentalCloudStore {
     }
 }
 
+private final class SlowCloud: FreeRentalCloudStore {
+    var record: FreeRentalSelection?
+    var duringSave: () -> Void = {}
+    func fetch() async throws -> FreeRentalSelection? { record }
+    func save(_ selection: FreeRentalSelection) async throws { duringSave(); record = selection }
+}
+
 private final class FakeLocal: FreeRentalLocalStore {
     var selection: FreeRentalSelection?
     var isDirty = false
@@ -68,6 +75,23 @@ final class FreeRentalSyncTests: XCTestCase {
         XCTAssertEqual(FreeRentalSync.merge(local: nil, remote: picked(oak, 1)), picked(oak, 1))
         XCTAssertEqual(FreeRentalSync.merge(local: picked(pine, 1), remote: nil), picked(pine, 1))
         XCTAssertNil(FreeRentalSync.merge(local: nil, remote: nil))
+    }
+
+    func testAPickWhoseRentalIsGoneNeverWins() {
+        // The iPad's pick was deleted here; this device's newer default at a real rental stays.
+        XCTAssertEqual(FreeRentalSync.merge(local: defaulted(oak, 5), remote: picked(pine, 9), known: [oak]), defaulted(oak, 5))
+        XCTAssertEqual(FreeRentalSync.merge(local: picked(pine, 1), remote: picked(oak, 0), known: [pine, oak]), picked(pine, 1),
+                       "with both rentals known, the usual rules")
+    }
+
+    func testAPickMadeDuringTheSaveStaysDirty() async {
+        let cloud = SlowCloud()
+        let phone = FakeLocal(); phone.selection = picked(pine, 6)
+        let sync = FreeRentalSync(local: phone, cloud: cloud)
+        cloud.duringSave = { phone.selection = self.picked(self.oak, 7); phone.isDirty = true }
+        sync.localPickChanged()
+        await sync.syncNow()
+        XCTAssertTrue(phone.isDirty, "the newer pick is still to send")
     }
 
     func testATieLandsTheSameOnBothDevices() {

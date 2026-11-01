@@ -730,6 +730,9 @@ final class CloudKitSyncService: ObservableObject {
         guard !pushesBlocked, let database, accountAvailable else { return }
         let owner = ownerTag ?? IdentityZone.household
         FreeRentalSync.shared.cloud = CloudKitFreeRentalStore(database: database, zoneID: zoneID, owner: owner)
+        FreeRentalSync.shared.knownRentals = { [weak self] in
+            self?.getViewModel().map { Set($0.properties.map(\.id)) }
+        }
         await FreeRentalSync.shared.syncNow()
     }
 

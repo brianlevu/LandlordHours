@@ -689,6 +689,8 @@ class AppViewModel: ObservableObject {
         return true // Open for all users
     }
     
+    /// Reads `isPro`, which mirrors `plan.hasProAccess` (2.3 bridge); AuditReportTests (not
+    /// package A's) drives it through `SubscriptionManager.isPro`, so it stays on the mirror.
     func canExportPDF() -> Bool {
         !ProGate.isExportLocked(isPro: SubscriptionManager.shared.isPro)
     }
@@ -866,11 +868,24 @@ class AppViewModel: ObservableObject {
 
     func updateTimeEntry(_ entry: TimeEntry) {
         if let index = timeEntries.firstIndex(where: { $0.id == entry.id }) {
-            // 2.3: an edit may not move hours onto a view-only rental (editing in place is fine).
-            if timeEntries[index].propertyId != entry.propertyId, !canLog(at: entry.propertyId) { return }
+            // 2.3: a view-only rental takes no new hours. An edit that moves an entry onto one, or
+            // changes what counts (hours, date, kind, who) at one, is refused with the reason;
+            // notes and photos stay editable.
+            if !Self.editAllowed(from: timeEntries[index], to: entry, canLog: canLog(at:)) {
+                AppToastCenter.shared.show(viewOnlyLogMessage, kind: .problem)
+                return
+            }
             timeEntries[index] = entry
             saveData()
         }
+    }
+
+    /// The view-only rule for an edit (pure, unit-tested).
+    nonisolated static func editAllowed(from old: TimeEntry, to new: TimeEntry, canLog: (UUID) -> Bool) -> Bool {
+        if old.propertyId != new.propertyId { return canLog(new.propertyId) }
+        guard !canLog(new.propertyId) else { return true }
+        return old.hours == new.hours && old.date == new.date && old.category == new.category
+            && old.participant == new.participant
     }
 
     func deleteTimeEntry(_ entry: TimeEntry) {

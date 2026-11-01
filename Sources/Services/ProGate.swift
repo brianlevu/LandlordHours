@@ -152,9 +152,12 @@ enum ProGate {
         case .reportsExport, .settingsExport: return "Export comes with Pro."
         case .propertiesLimit, .inboxLimit: return "Free covers one rental."
         case .settingsPro, .freeRentalSettings, .freeRentalPick: return "Dormer Pro"
-        case .viewOnlyRental, .logPicker: return "View only on the free plan."
-        case .carePlan: return "Care plans come with Pro."
-        case .learning: return "Lessons come with Pro."
+        case .viewOnlyRental, .logPicker:
+            return String(localized: "lock.viewOnly.line", defaultValue: "View only on the free plan.", table: "Pricing")
+        case .carePlan:
+            return String(localized: "lock.carePlan.line", defaultValue: "Care plans come with Pro.", table: "Pricing")
+        case .learning:
+            return String(localized: "lock.learning.line", defaultValue: "Lessons come with Pro.", table: "Pricing")
         case .todayRecord: return "Your \(wholeHours(confirmedHours)) hours, ready to export."
         }
     }
@@ -168,9 +171,12 @@ enum ProGate {
         case .propertiesLimit, .inboxLimit:
             let name = firstPropertyName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return "\(name?.isEmpty == false ? name! : "Your rental") keeps tracking. Nothing is lost."
-        case .settingsPro, .freeRentalSettings, .freeRentalPick: return "One rental stays free for good."
-        case .viewOnlyRental, .logPicker: return "Its hours stay in your total."
-        case .carePlan, .learning: return "Your hours and your free rental stay as they are."
+        case .settingsPro, .freeRentalSettings, .freeRentalPick:
+            return String(localized: "lock.freeRental.keeps", defaultValue: "One rental stays free for good.", table: "Pricing")
+        case .viewOnlyRental, .logPicker:
+            return String(localized: "lock.viewOnly.keeps", defaultValue: "Its hours stay in your total.", table: "Pricing")
+        case .carePlan, .learning:
+            return String(localized: "lock.pro.keeps", defaultValue: "Your hours and your free rental stay as they are.", table: "Pricing")
         }
     }
 

@@ -29,6 +29,7 @@ class SubscriptionManager: ObservableObject {
     let storeClient: StoreClient = StoreKit2Client()
     private var hasPurchasedKey: String { UserScope.key("hasPurchasedPro") }
     private var transactionListener: Task<Void, Never>?
+    private var statusListener: Task<Void, Never>?
 
     #if DEBUG
     /// Longest a restore waits on `AppStore.sync()` (it can sit on an Apple Account sign-in that
@@ -99,6 +100,8 @@ class SubscriptionManager: ObservableObject {
     func stopTransactionListener() {
         transactionListener?.cancel()
         transactionListener = nil
+        statusListener?.cancel()
+        statusListener = nil
     }
     #endif
 
@@ -109,7 +112,16 @@ class SubscriptionManager: ObservableObject {
     }
 
     private func listenForTransactions() -> Task<Void, Never> {
-        Task.detached { [weak self] in
+        // 2.3: renewal changes (auto-renew turned off in Settings, billing retry) arrive here, not
+        // as transactions: re-resolve so the day-12 reminder is cancelled without a relaunch.
+        statusListener?.cancel()
+        statusListener = Task.detached { [weak self] in
+            for await _ in Product.SubscriptionInfo.Status.updates {
+                guard let self else { return }
+                await self.refreshEntitlements()
+            }
+        }
+        return Task.detached { [weak self] in
             for await result in Transaction.updates {
                 guard let self else { return }
                 if case .verified(let transaction) = result {
@@ -263,13 +275,24 @@ class SubscriptionManager: ObservableObject {
         return outcome
     }
     
-    /// After a verified yearly purchase: refresh until the plan shows it (at most ~2 s).
+    /// After a verified yearly purchase: refresh until the plan shows it (~2 s here, then up to
+    /// 30 s more in the background, so a slow StoreKit still unlocks without a relaunch).
     @MainActor
     private func settleAfterPurchase() async {
         for _ in 0..<10 {
             await refreshEntitlements()
             if isPro { break }
             try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        if !isPro {
+            Task { @MainActor [weak self] in
+                for _ in 0..<15 {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard let self else { return }
+                    await self.refreshEntitlements()
+                    if self.isPro { return }
+                }
+            }
         }
         await refreshIntroOffer()
     }

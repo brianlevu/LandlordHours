@@ -364,6 +364,72 @@
         }
       }
     },
+    "lock.carePlan.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Care plans come with Pro."
+          }
+        }
+      }
+    },
+    "lock.freeRental.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One rental stays free for good."
+          }
+        }
+      }
+    },
+    "lock.learning.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lessons come with Pro."
+          }
+        }
+      }
+    },
+    "lock.pro.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours and your free rental stay as they are."
+          }
+        }
+      }
+    },
+    "lock.viewOnly.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its hours stay in your total."
+          }
+        }
+      }
+    },
+    "lock.viewOnly.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only on the free plan."
+          }
+        }
+      }
+    },
     "log.viewOnly": {
       "extractionState": "manual",
       "localizations": {
