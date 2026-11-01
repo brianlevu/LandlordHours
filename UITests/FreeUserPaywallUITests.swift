@@ -1,7 +1,9 @@
 import XCTest
 
 /// Free-to-paid journeys (Brian's release law): every Pro entry point is driven as a FREE
-/// install. Each journey counts taps from Today to the paywall and to the purchase, checks the
+/// install. 2.3: Pro is the yearly plan with Apple's 14-day trial, so each purchase here starts the
+/// trial (the trial-start moment, then the next step); the free plan keeps one rental, the rest
+/// view-only (Pick free, view-only pages). Each journey counts taps from Today to the paywall and to the purchase, checks the
 /// locked preview says what stays free, that the paywall is about the thing tapped, that closing
 /// it returns cleanly to the lock, and that after a purchase the action carries on.
 ///
@@ -36,7 +38,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         assertLockSaysWhatStays(lock)
         let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        assertPaywall("export", headline: "The record your CPA gets")
+        assertPaywall("export")
         closeThenPurchase(entryPoint: "Reports > Export card", origin: origin,
                           continuation: exportReady)
     }
@@ -47,7 +49,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         tap(app.buttons["reports.export"])
         let origin = exportPageUnlock()
         tap(origin)
-        assertPaywall("export", headline: "The record your CPA gets")
+        assertPaywall("export")
         closeThenPurchase(entryPoint: "Reports > Export page", origin: origin,
                           continuation: exportReady, continuationIsLockLifted: true)
     }
@@ -58,7 +60,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         tap(app.buttons["records.export"])
         let origin = exportPageUnlock()
         tap(origin)
-        assertPaywall("export", headline: "The record your CPA gets")
+        assertPaywall("export")
         closeThenPurchase(entryPoint: "Records > Export", origin: origin,
                           continuation: exportReady, continuationIsLockLifted: true)
     }
@@ -71,7 +73,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         assertLockSaysWhatStays(lock)
         let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        assertPaywall("export", headline: "The record your CPA gets")
+        assertPaywall("export")
         closeThenPurchase(entryPoint: "Settings > Export row", origin: origin, continuation: exportReady)
     }
 
@@ -80,10 +82,11 @@ final class FreeUserPaywallUITests: XCTestCase {
         tapTab("Settings")
         let origin = app.buttons["settings.proCard"]
         scrollTo(origin)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Pay once")).firstMatch.exists,
-                      "The card says it's paid once, with the App Store price")
+        let line = app.staticTexts["settings.proCard.line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 8), "The card names the yearly price")
+        XCTAssertTrue(line.label.contains("$"), "StoreKit's price on the card: \(line.label)")
         tap(origin)
-        assertPaywall("settingsUpgrade", headline: "Dormer Pro")
+        assertPaywall("settingsUpgrade")
         closeThenPurchase(entryPoint: "Settings > See Pro", origin: origin, continuation: nil)
     }
 
@@ -95,7 +98,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         assertLockSaysWhatStays(lock)
         let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        assertPaywall("secondProperty", headline: "Track every rental")
+        assertPaywall("secondProperty")
         closeThenPurchase(entryPoint: "Properties > Your next rental", origin: origin,
                           continuation: app.textFields["property.name"])
     }
@@ -108,7 +111,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         let origin = lock.buttons["lock.unlock"]
         scrollTo(origin, maxSwipes: 4)
         tap(origin)
-        assertPaywall("dashboardUnlock", headline: "Your hours, on paper")
+        assertPaywall("dashboardUnlock")
         closeThenPurchase(entryPoint: "Today > Your record", origin: origin,
                           continuation: exportReady)
     }
@@ -124,7 +127,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(line.label.contains("Pine Cabin keeps tracking"), "Says what stays active")
         let origin = app.buttons["confirm.unlockPro"]
         tap(origin)
-        assertPaywall("secondProperty", headline: "Track every rental")
+        assertPaywall("secondProperty")
         closeThenPurchase(entryPoint: "Inbox > New place", origin: origin,
                           continuation: app.textFields["property.name"])
     }
@@ -172,6 +175,79 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["paywall.success"].waitForExistence(timeout: 30), "Retry succeeds")
     }
 
+    // MARK: 2.3: the trial, the free rental, view-only
+
+    /// A first purchase starts Apple's trial: the trial-start moment, then Settings shows the trial
+    /// with Manage subscriptions (cancel and renewal live there).
+    func testTheTrialStartsFromThePaywall() {
+        launchFree()
+        tapTab("Settings")
+        tap(app.buttons["settings.proCard"])
+        assertPaywall("settingsUpgrade")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.timeline"].exists, "A trial offer leads with the timeline")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.trialTag"].exists)
+        buyWhenReady()
+        let start = app.staticTexts["trial.title"]
+        XCTAssertTrue(start.waitForExistence(timeout: 30), "The trial-start moment")
+        XCTAssertTrue(app.descendants(matching: .any)["trial.addRentals"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["trial.makePDF"].exists)
+        tap(app.buttons["paywall.continue"])
+        XCTAssertTrue(start.waitForNonExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["settings.manageSubscriptions"].waitForExistence(timeout: 8), "Manage subscriptions while the trial runs")
+        XCTAssertFalse(app.buttons["settings.proCard"].exists, "No Pro card on a trial")
+    }
+
+    /// Pro ended with two rentals and no pick: the pick sheet. Picking Oak makes Pine view-only.
+    func testPickYourFreeRentalAfterTheTrial() {
+        launchFree(extra: ["-LHPlanSeed", "d23", "-LHPlanLastKind", "trial"])
+        let sheet = app.descendants(matching: .any)["plan.pickFree"].firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "The pick sheet shows when Pro ends")
+        XCTAssertTrue(app.buttons["pickFree.seePro"].exists, "Pro stays one tap away")
+        tap(app.buttons["freeRental.row.Oak Street Duplex"])
+        tap(app.buttons["pickFree.confirm"])
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 6))
+        openRental("Pine Cabin")
+        XCTAssertTrue(app.descendants(matching: .any)["rental.viewOnly"].waitForExistence(timeout: 8), "Pine Cabin is view-only now")
+        tap(app.buttons["property.back"])
+        openRental("Oak Street Duplex")
+        XCTAssertFalse(app.descendants(matching: .any)["rental.viewOnly"].waitForExistence(timeout: 3), "Oak Street Duplex logs")
+    }
+
+    /// A swipe-down keeps the most-used rental (Pine Cabin, 420h).
+    func testSwipingThePickSheetAwayKeepsTheMostUsedRental() {
+        launchFree(extra: ["-LHPlanSeed", "d23", "-LHPlanLastKind", "trial"])
+        let sheet = app.descendants(matching: .any)["plan.pickFree"].firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10))
+        sheet.swipeDown(velocity: .fast)
+        if sheet.exists { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 6), "No close button, but a swipe-down closes it")
+        openRental("Oak Street Duplex")
+        XCTAssertTrue(app.descendants(matching: .any)["rental.viewOnly"].waitForExistence(timeout: 8), "The less-used rental is view-only")
+        // It never asks again this launch.
+        XCTAssertFalse(sheet.exists)
+    }
+
+    /// The view-only page: See Pro opens the paywall and backs out cleanly; Switch rental opens
+    /// Settings › Free rental, which refuses an early switch with the date.
+    func testAViewOnlyRentalOffersProAndASwitch() {
+        launchFree(extra: ["-LHPlanSeed", "d23", "-LHFreeRentalPick", "Pine Cabin", "-LHFreeRentalPickedDaysAgo", "1"])
+        openRental("Oak Street Duplex")
+        let card = app.descendants(matching: .any)["rental.viewOnly"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8))
+        let seePro = app.buttons["viewOnly.seePro"]
+        tap(seePro)
+        assertPaywall("secondProperty")
+        tap(app.buttons["paywall.close"])
+        XCTAssertTrue(seePro.waitForExistence(timeout: 6), "Back on the view-only page")
+        tap(app.buttons["viewOnly.switch"])
+        XCTAssertTrue(app.descendants(matching: .any)["plan.freeRental"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["freeRental.rule"].label.contains("next switch"), "Says when the next switch is")
+        let oak = app.descendants(matching: .any)["freeRental.row.Oak Street Duplex"]
+        XCTAssertTrue(oak.exists)
+        oak.tap()
+        XCTAssertTrue(app.staticTexts["freeRental.refused"].waitForExistence(timeout: 4), "An early switch is refused with the date")
+    }
+
     func testOnboardingEndsWithoutAPaywall() {
         app.launchArguments = baseArguments(scenario: "firstTime", tab: 0, scheme: "light")
         app.launch()
@@ -191,9 +267,10 @@ final class FreeUserPaywallUITests: XCTestCase {
         ]
     }
 
-    private func launchFree(scheme: String = "light") {
+    private func launchFree(scheme: String = "light", extra: [String] = []) {
         app.terminate()
-        app.launchArguments = baseArguments(scenario: "occasional", tab: 0, scheme: scheme)
+        let scenario = extra.contains("-LHPlanSeed") ? "emptyMainTabs" : "occasional"
+        app.launchArguments = baseArguments(scenario: scenario, tab: 0, scheme: scheme) + extra
         app.launch()
         taps = 0
         XCTAssertTrue(todayTab.waitForExistence(timeout: 12), "Home tab bar should load")
@@ -209,18 +286,31 @@ final class FreeUserPaywallUITests: XCTestCase {
         tapTab("Inbox")
     }
 
-    private var todayTab: XCUIElement { app.tabBars.firstMatch.buttons["Today"] }
+    /// The tabs by identifier: in the iPhone tab bar and in the iPad sidebar alike.
+    private var todayTab: XCUIElement { app.buttons["tab.today"].firstMatch }
 
-    /// The native tab bar: Today, Inbox, Records, Rentals, Log time. Reports and Settings are not
-    /// tabs: they open in the Today tab from the account menu (`today.account`), two taps.
+    private static let tabIDs = ["Today": "tab.today", "Inbox": "tab.inbox", "Records": "tab.records",
+                                 "Rentals": "tab.properties", "Log time": "tab.logTime"]
+
+    /// The tabs: Today, Inbox, Records, Rentals, Log time. Reports and Settings are not tabs: they
+    /// open in the Today tab from the account menu (`today.account`), two taps.
     private func tapTab(_ title: String) {
         switch title {
         case "Reports", "Settings":
             tap(app.buttons["today.account"])
             tap(app.buttons[title].firstMatch)
         default:
-            tap(app.tabBars.firstMatch.buttons[title])
+            tap(app.buttons[Self.tabIDs[title] ?? title].firstMatch)
         }
+    }
+
+    /// Rentals tab, then the named rental's page.
+    private func openRental(_ name: String) {
+        tapTab("Rentals")
+        let tile = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "properties.tile.", name)).firstMatch
+        scrollTo(tile, maxSwipes: 4)
+        tile.tap()
     }
 
     /// The unlocked Export page: create (or, when it already ran, share) the report.
@@ -257,19 +347,24 @@ final class FreeUserPaywallUITests: XCTestCase {
         taps += 1
     }
 
-    private func assertPaywall(_ context: String, headline: String) {
+    /// The 2.3 paywall: the analytics context is the thing tapped; the page is the same trial
+    /// offer everywhere (title, StoreKit price, the cancel rule beside the button, and Restore,
+    /// Terms and Privacy pinned under it, visible without scrolling).
+    private func assertPaywall(_ context: String) {
         let paywall = app.descendants(matching: .any)["paywall.\(context)"]
         XCTAssertTrue(paywall.waitForExistence(timeout: 8), "Paywall for \(context) should appear")
         let title = app.staticTexts["paywall.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
-        XCTAssertEqual(title.label, headline, "The paywall speaks to \(context)")
-        XCTAssertTrue(app.buttons["paywall.buy"].exists, "Unlock button")
-        XCTAssertTrue(app.buttons["paywall.restore"].exists, "Restore purchase sits under the buy button")
+        XCTAssertFalse(title.label.lowercased().contains("free"), "App Review: the title never says free")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 12), "Price from StoreKit")
+        XCTAssertTrue(app.buttons["paywall.buy"].exists, "The primary")
+        XCTAssertTrue(app.staticTexts["paywall.cancelRule"].isHittable, "How to cancel sits beside the button")
+        XCTAssertTrue(app.buttons["paywall.restore"].isHittable, "Restore purchase is visible")
         XCTAssertTrue(app.buttons["paywall.terms"].isHittable && app.buttons["paywall.privacy"].isHittable, "Terms and Privacy are visible and tappable")
         let buy = app.buttons["paywall.buy"].frame
         let restore = app.buttons["paywall.restore"].frame
         XCTAssertGreaterThan(restore.minY, buy.minY, "Restore is below the buy button")
-        XCTAssertLessThan(restore.minY - buy.maxY, 40, "Restore is directly under the buy button")
+        XCTAssertLessThan(restore.minY - buy.maxY, 100, "Restore is in the pinned foot, under the button")
     }
 
     /// 1. Close returns cleanly to the lock. 2. Reopen and buy: logs taps from Today.

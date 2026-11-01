@@ -32,6 +32,29 @@ final class ProGateRuleTests: XCTestCase {
         XCTAssertTrue(ProGate.isLocked(.inboxLimit, isPro: false, propertyCount: 1))
     }
 
+    /// 2.3: every lock reads the plan; a trial and founding open everything, free locks each feature.
+    func testEveryLockReadsThePlan() {
+        let trial = Plan.trial(.init(startedAt: Date(), expiresAt: Date().addingTimeInterval(86_400), willAutoRenew: true,
+                                     inGracePeriod: false, originalTransactionID: 1))
+        for plan in [trial, .founding(alsoSubscribed: false), .founding(alsoSubscribed: true)] {
+            for entry in LockEntry.allCases {
+                XCTAssertFalse(ProGate.isLocked(entry, plan: plan, propertyCount: 5, confirmedHours: 500), "\(entry) is open for \(plan.kind)")
+            }
+        }
+        for entry in LockEntry.allCases where ![.propertiesLimit, .inboxLimit, .todayRecord].contains(entry) {
+            XCTAssertTrue(ProGate.isLocked(entry, plan: .free), "\(entry) is locked on free")
+        }
+        XCTAssertFalse(ProGate.isLocked(.propertiesLimit, plan: .free, propertyCount: 0), "The first rental is free")
+        XCTAssertTrue(ProGate.isLocked(.propertiesLimit, plan: .free, propertyCount: 1))
+        XCTAssertFalse(ProGate.isLocked(.todayRecord, plan: .free, confirmedHours: 9))
+        XCTAssertTrue(ProGate.isLocked(.todayRecord, plan: .free, confirmedHours: 10))
+        XCTAssertEqual(ProGate.feature(for: .carePlan), .carePlan)
+        XCTAssertEqual(ProGate.feature(for: .learning), .learning)
+        XCTAssertEqual(ProGate.context(for: .carePlan), .carePlan)
+        XCTAssertEqual(ProGate.context(for: .learning), .learning)
+        XCTAssertEqual(ProGate.context(for: .viewOnlyRental), .secondProperty)
+    }
+
     func testTodayRecordLockNeedsTenHours() {
         XCTAssertFalse(ProGate.showsTodayRecordLock(isPro: false, confirmedHours: 9.99))
         XCTAssertTrue(ProGate.showsTodayRecordLock(isPro: false, confirmedHours: 10))
@@ -94,7 +117,10 @@ final class PaywallCopyTests: XCTestCase {
     }
 
     func testUnlockProIsSpelledTheSameEverywhere() {
-        XCTAssertEqual(PriceDisplay(billed: "$29.99", intro: nil).buttonTitle(large: true), "Unlock")
+        // 2.3: the paywall's primary names the offer, never a price; the locks still say Unlock Pro.
+        XCTAssertEqual(PriceDisplay(billed: "$49.99", trialDays: 14).buttonTitle, "Start free trial")
+        XCTAssertEqual(PriceDisplay(billed: "$49.99", trialDays: nil).buttonTitle, "Subscribe")
+        XCTAssertEqual(PriceDisplay(billed: "$49.99", trialDays: 0).buttonTitle, "Subscribe", "a 0-day offer is no trial")
         XCTAssertEqual(UnlockProButton(entry: .exportPage, action: {}).title, "Unlock Pro")
     }
 
@@ -117,28 +143,36 @@ final class PaywallCopyTests: XCTestCase {
 }
 
 final class PriceDisplayTests: XCTestCase {
+    /// App Review 3.1.2: the billed amount is first and strictly the largest price text, with or
+    /// without the trial, in any locale's price string.
     func testBilledAmountIsFirstAndLargest() {
-        for large in [false, true] {
-            let display = PriceDisplay(billed: "$29.99", intro: "Includes a free week")
-            let elements = display.elements(large: large)
-            XCTAssertEqual(elements.first?.role, .billed)
-            XCTAssertTrue(display.billedIsMostProminent(large: large))
-            let introIndex = elements.firstIndex { $0.role == .intro }!
-            XCTAssertGreaterThan(introIndex, 0, "Intro copy sits below the billed amount")
-            XCTAssertLessThan(elements[introIndex].pointSize, PriceDisplay.billedSize)
+        for days: Int? in [14, nil] {
+            for price in ["$49.99", "€54,99", "¥7,000"] {
+                let display = PriceDisplay(billed: price, trialDays: days)
+                let elements = display.elements()
+                XCTAssertEqual(elements.first?.role, .billed)
+                XCTAssertEqual(elements.first?.text, price, "StoreKit's string, never a literal")
+                XCTAssertTrue(display.billedIsMostProminent(), "\(price) \(String(describing: days))")
+                for element in elements.dropFirst() {
+                    XCTAssertLessThan(element.pointSize, PriceDisplay.billedSize, "\(element.role) must be smaller")
+                }
+            }
         }
     }
 
-    func testButtonCarriesTheBilledPriceAtDefaultSizes() {
-        let display = PriceDisplay(billed: "€34,99", intro: nil)
-        XCTAssertEqual(display.buttonTitle(large: false), "Unlock for €34,99", "The localized App Store string, never a literal")
-        XCTAssertEqual(display.buttonTitle(large: true), "Unlock")
-        XCTAssertLessThan(PriceDisplay.buttonSize, PriceDisplay.billedSize)
-        XCTAssertLessThan(PriceDisplay.captionSize, PriceDisplay.billedSize)
+    func testTheTrialIsWordedBelowThePriceAndNamesTheRenewal() {
+        let trial = PriceDisplay(billed: "$49.99", trialDays: 14)
+        XCTAssertEqual(trial.planLine, "Free for 14 days, then $49.99 a year. Renews each year until you cancel.")
+        XCTAssertTrue(trial.elements().contains { $0.role == .timeline }, "the timeline's renewal line is a price mention")
+        let plain = PriceDisplay(billed: "$49.99", trialDays: nil)
+        XCTAssertEqual(plain.planLine, "$49.99 a year. Renews each year until you cancel.")
+        XCTAssertFalse(plain.elements().contains { $0.role == .tag || $0.role == .timeline }, "no trial words without a trial")
+        XCTAssertEqual(PriceDisplay.billedSize, 34, ".largeTitle")
+        XCTAssertLessThan(PriceDisplay.periodSize, PriceDisplay.billedSize)
     }
 
-    func testAccessibilityReadsAOneTimePurchase() {
-        XCTAssertEqual(PriceDisplay(billed: "$29.99", intro: nil).accessibilityLabel, "$29.99, one-time purchase")
+    func testAccessibilityReadsAYearlyPrice() {
+        XCTAssertEqual(PriceDisplay(billed: "$49.99", trialDays: 14).accessibilityLabel, "$49.99 a year")
     }
 }
 
@@ -182,9 +216,10 @@ final class PaywallFlowTests: XCTestCase {
 
 @MainActor
 private final class FakeStore: ProPurchasing {
-    var isPro = false
+    var plan: Plan = .free
+    var isPro: Bool { plan.hasProAccess }
     var proDisplayPrice: String?
-    var proIsFamilyShareable = false
+    var introTrialDays: Int? = 14
     var priceAfterLoad: String? = "$29.99"
     var purchaseOutcome: SubscriptionManager.PurchaseOutcome = .purchased
     var restoreFinds = false
@@ -196,18 +231,23 @@ private final class FakeStore: ProPurchasing {
     func loadProducts() async { proDisplayPrice = priceAfterLoad }
     func purchasePro(lateOutcome: @escaping @MainActor (SubscriptionManager.PurchaseOutcome) -> Void) async -> SubscriptionManager.PurchaseOutcome {
         purchases += 1
-        if purchaseOutcome == .purchased { isPro = true }
+        if purchaseOutcome == .purchased { plan = FakeStore.trial(); introTrialDays = nil }
         if purchaseOutcome == .timedOut { isPurchaseInFlight = true; late = lateOutcome }
         return purchaseOutcome
     }
     @MainActor func finishLate(_ outcome: SubscriptionManager.PurchaseOutcome) {
         isPurchaseInFlight = false
-        if outcome == .purchased { isPro = true }
+        if outcome == .purchased { plan = FakeStore.trial(); introTrialDays = nil }
         late?(outcome)
     }
     func restorePurchases() async -> Bool {
-        if restoreFinds { isPro = true }
+        if restoreFinds { plan = .founding(alsoSubscribed: false) }
         return restoreFinds
+    }
+
+    static func trial(now: Date = Date()) -> Plan {
+        .trial(Plan.Subscription(startedAt: now, expiresAt: now.addingTimeInterval(14 * 86_400), willAutoRenew: true,
+                                 inGracePeriod: false, originalTransactionID: 7))
     }
 }
 
@@ -584,8 +624,29 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         let manager = SubscriptionManager.shared
         await manager.loadProducts()
         let product = try XCTUnwrap(manager.proProduct)
+        XCTAssertEqual(product.id, ProductIDs.yearly, "2.3 sells the yearly plan")
         XCTAssertEqual(manager.proDisplayPrice, product.displayPrice)
-        XCTAssertEqual(manager.proIsFamilyShareable, product.isFamilyShareable)
+        XCTAssertEqual(manager.introTrialDays, 14, "a fresh account gets Apple's 14-day trial")
+    }
+
+    func testBuyingTheYearlyPlanStartsTheTrialNotTheFoundingFlag() async throws {
+        let manager = SubscriptionManager.shared
+        await manager.loadProducts()
+        _ = try await session.buyProduct(identifier: ProductIDs.yearly)
+        await waitForPro(manager)
+        let dump = await entitlementsDump()
+        XCTAssertTrue(manager.isPro, dump)
+        XCTAssertFalse(manager.plan.isFounding, "a subscription never sets the lifetime flag")
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: UserScope.key("isProUser")))
+        if case .trial(let sub) = manager.plan {
+            XCTAssertEqual(TrialSchedule.current(manager.plan).map { $0.renewal }, sub.expiresAt)
+        } else if case .pro = manager.plan {
+            // The test session may bill without the intro offer; Pro either way.
+        } else {
+            XCTFail("expected a trial or Pro, got \(manager.plan)")
+        }
+        // Intro-offer eligibility after a purchase isn't reliable inside SKTestSession (it still
+        // says eligible); the "Subscribe" offer is covered against a fake in PaywallTrialFlowTests.
     }
 
     // A unit-test host has no window to confirm `Product.purchase()` in, so these drive the

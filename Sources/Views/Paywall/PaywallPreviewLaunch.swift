@@ -66,22 +66,144 @@ enum RestoreFailureLaunch {
     }
 }
 
+/// DEBUG-only launch hooks for the 2.3 plan states (captures and UI tests). Applied once, from
+/// the shell's `PlanMomentsHost`, before Today reads the data.
+///
+/// `-LHPlanSeed d23`                Pine Cabin 420h and Oak Street Duplex 46h this year, the 750h goal
+///                                  (the hi-fi frames' data); Pine Cabin logged 1.5h today.
+/// `-LHPlanLastKind trial|pro`      how Pro ended (the pick sheet's first line).
+/// `-LHFreeRentalPick <name>`       the free rental, picked `-LHFreeRentalPickedDaysAgo <n>` days ago (default 1).
+/// `-LHPlanFounding`               a founding (lifetime) buyer: Pro, every rental logs.
+/// `-LHPlanMoment day12|pickFree`   show that sheet on Today (day 12: renewal in 2 days).
+/// `-LHTrialStartPreview`           with `-LHPaywallPreview`: the trial-start moment instead of the paywall.
+@MainActor
+enum PricingDebugLaunch {
+    private static var didApply = false
+    private static var didForce = false
+    private static var args: [String] { ProcessInfo.processInfo.arguments }
+
+    static func value(_ flag: String) -> String? {
+        guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
+        return args[i + 1]
+    }
+
+    static func applyIfNeeded(app: AppViewModel) {
+        guard !didApply else { return }
+        didApply = true
+        if value("-LHPlanSeed") == "d23" { seedD23(app) }
+        if args.contains("-LHPlanFounding") {
+            EntitlementStore.shared.setFoundingFlag(true)
+            SubscriptionManager.shared.checkSubscriptionStatus()
+        }
+        if let kind = value("-LHPlanLastKind") {
+            UserDefaults.standard.set(kind, forKey: UserScope.key(PlanMomentsHost.lastPlanKey))
+        }
+        if let name = value("-LHFreeRentalPick"), let rental = app.properties.first(where: { $0.name == name }) {
+            let days = value("-LHFreeRentalPickedDaysAgo").flatMap(Double.init) ?? 1
+            let chosenAt = Date().addingTimeInterval(-days * 86_400)
+            EntitlementFreeRentalLocal().adopt(FreeRentalSelection(rentalID: rental.id, chosenAt: chosenAt, source: .picked))
+        }
+    }
+
+    /// A plain launch shows the plan sheets on their own; a seeded launch (`-LHMockScenario`)
+    /// only with `-LHPlanSeed`, `-LHPlanLastKind` or `-LHPlanMoments on`.
+    static var allowsAutomaticMoments: Bool {
+        guard args.contains("-LHMockScenario") else { return true }
+        return value("-LHPlanSeed") != nil || value("-LHPlanLastKind") != nil || value("-LHPlanMoments") == "on"
+    }
+
+    /// The sheet a capture asks for, once.
+    static func forcedMoment() -> PlanMoment? {
+        guard !didForce, let raw = value("-LHPlanMoment") else { return nil }
+        didForce = true
+        switch raw {
+        case "day12":
+            let renewal = Calendar.current.date(byAdding: .day, value: TrialSchedule.reminderLeadDays,
+                                                to: Calendar.current.startOfDay(for: Date())) ?? Date()
+            return .day12(renewal: renewal, originalTransactionID: 0)
+        case "pickFree":
+            return .pickFree(.trialEnded)
+        default:
+            return nil
+        }
+    }
+
+    private static func seedD23(_ app: AppViewModel) {
+        GoalManager.shared.setGoalChoice(.reps750)
+        let plan: [(String, Double)] = [("Pine Cabin", 420), ("Oak Street Duplex", 46)]
+        let wasSuppressed = app.suppressCelebrations
+        app.suppressCelebrations = true
+        defer { app.suppressCelebrations = wasSuppressed }
+        let rentals = plan.map { item in
+            app.properties.first { $0.name == item.0 } ?? RentalProperty(name: item.0, address: "", propertyType: .ltr)
+        }
+        app.properties = rentals
+        app.timeEntries = []
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let year = calendar.component(.year, from: today)
+        let kinds: [ActivityCategory] = [.repairs, .management, .leasing, .bookkeeping]
+        for (i, rental) in rentals.enumerated() {
+            var remaining = plan[i].1
+            if i == 0, let at = calendar.date(byAdding: .hour, value: 9, to: today) {
+                app.timeEntries.append(TimeEntry(propertyId: rental.id, participant: .selfParticipant, category: .repairs,
+                                                 hours: 1.5, date: at, notes: ""))
+                remaining -= 1.5
+            }
+            var daysBack = 2
+            while remaining > 0.0001 {
+                let hours = min(8, remaining)
+                guard let day = calendar.date(byAdding: .day, value: -daysBack, to: today),
+                      calendar.component(.year, from: day) == year,
+                      let at = calendar.date(byAdding: .hour, value: 10, to: day) else { break }
+                app.timeEntries.append(TimeEntry(propertyId: rental.id, participant: .selfParticipant,
+                                                 category: kinds[daysBack % kinds.count], hours: hours, date: at, notes: ""))
+                remaining -= hours
+                daysBack += 1
+            }
+        }
+        app.saveData()
+    }
+}
+
 struct PaywallPreviewRoot: View {
     let launch: PaywallPreviewLaunch
+
+    /// `-LHPaywallOffer subscribe` pins the no-trial offer (the trial already used);
+    /// `founding` / `foundingSubscribed` pin the owned page of a founding buyer.
+    private var pinnedOffer: PaywallOffer? {
+        switch PricingDebugLaunch.value("-LHPaywallOffer") {
+        case "subscribe"?: return .subscribe
+        case "founding"?, "foundingSubscribed"?: return .owned
+        default: return nil
+        }
+    }
+
+    private var pinnedPlan: Plan? {
+        switch PricingDebugLaunch.value("-LHPaywallOffer") {
+        case "founding"?: return .founding(alsoSubscribed: false)
+        case "foundingSubscribed"?: return .founding(alsoSubscribed: true)
+        default: return nil
+        }
+    }
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var ready = false
 
     var body: some View {
         Group {
-            if ready {
+            if ready && ProcessInfo.processInfo.arguments.contains("-LHTrialStartPreview") {
+                TrialStartView(renewal: Calendar.current.date(byAdding: .day, value: TrialSchedule.defaultTrialDays,
+                                                              to: PaywallClock.now()) ?? Date(),
+                               price: subscriptionManager.proDisplayPrice,
+                               onAddRentals: {}, onMakePDF: {}, onDone: {})
+            } else if ready {
                 PaywallView(
                     context: launch.context,
                     propertyName: launch.propertyName,
                     confirmedHours: launch.hours,
                     pinnedPhase: launch.phase,
-                    startsBelowFold: launch.belowFold,
-                    holdsPageLoading: launch.pageLoading,
-                    forcesSample: launch.sample,
+                    pinnedOffer: pinnedOffer,
+                    pinnedPlan: pinnedPlan,
                     onClose: {}
                 )
             } else {

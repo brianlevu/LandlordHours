@@ -159,7 +159,42 @@ struct LogPropertyPicker: View {
         })
     }
 
+    /// 2.3: on the free plan a view-only rental shows locked, naming the free rental. A tap opens
+    /// the paywall (`LockEntry.logPicker`); after a purchase the rental is picked.
+    @ViewBuilder
     private func row(_ property: RentalProperty, index: Int) -> some View {
+        if viewModel.canLog(at: property.id) {
+            openRow(property, index: index)
+        } else {
+            lockedRow(property, index: index)
+        }
+    }
+
+    private func lockedRow(_ property: RentalProperty, index: Int) -> some View {
+        let meta = viewModel.freeRentalName.map {
+            String(localized: "picker.locked.meta", defaultValue: "Free plan logs at \($0)", table: "Pricing")
+        } ?? String(localized: "picker.locked.metaNoName", defaultValue: "View only on the free plan", table: "Pricing")
+        return LHRow.Browse(title: property.name, meta: meta, showsChevron: false, action: {
+            paywall = ProPaywallRequest(context: ProGate.context(for: .logPicker), entry: .logPicker, onUnlocked: {
+                onPick(property.id)
+                dismiss()
+            })
+        }) {
+            PropertySeal(property, in: properties, size: 32)
+        }
+        .overlay(alignment: .trailing) {
+            Image(systemName: "lock")
+                .font(.body)
+                .foregroundStyle(colors.textSecondary)
+                .padding(.trailing, 16)
+                .accessibilityHidden(true)
+        }
+        .accessibilityValue(String(localized: "picker.locked.value", defaultValue: "View only", table: "Pricing"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("picker.property.\(index)")
+    }
+
+    private func openRow(_ property: RentalProperty, index: Int) -> some View {
         let on = property.id == selected
         return LHRow.Browse(title: property.name, meta: property.address.isEmpty ? nil : property.address, showsChevron: false,
                             action: {

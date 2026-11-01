@@ -120,7 +120,7 @@ extension AppViewModel {
 
     /// Free plan: one rental. True when adding another needs Pro.
     var propertiesAtFreeLimit: Bool {
-        ProGate.isAtPropertyLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
+        !EntitlementStore.shared.canAddRental(rentalCount: properties.count)
     }
 
     /// True for a material participation goal without a grouping election: each row can say
@@ -196,6 +196,11 @@ enum PropertyLimit {
 
     static func isAtLimit(isPro: Bool, propertyCount: Int) -> Bool {
         ProGate.isAtPropertyLimit(isPro: isPro, propertyCount: propertyCount)
+    }
+
+    /// 2.3: the plan decides (`FreeRentalPolicy.canAddRental`).
+    static func isAtLimit(plan: Plan, propertyCount: Int) -> Bool {
+        !FreeRentalPolicy.canAddRental(plan: plan, rentalCount: propertyCount)
     }
 
     static let lockLine = ProGate.lockLine(.propertiesLimit)

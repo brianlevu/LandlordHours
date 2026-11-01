@@ -32,6 +32,10 @@ enum PaywallContext: String, CaseIterable, Identifiable {
     case todayUnlock = "dashboardUnlock"
     /// The Pro card at the top of Settings.
     case settings = "settingsUpgrade"
+    /// 2.3: the care plan (package B calls `ProPaywallPresenter.present(entry: .carePlan)`).
+    case carePlan
+    /// 2.3: lessons (package C calls `ProPaywallPresenter.present(entry: .learning)`).
+    case learning
 
     var id: String { rawValue }
 }
@@ -54,6 +58,18 @@ enum LockEntry: String, CaseIterable, Identifiable {
     case todayRecord = "today_record"
     /// Inbox: a suggestion at a new rental while the free plan is full.
     case inboxLimit = "inbox_limit"
+    /// 2.3: a view-only rental's page ("See Pro" on the view-only card).
+    case viewOnlyRental = "view_only_rental"
+    /// 2.3: the Log time rental picker, on a view-only rental.
+    case logPicker = "log_picker"
+    /// 2.3: "See Pro" on the pick-your-free-rental sheet.
+    case freeRentalPick = "free_rental_pick"
+    /// 2.3: Settings › Free rental, the Pro row.
+    case freeRentalSettings = "free_rental_settings"
+    /// 2.3: the care plan's locked preview (package B).
+    case carePlan = "care_plan"
+    /// 2.3: a lesson past the free preview (package C).
+    case learning = "learning"
 
     var id: String { rawValue }
 }
@@ -63,6 +79,32 @@ enum LockEntry: String, CaseIterable, Identifiable {
 enum ProGate {
     /// The free plan covers one rental.
     static let freeRentals = 1
+
+    // MARK: 2.3: every lock reads the plan (`Plan.allows(_:)`), never `isPro`.
+
+    /// The feature each entry point sells.
+    static func feature(for entry: LockEntry) -> ProFeature {
+        switch entry {
+        case .exportPage, .reportsExport, .settingsExport, .todayRecord: return .export
+        case .propertiesLimit, .inboxLimit, .viewOnlyRental, .logPicker, .freeRentalPick, .freeRentalSettings, .settingsPro:
+            return .allRentals
+        case .carePlan: return .carePlan
+        case .learning: return .learning
+        }
+    }
+
+    /// Whether the entry point shows its lock for this plan.
+    static func isLocked(_ entry: LockEntry, plan: Plan, propertyCount: Int = 0, confirmedHours: Double = 0) -> Bool {
+        let allowed = plan.allows(feature(for: entry))
+        switch entry {
+        case .propertiesLimit, .inboxLimit:
+            return !FreeRentalPolicy.canAddRental(plan: plan, rentalCount: propertyCount)
+        case .todayRecord:
+            return !allowed && confirmedHours.isFinite && confirmedHours >= todayRecordMinimumHours
+        default:
+            return !allowed
+        }
+    }
     /// Today shows "Your record" once a free user has this many confirmed hours.
     static let todayRecordMinimumHours: Double = 10
 
@@ -85,7 +127,7 @@ enum ProGate {
         switch entry {
         case .exportPage, .reportsExport, .settingsExport: return isExportLocked(isPro: isPro)
         case .propertiesLimit, .inboxLimit: return isAtPropertyLimit(isPro: isPro, propertyCount: propertyCount)
-        case .settingsPro: return !isPro
+        case .settingsPro, .viewOnlyRental, .logPicker, .freeRentalPick, .freeRentalSettings, .carePlan, .learning: return !isPro
         case .todayRecord: return showsTodayRecordLock(isPro: isPro, confirmedHours: confirmedHours)
         }
     }
@@ -94,9 +136,12 @@ enum ProGate {
     static func context(for entry: LockEntry) -> PaywallContext {
         switch entry {
         case .exportPage, .reportsExport, .settingsExport: return .export
-        case .propertiesLimit, .inboxLimit: return .secondProperty
+        case .propertiesLimit, .inboxLimit, .viewOnlyRental, .logPicker, .freeRentalPick, .freeRentalSettings:
+            return .secondProperty
         case .settingsPro: return .settings
         case .todayRecord: return .todayUnlock
+        case .carePlan: return .carePlan
+        case .learning: return .learning
         }
     }
 
@@ -106,7 +151,13 @@ enum ProGate {
         case .exportPage: return "This is the record your accountant gets."
         case .reportsExport, .settingsExport: return "Export comes with Pro."
         case .propertiesLimit, .inboxLimit: return "Free covers one rental."
-        case .settingsPro: return "Dormer Pro"
+        case .settingsPro, .freeRentalSettings, .freeRentalPick: return "Dormer Pro"
+        case .viewOnlyRental, .logPicker:
+            return String(localized: "lock.viewOnly.line", defaultValue: "View only on the free plan.", table: "Pricing")
+        case .carePlan:
+            return String(localized: "lock.carePlan.line", defaultValue: "Care plans come with Pro.", table: "Pricing")
+        case .learning:
+            return String(localized: "lock.learning.line", defaultValue: "Lessons come with Pro.", table: "Pricing")
         case .todayRecord: return "Your \(wholeHours(confirmedHours)) hours, ready to export."
         }
     }
@@ -120,7 +171,12 @@ enum ProGate {
         case .propertiesLimit, .inboxLimit:
             let name = firstPropertyName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return "\(name?.isEmpty == false ? name! : "Your rental") keeps tracking. Nothing is lost."
-        case .settingsPro: return "Pay once. Everything you have stays free."
+        case .settingsPro, .freeRentalSettings, .freeRentalPick:
+            return String(localized: "lock.freeRental.keeps", defaultValue: "One rental stays free for good.", table: "Pricing")
+        case .viewOnlyRental, .logPicker:
+            return String(localized: "lock.viewOnly.keeps", defaultValue: "Its hours stay in your total.", table: "Pricing")
+        case .carePlan, .learning:
+            return String(localized: "lock.pro.keeps", defaultValue: "Your hours and your free rental stay as they are.", table: "Pricing")
         }
     }
 
@@ -158,8 +214,16 @@ struct PaywallCopy: Equatable {
                                nextStep: "See your record")
         case .settings:
             return PaywallCopy(headline: "Dormer Pro",
-                               planLine: "Every rental, the PDF and spreadsheet, and the record of where each hour came from.",
+                               planLine: "Every rental, the PDF and spreadsheet, care plans and lessons.",
                                nextStep: "Done")
+        case .carePlan:
+            return PaywallCopy(headline: "A care plan for each rental",
+                               planLine: "The upkeep each season brings, per rental. You log it and set the hours.",
+                               nextStep: "See the care plan")
+        case .learning:
+            return PaywallCopy(headline: "Short lessons in plain words",
+                               planLine: "What counts toward your hours, one card at a time. Each ends with what to ask your CPA.",
+                               nextStep: "Keep reading")
         }
     }
 
@@ -172,10 +236,13 @@ struct PaywallCopy: Equatable {
     ]
 }
 
-// MARK: - Price display (App Review: the billed amount is the most conspicuous price)
+// MARK: - Price display (App Review 3.1.2: the billed amount is the most conspicuous price)
 
+/// Every price the 2.3 paywall shows, with its size, so a test can prove the billed amount
+/// (StoreKit's `displayPrice`, never a literal) is first and strictly the largest. The trial is
+/// always worded below it and smaller ("Free for 14 days, then <price> a year").
 struct PriceDisplay: Equatable {
-    enum Role: String, Equatable { case billed, caption, button, intro }
+    enum Role: String, Equatable { case billed, period, planLine, timeline, button, tag }
 
     struct Element: Equatable {
         let role: Role
@@ -184,38 +251,68 @@ struct PriceDisplay: Equatable {
         let pointSize: CGFloat
     }
 
-    /// The App Store's localized price, e.g. "$29.99". Never hardcoded.
+    /// The App Store's localized price, e.g. "<price>". Never hardcoded.
     let billed: String
-    /// Optional trial or intro copy. Always subordinate: smaller and below the billed amount.
-    let intro: String?
+    /// Days of Apple's free trial, nil when the person can't get one (then the button subscribes).
+    let trialDays: Int?
 
-    static let billedSize: CGFloat = 44
-    static let captionSize: CGFloat = 15
+    /// `.largeTitle` bold rounded.
+    static let billedSize: CGFloat = 34
+    /// "a year": `.title3` semibold.
+    static let periodSize: CGFloat = 20
+    /// The plan line under the price and the timeline lines: `.subheadline`.
+    static let lineSize: CGFloat = 15
     static let buttonSize: CGFloat = 17
-    static let introSize: CGFloat = 13
-    static let caption = "one payment, no subscription"
+    /// The "14 days free" tag: `.footnote`.
+    static let tagSize: CGFloat = 13
 
-    /// The buy button's label. At large text sizes it drops the price ("Unlock").
-    func buttonTitle(large: Bool) -> String { large ? "Unlock" : "Unlock for \(billed)" }
+    var offersTrial: Bool { (trialDays ?? 0) > 0 }
 
-    /// Everything on the page that mentions money, top to bottom.
-    func elements(large: Bool) -> [Element] {
+    /// The primary button. Never a price: the billed amount stays the one big price.
+    var buttonTitle: String {
+        offersTrial ? String(localized: "paywall.cta.trial", defaultValue: "Start free trial", table: "Pricing")
+                    : String(localized: "paywall.cta.subscribe", defaultValue: "Subscribe", table: "Pricing")
+    }
+
+    var period: String { String(localized: "paywall.price.period", defaultValue: "a year", table: "Pricing") }
+
+    /// "Free for 14 days, then <price> a year. Renews each year until you cancel." or, without a
+    /// trial, "<price> a year. Renews each year until you cancel."
+    var planLine: String {
+        if let days = trialDays, days > 0 {
+            return String(localized: "paywall.price.lineTrial",
+                          defaultValue: "Free for \(days) days, then \(billed) a year. Renews each year until you cancel.",
+                          table: "Pricing")
+        }
+        return String(localized: "paywall.price.line", defaultValue: "\(billed) a year. Renews each year until you cancel.",
+                      table: "Pricing")
+    }
+
+    /// Everything on the page that mentions money, top to bottom (the timeline sits above the
+    /// card but its renewal line is `.subheadline`, smaller than the billed amount).
+    func elements() -> [Element] {
         var list = [Element(role: .billed, text: billed, pointSize: Self.billedSize),
-                    Element(role: .caption, text: Self.caption, pointSize: Self.captionSize)]
-        if let intro { list.append(Element(role: .intro, text: intro, pointSize: Self.introSize)) }
-        list.append(Element(role: .button, text: buttonTitle(large: large), pointSize: Self.buttonSize))
+                    Element(role: .period, text: period, pointSize: Self.periodSize),
+                    Element(role: .planLine, text: planLine, pointSize: Self.lineSize)]
+        if offersTrial {
+            list.append(Element(role: .timeline, text: billed, pointSize: Self.lineSize))
+            list.append(Element(role: .tag, text: "\(trialDays ?? 0)", pointSize: Self.tagSize))
+        }
+        list.append(Element(role: .button, text: buttonTitle, pointSize: Self.buttonSize))
         return list
     }
 
     /// The billed amount is first and strictly larger than every other price element.
-    func billedIsMostProminent(large: Bool) -> Bool {
-        let all = elements(large: large)
+    func billedIsMostProminent() -> Bool {
+        let all = elements()
         guard let first = all.first, first.role == .billed else { return false }
         return all.dropFirst().allSatisfy { $0.pointSize < first.pointSize }
     }
 
-    /// VoiceOver: "29 dollars 99, one-time purchase" style, from the localized price.
-    var accessibilityLabel: String { "\(billed), one-time purchase" }
+    /// VoiceOver: "<price> a year".
+    var accessibilityLabel: String {
+        String(localized: "paywall.price.a11y", defaultValue: "\(billed) a year", table: "Pricing")
+    }
 }
 
 // MARK: - Purchase flow

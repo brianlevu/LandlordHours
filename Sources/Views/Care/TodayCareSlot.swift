@@ -109,12 +109,11 @@ struct TodayCareSlot: View {
             LHRowGroup(onPage: true) {
                 LockedPreview(
                     size: .row,
-                    // Placeholder until package A adds `LockEntry.carePlan` (build plan §2, integration order).
-                    entry: .settingsPro,
+                    entry: .carePlan,
                     line: CareText.lockLine,
                     keeps: dynamicTypeSize.isAccessibilitySize ? "" : CareText.lockKeeps,
                     surface: colors.backgroundSecondary,
-                    onUnlock: { ProPaywallPresenter.shared.present(entry: .settingsPro) }
+                    onUnlock: { ProPaywallPresenter.shared.present(entry: .carePlan) }
                 ) {
                     if !dynamicTypeSize.isAccessibilitySize, let first = plan.todayItems.first {
                         CareRow(item: first) {}

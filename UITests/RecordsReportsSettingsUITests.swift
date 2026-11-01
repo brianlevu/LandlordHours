@@ -82,7 +82,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
             XCTAssertTrue(disclosure.label.contains("we never see it"), disclosure.label)
             XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle below iOS 27")
         }
-        element("settings.capture.muted").tap()
+        tapWhenReady(element("settings.capture.muted"))
         XCTAssertTrue(element("settings.muted.screen").waitForExistence(timeout: 5))
     }
 
@@ -145,6 +145,29 @@ final class RecordsReportsSettingsUITests: XCTestCase {
             XCTAssertTrue(app.buttons["tab.today"].isSelected, "Reports and Settings sit under Today")
             tapRetrying(back, until: element("today.hero"))
         }
+    }
+
+    /// 2.3: Settings' plan rows follow the plan. Free with two rentals: the Pro card names the
+    /// yearly price, Free rental names the rental you log at and opens its page; no Manage
+    /// subscriptions (nothing to manage).
+    func testSettingsPlanRowsFollowThePlan() {
+        launch(tab: 4, scenario: "emptyMainTabs",
+               extra: ["-LHPlanSeed", "d23", "-LHFreeRentalPick", "Pine Cabin", "-LHFreeRentalPickedDaysAgo", "1"])
+        let card = app.buttons["settings.proCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 20), "Free: the Pro card")
+        let line = app.staticTexts["settings.proCard.line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 12))
+        XCTAssertTrue(line.label.contains("$"), "StoreKit's price: \(line.label)")
+        XCTAssertTrue(element("settings.planTag").exists, "The plan tag under the name")
+        let free = app.buttons["settings.freeRental"]
+        var swipes = 0
+        while !free.isHittable && swipes < 4 { app.swipeUp(); swipes += 1 }
+        XCTAssertTrue(free.exists, "Free rental row")
+        XCTAssertTrue(free.label.contains("Pine Cabin"), free.label)
+        XCTAssertFalse(app.buttons["settings.manageSubscriptions"].exists, "Nothing to manage on the free plan")
+        free.tap()
+        XCTAssertTrue(element("plan.freeRental").waitForExistence(timeout: 8), "Settings › Free rental")
+        XCTAssertTrue(app.buttons["freeRental.back"].exists)
     }
 
     // MARK: Frames
@@ -382,6 +405,24 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         let tabBar = app.buttons["tab.today"]
         if tabBar.exists, element.frame.maxY > tabBar.frame.minY - 8 {
             app.swipeUp()
+        }
+        // And clear of the compact title, which floats over the top of the list once it scrolls
+        // (the plan rows above Auto-capture can leave a row parked under it).
+        let title = app.descendants(matching: .any)["screen.compactTitle"].firstMatch
+        let headerBottom = title.exists && title.frame.maxY > 0 ? title.frame.maxY + 12 : 110
+        if element.frame.minY < headerBottom + 8 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            // Slow, with a hold before release, so the list doesn't fling.
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 160)),
+                        withVelocity: .slow, thenHoldForDuration: 0.3)
+        }
+        // A tap while the list is still decelerating only stops the scroll; wait until it rests.
+        var last = element.frame
+        for _ in 0..<15 {
+            Thread.sleep(forTimeInterval: 0.2)
+            let now = element.frame
+            if now == last { break }
+            last = now
         }
         element.tap()
     }

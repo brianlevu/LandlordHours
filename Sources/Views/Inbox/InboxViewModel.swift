@@ -86,7 +86,8 @@ final class InboxViewModel: ObservableObject {
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         spouseTracking: @escaping () -> Bool = { TaxProfileManager.shared.spouseTracking },
-        isPro: @escaping () -> Bool = { SubscriptionManager.shared.isPro },
+        // 2.3: the plan decides (a trial counts), never the legacy `isPro` flag.
+        isPro: @escaping () -> Bool = { EntitlementStore.shared.plan.allows(.allRentals) },
         waitList: ProWaitList = .shared,
         undoWindow: TimeInterval = 5
     ) {
@@ -245,6 +246,7 @@ final class InboxViewModel: ObservableObject {
     @discardableResult
     func log(_ suggestion: Suggestion, edits: SuggestionEdits) -> CaptureConfirmResult {
         let missing = missingFields(suggestion, edits: edits)
+        if missing == [.plan], let app { showProblem(app.viewOnlyLogMessage) }
         guard missing.isEmpty else { return .needsInput(missing: missing) }
         let result = save(latest(suggestion), edits: edits)
         if result.entryId != nil, sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
@@ -317,7 +319,16 @@ final class InboxViewModel: ObservableObject {
         if property == nil || !properties.contains(where: { $0.id == property }) { missing.insert(.property) }
         if (edits.category ?? suggestion.proposedCategory) == nil { missing.insert(.category) }
         if (edits.hours ?? suggestion.proposedHours ?? 0) <= 0 { missing.insert(.hours) }
+        // 2.3: a view-only rental (free plan) takes no new entry.
+        if missing.isEmpty, let property, let app, !app.canLog(at: property) { missing.insert(.plan) }
         return missing
+    }
+
+    /// 2.3: the item is at a rental that is view-only on the free plan.
+    func isAtViewOnlyRental(_ suggestion: Suggestion, edits: SuggestionEdits = SuggestionEdits()) -> Bool {
+        guard let property = edits.propertyId ?? suggestion.proposedPropertyId, let app,
+              app.properties.contains(where: { $0.id == property }) else { return false }
+        return !app.canLog(at: property)
     }
 
     static var noProfileMessage: String {

@@ -128,7 +128,7 @@ struct LessonSheet: View {
 // MARK: - Presenting a lesson (shared by Today and the list)
 
 /// Presents the lesson sheet for `open`, or the paywall when the person's plan doesn't cover it.
-/// The paywall entry is `.settingsPro` until package A adds `LockEntry.learning`.
+/// The paywall entry is `LockEntry.learning`.
 struct LessonSheetHost: ViewModifier {
     @Binding var open: LessonOpen?
     @EnvironmentObject private var viewModel: AppViewModel
@@ -157,7 +157,7 @@ struct LessonSheetHost: ViewModifier {
         open = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             // After a purchase the lesson opens in full.
-            ProPaywallPresenter.shared.present(entry: .settingsPro, onUnlocked: { open = LessonOpen(lessonID: lessonID, access: .full) })
+            ProPaywallPresenter.shared.present(entry: .learning, onUnlocked: { open = LessonOpen(lessonID: lessonID, access: .full) })
         }
     }
 }
@@ -181,7 +181,7 @@ enum LessonLauncher {
     static func open(_ lessonID: String, card: Int = 0, into binding: Binding<LessonOpen?>) {
         let allowed = EntitlementStore.shared.plan.allows(.learning) && !debugFree
         switch LessonAccess.route(lessonID: lessonID, firstLessonID: LearnLibrary.lessons.first?.id, allowed: allowed) {
-        case .paywall: ProPaywallPresenter.shared.present(entry: .settingsPro)
+        case .paywall: ProPaywallPresenter.shared.present(entry: .learning)
         case let access: binding.wrappedValue = LessonOpen(lessonID: lessonID, card: card, access: access)
         }
     }

@@ -36,6 +36,8 @@ enum PropertyEditorMode: Identifiable, Equatable {
 struct PropertiesView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var subscription = SubscriptionManager.shared
+    /// 2.3: the plan and the free-rental pick (the limit and view-only redraw on a change).
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @ObservedObject private var taxProfile = TaxProfileManager.shared
     @ObservedObject private var goalManager = GoalManager.shared
     @Environment(\.colorScheme) private var colorScheme

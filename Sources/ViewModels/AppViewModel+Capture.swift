@@ -77,6 +77,8 @@ extension AppViewModel {
         guard missing.isEmpty, let propertyId, let category, let hours else {
             return .needsInput(missing: missing)
         }
+        // 2.3: a view-only rental (free plan) takes no new entry; the hours there stay counted.
+        guard canLog(at: propertyId) else { return .needsInput(missing: [.plan]) }
 
         let houseHoursBefore = houseCountableHours()
         let source = suggestion.kind.entrySource

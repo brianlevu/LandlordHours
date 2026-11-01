@@ -222,23 +222,155 @@ struct ProTintedButtonStyle: ButtonStyle {
 
 // MARK: - The one paywall host
 
-/// Installed once on the shell. Presents `ProPaywallPresenter.shared.request` full screen.
+/// Installed once on the shell. Presents `ProPaywallPresenter.shared.request` full screen, and
+/// the 2.3 plan moments as sheets (`PlanMomentsHost`): the day-12 reminder and the free-rental pick.
 struct ProPaywallHost: ViewModifier {
     @ObservedObject var presenter: ProPaywallPresenter = .shared
     @EnvironmentObject private var viewModel: AppViewModel
 
     func body(content: Content) -> some View {
-        content.fullScreenCover(item: $presenter.request) { request in
-            PaywallView(
-                context: request.context,
-                entry: request.entry,
-                year: request.year,
-                propertyName: request.propertyName,
-                confirmedHours: request.confirmedHours,
-                onUnlocked: request.onUnlocked,
-                onClose: { presenter.dismiss() }
-            )
-            .environmentObject(viewModel)
+        content
+            .background { PlanMomentsHost() }
+            .fullScreenCover(item: $presenter.request) { request in
+                PaywallView(
+                    context: request.context,
+                    entry: request.entry,
+                    year: request.year,
+                    propertyName: request.propertyName,
+                    confirmedHours: request.confirmedHours,
+                    onUnlocked: request.onUnlocked,
+                    onClose: { presenter.dismiss() }
+                )
+                .environmentObject(viewModel)
+            }
+    }
+}
+
+/// A plan moment the shell shows on its own (never while the paywall is up).
+enum PlanMoment: Identifiable, Equatable {
+    case day12(renewal: Date, originalTransactionID: UInt64)
+    case pickFree(PickFreeRentalSheet.Reason)
+
+    var id: String {
+        switch self {
+        case .day12(_, let id): return "day12.\(id)"
+        case .pickFree: return "pickFree"
+        }
+    }
+
+    /// What to show for this plan right now: the reminder first, then the pick.
+    static func next(plan: Plan, shouldShowDay12: Bool, needsPick: Bool, lastPlanKind: String?) -> PlanMoment? {
+        if shouldShowDay12, case .trial(let sub) = plan {
+            return .day12(renewal: sub.expiresAt, originalTransactionID: sub.originalTransactionID)
+        }
+        if needsPick {
+            switch lastPlanKind {
+            case "trial": return .pickFree(.trialEnded)
+            case "pro": return .pickFree(.proEnded)
+            default: return .pickFree(.unknown)
+            }
+        }
+        return nil
+    }
+}
+
+/// Watches the plan and shows the day-12 sheet and the pick sheet. Keeps the day-12 local
+/// notification in step (`TrialReminderScheduler`) and remembers the last plan kind per profile,
+/// so the pick sheet can say "Your trial has ended" rather than guess.
+struct PlanMomentsHost: View {
+    @EnvironmentObject private var viewModel: AppViewModel
+    @ObservedObject private var store = EntitlementStore.shared
+    @ObservedObject private var presenter = ProPaywallPresenter.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var moment: PlanMoment?
+    /// "See Pro" closed the pick sheet: not a swipe, so no default is kept (the sheet comes back
+    /// if the paywall closes without a purchase).
+    @State private var leavingForPaywall = false
+
+    static let lastPlanKey = "pricing.lastPlan.v1"
+
+    var body: some View {
+        Color.clear
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onAppear {
+                #if DEBUG
+                PricingDebugLaunch.applyIfNeeded(app: viewModel)
+                #endif
+                evaluate()
+            }
+            .onChange(of: store.plan) { _, _ in evaluate() }
+            .onChange(of: viewModel.properties.count) { _, _ in evaluate() }
+            .onChange(of: presenter.request == nil) { _, closed in if closed { evaluate() } }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                evaluate()
+                // Auto-renew turned off in Settings › Subscriptions arrives as a renewal change:
+                // re-read StoreKit so the day-12 reminder is cancelled (a plan change re-runs evaluate).
+                Task { await SubscriptionManager.shared.refreshEntitlements() }
+            }
+            .sheet(item: $moment, onDismiss: dismissed) { moment in
+                switch moment {
+                case .day12(let renewal, let id):
+                    Day12ReminderSheet(renewal: renewal, price: subscriptionManager.proDisplayPrice,
+                                       freeRentalName: viewModel.freeRentalName,
+                                       onAnswered: { store.markDay12ReminderShown(for: id) })
+                        .presentationDetents([.fraction(0.72), .large])
+                        .presentationDragIndicator(.visible)
+                        .environmentObject(viewModel)
+                case .pickFree(let reason):
+                    PickFreeRentalSheet(reason: reason, onSeePro: {
+                        leavingForPaywall = true
+                        self.moment = nil
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(450))
+                            ProPaywallPresenter.shared.present(entry: .freeRentalPick)
+                        }
+                    })
+                    .presentationDetents([.fraction(0.7), .large])
+                    .presentationDragIndicator(.visible)
+                    .environmentObject(viewModel)
+                }
+            }
+    }
+
+    private var lastPlanKind: String? { UserDefaults.standard.string(forKey: UserScope.key(Self.lastPlanKey)) }
+
+    private func evaluate() {
+        let plan = store.plan
+        Task { await TrialReminderScheduler.shared.sync(plan: plan, price: subscriptionManager.proDisplayPrice) }
+        defer {
+            // Remember Pro plans only; "free" never overwrites how Pro ended.
+            if plan.hasProAccess { UserDefaults.standard.set(plan.kind, forKey: UserScope.key(Self.lastPlanKey)) }
+        }
+        guard presenter.request == nil, moment == nil, viewModel.isSignedIn else { return }
+        #if DEBUG
+        if let forced = PricingDebugLaunch.forcedMoment() { moment = forced; return }
+        // Seeded DEBUG launches (UI tests, captures) show the plan sheets only when they ask
+        // for them, so a seed with two free rentals doesn't cover every other screen's test.
+        guard PricingDebugLaunch.allowsAutomaticMoments else { return }
+        #endif
+        let next = PlanMoment.next(plan: plan, shouldShowDay12: store.shouldShowDay12Reminder(),
+                                   needsPick: store.needsFreeRentalPick(rentals: viewModel.rentalUsages),
+                                   lastPlanKind: lastPlanKind)
+        guard case .pickFree? = next else { moment = next; return }
+        // Before asking, read iCloud once: a pick made on another device wins over a new one
+        // here (and keeps its month clock).
+        Task { @MainActor in
+            await FreeRentalSync.shared.syncNow()
+            guard presenter.request == nil, moment == nil,
+                  store.needsFreeRentalPick(rentals: viewModel.rentalUsages) else { return }
+            moment = next
+        }
+    }
+
+    /// A swipe-down on the pick sheet keeps the most-used rental (without using up the pick).
+    private func dismissed() {
+        if leavingForPaywall { leavingForPaywall = false; return }
+        if store.needsFreeRentalPick(rentals: viewModel.rentalUsages) {
+            store.keepDefaultFreeRental(rentals: viewModel.rentalUsages)
+            FreeRentalSync.shared.localPickChanged()
         }
     }
 }

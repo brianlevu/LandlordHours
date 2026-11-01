@@ -44,9 +44,26 @@ extension LogTimeSheet {
             : ordered
         LogChipFlow(spacing: 8) {
             ForEach(Array(shown.prefix(ordered.count > 6 ? 12 : 6).enumerated()), id: \.element.id) { index, property in
-                LHChip(property.name, isSelected: form.propertyId == property.id) { pick(property: property.id) }
+                if viewModel.canLog(at: property.id) {
+                    LHChip(property.name, isSelected: form.propertyId == property.id) { pick(property: property.id) }
+                        .accessibilityIdentifier("log.pick.property.\(index)")
+                } else {
+                    // 2.3: view-only on the free plan. A tap opens the paywall; after a purchase
+                    // the rental is picked.
+                    LHChip(property.name, systemImage: "lock", isSelected: false) {
+                        paywall = ProPaywallRequest(context: ProGate.context(for: .logPicker), entry: .logPicker,
+                                                    onUnlocked: { pick(property: property.id) })
+                    }
+                    .accessibilityValue(String(localized: "picker.locked.value", defaultValue: "View only", table: "Pricing"))
                     .accessibilityIdentifier("log.pick.property.\(index)")
+                }
             }
+        }
+        if let free = viewModel.freeRentalName, shown.contains(where: { !viewModel.canLog(at: $0.id) }) {
+            Text(String(localized: "picker.locked.meta", defaultValue: "Free plan logs at \(free)", table: "Pricing"))
+                .font(.footnote)
+                .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textSecondary)
+                .accessibilityIdentifier("log.pick.freeRentalNote")
         }
         if viewModel.canAddProperty() {
             Button {

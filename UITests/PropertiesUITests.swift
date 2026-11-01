@@ -385,6 +385,7 @@ final class PropertiesUITests: XCTestCase {
             UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", "occasional",
             "-LHPropertiesSeed", seed,
+            "-LHPlanMoments", "on",   // 2.3: the plan sheets show as they do for real users
             "-LHInitialTab", "1",
             "-LHColorScheme", scheme,
             "-AppleLanguages", "(en)",
@@ -402,6 +403,14 @@ final class PropertiesUITests: XCTestCase {
         }
         XCTAssertTrue(ready, "the app launched to the tab bar, a sheet or an alert")
         Thread.sleep(forTimeInterval: 3)
+        // 2.3: a free owner with two rentals and no pick gets "Pick your free rental" first.
+        // A swipe-down keeps the most-used one (the limit tests then run as before).
+        let pick = app.descendants(matching: .any)["plan.pickFree"].firstMatch
+        if seed == "limit2" {
+            XCTAssertTrue(pick.waitForExistence(timeout: 6), "two rentals on the free plan, no pick: the pick sheet")
+            pick.swipeDown(velocity: .fast)
+            XCTAssertTrue(pick.waitForNonExistence(timeout: 6), "a swipe-down closes it")
+        }
         // First keyboard on a fresh simulator shows a one-time typing tip.
         let tip = app.buttons["Continue"]
         if tip.exists { tip.tap() }

@@ -96,7 +96,7 @@ enum RecordPageHighlight: Equatable {
             let name = propertyName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return .newRow(name?.isEmpty == false ? name! : "Your next rental")
         case .todayUnlock: return .total
-        case .export, .settings: return .none
+        case .export, .settings, .carePlan, .learning: return .none
         }
     }
 }

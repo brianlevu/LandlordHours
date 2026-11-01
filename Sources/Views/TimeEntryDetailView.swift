@@ -26,6 +26,9 @@ struct TimeEntryDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingDiscardAlert = false
     @State private var savedTick = 0
+    /// 2.3: an edit refused at a view-only rental: the reason, shown under the hours card.
+    @State private var refusal: String?
+    @State private var refusedTick = 0
 
     init(entry: TimeEntry) {
         self.entry = entry
@@ -58,6 +61,13 @@ struct TimeEntryDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
                 hoursCard
+                if let refusal, !isEditing {
+                    Label(refusal, systemImage: "exclamationmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.caution)
+                        .padding(.horizontal, 4)
+                        .accessibilityIdentifier("entry.refused")
+                }
                 if isEditing { editSections } else { readSections }
             }
             .padding(.horizontal, LHMetrics.gutter)
@@ -80,6 +90,7 @@ struct TimeEntryDetailView: View {
                         .disabled(!hasChanges)
                 } else {
                     LHHeaderAction(title: RR.t("record.edit", "Edit"), identifier: "entry.edit") {
+                        refusal = nil
                         animate { isEditing = true }
                     }
                 }
@@ -102,6 +113,7 @@ struct TimeEntryDetailView: View {
             Text(RR.t("record.discard.message", "Your edits to this record will be lost."))
         }
         .sensoryFeedback(.success, trigger: savedTick)
+        .sensoryFeedback(.error, trigger: refusedTick)
         .navigationBarBackButtonHidden(isEditing)
         .accessibilityIdentifier("entry.detail")
     }
@@ -347,9 +359,18 @@ struct TimeEntryDetailView: View {
         updated.date = date
         updated.participant = participant
         updated.modifiedAt = Date()
-        viewModel.updateTimeEntry(updated)
-        savedTick += 1
-        animate { isEditing = false }
+        switch viewModel.updateTimeEntry(updated) {
+        case .refused(let reason):
+            // Show what is really saved, say why, and buzz an error (never the success haptic).
+            discardChanges()
+            refusal = reason
+            refusedTick += 1
+            UIAccessibility.post(notification: .announcement, argument: reason)
+        case .saved, .notFound:
+            refusal = nil
+            savedTick += 1
+            animate { isEditing = false }
+        }
     }
 
     private func cancelEditing() {

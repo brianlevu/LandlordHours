@@ -1,0 +1,1502 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "common.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    },
+    "common.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "day12.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro renews on its own. To stop it, cancel in Settings at least a day before."
+          }
+        }
+      }
+    },
+    "day12.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel in Settings"
+          }
+        }
+      }
+    },
+    "day12.ifCancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you cancel"
+          }
+        }
+      }
+    },
+    "day12.keep": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Pro"
+          }
+        }
+      }
+    },
+    "day12.keeps.hours": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every hour you logged stays."
+          }
+        }
+      }
+    },
+    "day12.keeps.oneRental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You keep logging at one rental, free."
+          }
+        }
+      }
+    },
+    "day12.keeps.rental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You keep logging at %@, free."
+          }
+        }
+      }
+    },
+    "day12.needsPro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other rentals and the PDF need Pro."
+          }
+        }
+      }
+    },
+    "day12.price.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a year, from %@"
+          }
+        }
+      }
+    },
+    "day12.price.from": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "a year, from %@"
+          }
+        }
+      }
+    },
+    "day12.push.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro renews at %@ a year on %@. To stop it, cancel in Settings at least a day before."
+          }
+        }
+      }
+    },
+    "day12.push.bodyNoPrice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro renews on %@. To stop it, cancel in Settings at least a day before."
+          }
+        }
+      }
+    },
+    "day12.push.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial ends in 2 days"
+          }
+        }
+      }
+    },
+    "day12.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial ends in %lld days"
+          }
+        }
+      }
+    },
+    "freeRental.confirm.keep": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it as it is"
+          }
+        }
+      }
+    },
+    "freeRental.confirm.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch once a month. Every rental’s hours stay in your total."
+          }
+        }
+      }
+    },
+    "freeRental.confirm.switch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to %@"
+          }
+        }
+      }
+    },
+    "freeRental.confirm.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log at %@ for free?"
+          }
+        }
+      }
+    },
+    "freeRental.pro.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a year, with the PDF"
+          }
+        }
+      }
+    },
+    "freeRental.pro.metaNoPrice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every rental, with the PDF"
+          }
+        }
+      }
+    },
+    "freeRental.pro.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log at every rental"
+          }
+        }
+      }
+    },
+    "freeRental.refused": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You switched this month. You can switch again on %@."
+          }
+        }
+      }
+    },
+    "freeRental.row.kept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldh this year · kept in your total"
+          }
+        }
+      }
+    },
+    "freeRental.row.locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldh this year · switch on %@"
+          }
+        }
+      }
+    },
+    "freeRental.row.lockedHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch on %@"
+          }
+        }
+      }
+    },
+    "freeRental.rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch once a month."
+          }
+        }
+      }
+    },
+    "freeRental.rule.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch once a month. Your next switch is on %@."
+          }
+        }
+      }
+    },
+    "freeRental.section.logAt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You log at"
+          }
+        }
+      }
+    },
+    "freeRental.section.pro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro"
+          }
+        }
+      }
+    },
+    "freeRental.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The free plan logs at one rental."
+          }
+        }
+      }
+    },
+    "freeRental.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free rental"
+          }
+        }
+      }
+    },
+    "lock.carePlan.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Care plans come with Pro."
+          }
+        }
+      }
+    },
+    "lock.freeRental.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One rental stays free for good."
+          }
+        }
+      }
+    },
+    "lock.learning.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lessons come with Pro."
+          }
+        }
+      }
+    },
+    "lock.pro.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours and your free rental stay as they are."
+          }
+        }
+      }
+    },
+    "lock.viewOnly.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its hours stay in your total."
+          }
+        }
+      }
+    },
+    "lock.viewOnly.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only on the free plan."
+          }
+        }
+      }
+    },
+    "log.viewOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The free plan logs at %@. Pro logs at every rental."
+          }
+        }
+      }
+    },
+    "log.viewOnlyNoName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The free plan logs at one rental. Pro logs at every rental."
+          }
+        }
+      }
+    },
+    "paywall.cancelRule": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel any time in Settings, at least a day before it renews."
+          }
+        }
+      }
+    },
+    "paywall.card.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer Pro"
+          }
+        }
+      }
+    },
+    "paywall.card.tag": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld days free"
+          }
+        }
+      }
+    },
+    "paywall.care.headline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A care plan for each rental"
+          }
+        }
+      }
+    },
+    "paywall.care.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The upkeep each season brings, per rental. You log it and set the hours."
+          }
+        }
+      }
+    },
+    "paywall.care.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See the care plan"
+          }
+        }
+      }
+    },
+    "paywall.cta.buying": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for the App Store"
+          }
+        }
+      }
+    },
+    "paywall.cta.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "paywall.cta.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting the price"
+          }
+        }
+      }
+    },
+    "paywall.cta.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        }
+      }
+    },
+    "paywall.cta.subscribe": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subscribe"
+          }
+        }
+      }
+    },
+    "paywall.cta.trial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start free trial"
+          }
+        }
+      }
+    },
+    "paywall.inPro.care.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For each rental"
+          }
+        }
+      }
+    },
+    "paywall.inPro.care.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Care plans and lessons"
+          }
+        }
+      }
+    },
+    "paywall.inPro.header": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Pro"
+          }
+        }
+      }
+    },
+    "paywall.inPro.pdf.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus the spreadsheet"
+          }
+        }
+      }
+    },
+    "paywall.inPro.pdf.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PDF for your CPA"
+          }
+        }
+      }
+    },
+    "paywall.inPro.rentals.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log at as many as you own"
+          }
+        }
+      }
+    },
+    "paywall.inPro.rentals.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every rental"
+          }
+        }
+      }
+    },
+    "paywall.learn.headline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short lessons in plain words"
+          }
+        }
+      }
+    },
+    "paywall.learn.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What counts toward your hours, one card at a time. Each ends with what to ask your CPA."
+          }
+        }
+      }
+    },
+    "paywall.learn.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep reading"
+          }
+        }
+      }
+    },
+    "paywall.notNow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now? You keep logging at one rental for free, and every hour stays."
+          }
+        }
+      }
+    },
+    "paywall.price.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a year"
+          }
+        }
+      }
+    },
+    "paywall.price.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a year. Renews each year until you cancel."
+          }
+        }
+      }
+    },
+    "paywall.price.lineTrial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free for %lld days, then %@ a year. Renews each year until you cancel."
+          }
+        }
+      }
+    },
+    "paywall.price.period": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "a year"
+          }
+        }
+      }
+    },
+    "paywall.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        }
+      }
+    },
+    "paywall.privacy.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        }
+      }
+    },
+    "paywall.restore": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore purchase"
+          }
+        }
+      }
+    },
+    "paywall.restore.checking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        }
+      }
+    },
+    "paywall.status.askToBuy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval. Pro turns on when it comes through."
+          }
+        }
+      }
+    },
+    "paywall.status.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t finish the purchase. Nothing was charged. Try again in a moment."
+          }
+        }
+      }
+    },
+    "paywall.status.finishing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still finishing your purchase…"
+          }
+        }
+      }
+    },
+    "paywall.status.priceFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t reach the App Store."
+          }
+        }
+      }
+    },
+    "paywall.status.restoreNone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No purchase found on this Apple Account."
+          }
+        }
+      }
+    },
+    "paywall.success": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro is on"
+          }
+        }
+      }
+    },
+    "paywall.success.announce": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro is on"
+          }
+        }
+      }
+    },
+    "paywall.terms": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms"
+          }
+        }
+      }
+    },
+    "paywall.terms.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of Use"
+          }
+        }
+      }
+    },
+    "paywall.timeline.reminder.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We remind you that the trial ends in %lld days."
+          }
+        }
+      }
+    },
+    "paywall.timeline.reminder.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In %lld days · %@"
+          }
+        }
+      }
+    },
+    "paywall.timeline.renew.noPrice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro renews each year. Cancel at least a day before and you pay nothing."
+          }
+        }
+      }
+    },
+    "paywall.timeline.renew.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro renews at %@ a year. Cancel at least a day before and you pay nothing."
+          }
+        }
+      }
+    },
+    "paywall.timeline.renew.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In %lld days · %@"
+          }
+        }
+      }
+    },
+    "paywall.timeline.today.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro is on: every rental, your PDF, care plans and lessons."
+          }
+        }
+      }
+    },
+    "paywall.timeline.today.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        }
+      }
+    },
+    "paywall.title.subscribe": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer Pro"
+          }
+        }
+      }
+    },
+    "paywall.title.trial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How your trial works"
+          }
+        }
+      }
+    },
+    "pickFree.cta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log at %@"
+          }
+        }
+      }
+    },
+    "pickFree.footnote": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch once a month in Settings."
+          }
+        }
+      }
+    },
+    "pickFree.lead.free": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The free plan logs at one rental. Every rental’s hours stay in your total."
+          }
+        }
+      }
+    },
+    "pickFree.lead.pro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Pro plan has ended. You can keep logging at one rental for free. Every rental’s hours stay in your total."
+          }
+        }
+      }
+    },
+    "pickFree.lead.trial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial has ended. You can keep logging at one rental for free. Every rental’s hours stay in your total."
+          }
+        }
+      }
+    },
+    "pickFree.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick your free rental"
+          }
+        }
+      }
+    },
+    "picker.locked.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free plan logs at %@"
+          }
+        }
+      }
+    },
+    "picker.locked.metaNoName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only on the free plan"
+          }
+        }
+      }
+    },
+    "picker.locked.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only"
+          }
+        }
+      }
+    },
+    "plan.founding.alsoSubscribed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You also have a yearly plan. You don’t need it with Pro for life. You can cancel it in Manage subscriptions."
+          }
+        }
+      }
+    },
+    "plan.founding.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You bought Dormer Pro for life. Every rental, the PDF, care plans and lessons stay open."
+          }
+        }
+      }
+    },
+    "plan.founding.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro for life"
+          }
+        }
+      }
+    },
+    "plan.free.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You log at one rental for free."
+          }
+        }
+      }
+    },
+    "plan.free.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free plan"
+          }
+        }
+      }
+    },
+    "plan.manage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage subscriptions"
+          }
+        }
+      }
+    },
+    "plan.pro.ends": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro ends on %@. It won’t renew."
+          }
+        }
+      }
+    },
+    "plan.pro.renews": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro renews on %@."
+          }
+        }
+      }
+    },
+    "plan.pro.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro is on"
+          }
+        }
+      }
+    },
+    "plan.tag.founding": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro for life"
+          }
+        }
+      }
+    },
+    "plan.tag.free": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free plan"
+          }
+        }
+      }
+    },
+    "plan.tag.pro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro"
+          }
+        }
+      }
+    },
+    "plan.tag.trial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro · Trial"
+          }
+        }
+      }
+    },
+    "plan.trial.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything in Pro is open until %@. Then %@ a year unless you cancel."
+          }
+        }
+      }
+    },
+    "plan.trial.bodyEnds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything in Pro is open until %@. It won’t renew."
+          }
+        }
+      }
+    },
+    "plan.trial.bodyNoPrice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything in Pro is open until %@. Then it renews each year unless you cancel."
+          }
+        }
+      }
+    },
+    "plan.trial.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial is on"
+          }
+        }
+      }
+    },
+    "seePro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See Pro"
+          }
+        }
+      }
+    },
+    "seePro.price": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See Pro · %@ a year"
+          }
+        }
+      }
+    },
+    "settings.freeRental.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free rental"
+          }
+        }
+      }
+    },
+    "settings.proCard.noPrice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every rental, the PDF, care plans"
+          }
+        }
+      }
+    },
+    "settings.proCard.price": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a year"
+          }
+        }
+      }
+    },
+    "settings.proCard.trial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a year · %lld days free"
+          }
+        }
+      }
+    },
+    "settings.restore.found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Pro is back."
+          }
+        }
+      }
+    },
+    "trialStart.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything in Pro is open until %@. We’ll remind you on %@. Then %@ a year unless you cancel."
+          }
+        }
+      }
+    },
+    "trialStart.bodyNoPrice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything in Pro is open until %@. We’ll remind you on %@. Then it renews each year unless you cancel."
+          }
+        }
+      }
+    },
+    "trialStart.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "trialStart.pdf.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The record your CPA gets"
+          }
+        }
+      }
+    },
+    "trialStart.pdf.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make your first PDF"
+          }
+        }
+      }
+    },
+    "trialStart.rentals.meta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each gets its own care plan"
+          }
+        }
+      }
+    },
+    "trialStart.rentals.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your other rentals"
+          }
+        }
+      }
+    },
+    "trialStart.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial is on."
+          }
+        }
+      }
+    },
+    "trialStart.tryFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try these first"
+          }
+        }
+      }
+    },
+    "viewOnly.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You log at %@ for free. The %lld hours here stay in your total."
+          }
+        }
+      }
+    },
+    "viewOnly.bodyNoName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The free plan logs at one rental. The %lld hours here stay in your total."
+          }
+        }
+      }
+    },
+    "viewOnly.switch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch rental"
+          }
+        }
+      }
+    },
+    "viewOnly.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View only on the free plan"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
