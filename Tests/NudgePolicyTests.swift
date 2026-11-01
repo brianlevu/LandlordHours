@@ -50,11 +50,15 @@ final class NudgePolicyTests: XCTestCase {
     }
 
     func testOnlyTheKindsTheyTurnedOnAreScheduled() {
-        for kind in NudgeKind.allCases {
+        // Each kind needs its own moment: behind needs a pace gap within reach, year end needs Dec 1 close.
+        let cases: [(NudgeKind, Date, Double)] = [
+            (.weeklyPace, date(2026, 12, 10), 700), (.behindPace, date(2026, 10, 5), 300),
+            (.yearEnd, date(2026, 11, 25), 600), (.carePlan, date(2026, 12, 10), 700)
+        ]
+        for (kind, now, hours) in cases {
             var s = NudgeSettings()
             s.set(kind, true)
-            let now = date(2026, 12, 10)
-            let out = NudgePolicy.plan(settings: s, facts: facts(now: now, hours: 600, care: [gutters()]), ledger: [])
+            let out = NudgePolicy.plan(settings: s, facts: facts(now: now, hours: hours, care: [gutters()]), ledger: [])
             XCTAssertFalse(out.plans.isEmpty, "\(kind) should plan something")
             XCTAssertTrue(out.plans.allSatisfy { $0.kind == kind }, "\(kind) switch leaked another kind")
         }
@@ -83,6 +87,53 @@ final class NudgePolicyTests: XCTestCase {
         XCTAssertEqual(NudgePolicy.hoursPerWeek(facts(hours: 800)), 0, "a met goal asks for no more hours")
     }
 
+    // MARK: Out of reach
+
+    /// Now = Nov 4: 57 days, 9 weeks left. 399h logged leaves 351h = 39h a week; 381h leaves 369h = 41h.
+    func testAPaceOf39HoursAWeekStillSendsAndAt41ItIsSuppressed() {
+        var s = NudgeSettings(); s.weeklyPace = true
+        let reach = facts(now: date(2026, 11, 4), hours: 399)
+        XCTAssertEqual(NudgePolicy.hoursPerWeek(reach), 39)
+        XCTAssertTrue(NudgePolicy.isPaceInReach(reach))
+        XCTAssertFalse(NudgePolicy.plan(settings: s, facts: reach, ledger: []).plans.isEmpty, "39h a week sends")
+
+        let far = facts(now: date(2026, 11, 4), hours: 381)
+        XCTAssertEqual(NudgePolicy.hoursPerWeek(far), 41)
+        XCTAssertFalse(NudgePolicy.isPaceInReach(far))
+        XCTAssertTrue(NudgePolicy.plan(settings: s, facts: far, ledger: []).plans.isEmpty, "41h a week sends nothing")
+    }
+
+    func testExactlyFortyHoursAWeekStillSends() {
+        // 360h left over 9 weeks is exactly 40h a week.
+        let f = facts(now: date(2026, 11, 4), hours: 390)
+        XCTAssertEqual(NudgePolicy.hoursPerWeek(f), 40)
+        var s = NudgeSettings(); s.weeklyPace = true
+        XCTAssertFalse(NudgePolicy.plan(settings: s, facts: f, ledger: []).plans.isEmpty)
+    }
+
+    func testBehindPaceIsAlsoSuppressedWhenOutOfReach() {
+        var s = NudgeSettings(); s.behindPace = true
+        let far = facts(now: date(2026, 11, 20), hours: 300)   // far behind, and 450h in 6 weeks is out of reach
+        XCTAssertFalse(NudgePolicy.isPaceInReach(far))
+        XCTAssertTrue(NudgePolicy.isBehind(far))
+        XCTAssertTrue(NudgePolicy.plan(settings: s, facts: far, ledger: []).plans.isEmpty)
+    }
+
+    func testOutOfReachDoesNotSilenceCareOrYearEnd() {
+        var s = NudgeSettings(); s.carePlan = true; s.yearEnd = true
+        let out = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 11, 25), hours: 100, care: [gutters()]), ledger: [])
+        XCTAssertTrue(out.plans.contains { $0.kind == .carePlan })
+        XCTAssertTrue(out.plans.contains { $0.kind == .yearEnd })
+    }
+
+    func testTheOutOfReachLineIsCalmAndPlain() {
+        let text = NudgeCopy.outOfReach(target: 750)
+        XCTAssertTrue(text.body.contains("750"))
+        for word in ["qualif", "audit", "evidence", "proof", "compliance", "!"] {
+            XCTAssertFalse(text.body.lowercased().contains(word))
+        }
+    }
+
     // MARK: Quiet hours
 
     func testNoPlanEverLandsInQuietHours() {
@@ -91,7 +142,7 @@ final class NudgePolicyTests: XCTestCase {
             for end in 0..<24 {
                 var s = allOn()
                 s.quietStartHour = start; s.quietEndHour = end
-                let out = NudgePolicy.plan(settings: s, facts: facts(now: now, hours: 500, care: [gutters()]), ledger: [])
+                let out = NudgePolicy.plan(settings: s, facts: facts(now: now, hours: 700, care: [gutters()]), ledger: [])
                 for plan in out.plans {
                     XCTAssertFalse(s.isQuiet(plan.fireDate, calendar: utc), "quiet \(start)-\(end): \(plan.kind) at \(plan.fireDate)")
                     XCTAssertGreaterThan(plan.fireDate, now)
@@ -123,7 +174,7 @@ final class NudgePolicyTests: XCTestCase {
 
     func testAtMostOneNudgeADay() {
         let now = date(2026, 12, 10)
-        let out = NudgePolicy.plan(settings: allOn(), facts: facts(now: now, hours: 500, care: [gutters()]), ledger: [])
+        let out = NudgePolicy.plan(settings: allOn(), facts: facts(now: now, hours: 700, care: [gutters()]), ledger: [])
         let days = out.plans.map { utc.startOfDay(for: $0.fireDate) }
         XCTAssertEqual(days.count, Set(days).count, "two nudges on one day")
     }
@@ -148,7 +199,7 @@ final class NudgePolicyTests: XCTestCase {
 
     func testYearEndBeatsWeeklyOnTheSameSunday() {
         var s = NudgeSettings(); s.yearEnd = true; s.weeklyPace = true
-        let out = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 12, 14), hours: 600), ledger: [])
+        let out = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 12, 14), hours: 720), ledger: [])
         let dec20 = out.plans.filter { utc.isDate($0.fireDate, inSameDayAs: date(2026, 12, 20)) }
         XCTAssertEqual(dec20.map(\.kind), [.yearEnd])
     }
@@ -177,7 +228,7 @@ final class NudgePolicyTests: XCTestCase {
         let caughtUp = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 10, 1), hours: 700), ledger: first.ledger)
         XCTAssertTrue(caughtUp.ledger.filter { $0.kind == .behindPace }.allSatisfy { $0.released == true },
                       "catching up releases the latch but keeps the entry for the caps")
-        let again = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 11, 20), hours: 300), ledger: caughtUp.ledger)
+        let again = NudgePolicy.plan(settings: s, facts: facts(now: date(2026, 10, 5), hours: 300), ledger: caughtUp.ledger)
         XCTAssertEqual(again.plans.map(\.kind), [.behindPace])
     }
 
@@ -291,6 +342,7 @@ final class NudgeSchedulerTests: XCTestCase {
     private var clock = date(2026, 11, 4)
     private var care: [CareDueItem] = []
     private var scope = "profile-a"
+    private var proUnlocked = true
 
     override func setUp() async throws {
         suiteName = "nudge-tests-\(UUID().uuidString)"
@@ -299,6 +351,7 @@ final class NudgeSchedulerTests: XCTestCase {
         clock = date(2026, 11, 4)
         care = []
         scope = "profile-a"
+        proUnlocked = true
     }
 
     override func tearDown() async throws {
@@ -314,7 +367,7 @@ final class NudgeSchedulerTests: XCTestCase {
         NudgeScheduler(center: center, store: store ?? makeStore(), now: { [unowned self] in self.clock }, calendar: { utc },
                        facts: { [unowned self] now, cal in
                            NudgeFacts(now: now, calendar: cal, rentals: [pine, lake], yearHours: 420, targetHours: 750,
-                                      careItems: self.care, carePlanUnlocked: true)
+                                      careItems: self.care, carePlanUnlocked: self.proUnlocked)
                        },
                        profileID: { [unowned self] in self.scope })
     }
@@ -424,6 +477,21 @@ final class NudgeSchedulerTests: XCTestCase {
         let ids = Array(center.pending.keys)
         XCTAssertEqual(ids.count, Set(ids).count)
         XCTAssertEqual(ids.count, 3)
+    }
+
+    /// The care due source does not check Pro, so the scheduler must: no plan, no care nudge.
+    func testCareNudgesGoOnlyToPeopleWithProOrATrial() async {
+        care = [gutters()]
+        turnOn(.carePlan)
+        proUnlocked = false
+        await makeScheduler().rebuild(reason: "launch")
+        XCTAssertTrue(center.pending.isEmpty, "a free person gets no care nudge")
+        proUnlocked = true
+        await makeScheduler().rebuild(reason: "foreground")
+        XCTAssertEqual(center.pending.count, 1, "Pro or a trial does")
+        proUnlocked = false   // Pro ends: the pending care nudge is cancelled by the next rebuild
+        await makeScheduler().rebuild(reason: "foreground")
+        XCTAssertTrue(center.pending.isEmpty)
     }
 
     func testAProfileSwitchNeverReadsTheOtherProfilesChoices() async {

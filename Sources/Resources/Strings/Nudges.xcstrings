@@ -34,6 +34,17 @@
         }
       }
     },
+    "nudge.outOfReach.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld by Dec 31 is out of reach at this pace. Keep logging what you do."
+          }
+        }
+      }
+    },
     "nudge.weekly.body": {
       "extractionState": "manual",
       "localizations": {

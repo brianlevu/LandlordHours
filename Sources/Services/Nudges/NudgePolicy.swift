@@ -53,6 +53,9 @@ enum NudgePolicy {
     static let careRepeatDays = 30
     /// "Behind" means this many weeks of the pace the goal needs.
     static let behindWeeks = 2.0
+    /// More than this many hours a week to reach the goal by Dec 31 is out of reach. Past it, no
+    /// pace nudge is sent: asking someone for 165 hours a week invites padded logs.
+    static let maxReachableHoursPerWeek = 40
     /// Too early in the year for a pace to mean anything.
     static let minDaysIntoYear = 60
 
@@ -93,6 +96,8 @@ enum NudgePolicy {
         }
         var candidates: [Candidate] = []
         let hasData = facts.yearHours > 0 && !facts.rentals.isEmpty
+        // The weekly and behind-pace nudges only go out while the goal is within reach.
+        let paceInReach = isPaceInReach(facts)
 
         if settings.yearEnd, hasData {
             let year = cal.component(.year, from: now)
@@ -106,7 +111,7 @@ enum NudgePolicy {
             }
         }
 
-        if settings.behindPace, behind, !sent.contains(where: { $0.kind == .behindPace && $0.released != true }) {
+        if settings.behindPace, behind, paceInReach, !sent.contains(where: { $0.kind == .behindPace && $0.released != true }) {
             let today = cal.startOfDay(for: now)
             var fire = at(hour: morningHour, on: today, cal) ?? now
             if fire <= now { fire = at(hour: morningHour, on: cal.date(byAdding: .day, value: 1, to: today) ?? today, cal) ?? fire }
@@ -115,7 +120,7 @@ enum NudgePolicy {
                                         title: text.title, body: text.body, rentalID: nil, movable: false))
         }
 
-        if settings.weeklyPace, hasData {
+        if settings.weeklyPace, hasData, paceInReach {
             let today = cal.startOfDay(for: now)
             for offset in 0..<horizonDays {
                 guard let day = cal.date(byAdding: .day, value: offset, to: today),
@@ -202,6 +207,11 @@ enum NudgePolicy {
         let daysLeft = max(1, daysInYear(facts) - dayOfYear(facts))
         let weeksLeft = max(1, Int((Double(daysLeft) / 7).rounded(.up)))
         return Int((remaining / Double(weeksLeft)).rounded(.up))
+    }
+
+    /// False when the hours a week still needed to reach the goal exceed `maxReachableHoursPerWeek`.
+    static func isPaceInReach(_ facts: NudgeFacts) -> Bool {
+        hoursPerWeek(facts) <= maxReachableHoursPerWeek
     }
 
     // MARK: Care

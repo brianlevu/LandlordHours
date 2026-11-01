@@ -80,6 +80,9 @@ final class RemindersSettingsModel: ObservableObject {
     /// The weekly note as it would read now: the person's own numbers, or an example with none yet.
     func weeklyPreview(now: Date = Date()) -> NotificationText {
         if let facts = NudgeScheduler.liveFacts(now: now, calendar: .current), facts.yearHours > 0 {
+            if !NudgePolicy.isPaceInReach(facts) {
+                return NudgeCopy.outOfReach(target: NudgePolicy.wholeHours(facts.targetHours))
+            }
             return NudgeCopy.weekly(hours: NudgePolicy.wholeHours(facts.yearHours), target: NudgePolicy.wholeHours(facts.targetHours),
                                     perWeek: NudgePolicy.hoursPerWeek(facts))
         }

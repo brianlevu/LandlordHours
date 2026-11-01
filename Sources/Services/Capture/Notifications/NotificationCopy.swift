@@ -143,6 +143,14 @@ enum NudgeCopy {
             "nudge.weekly.body", "%lld of %lld this year. About %lldh a week gets you to %lld by Dec 31.", hours, target, perWeek, target))
     }
 
+    /// The calm line for a goal that is out of reach at this pace. Settings preview only: no
+    /// notification is ever sent with it.
+    static func outOfReach(target: Int) -> NotificationText {
+        NotificationText(
+            title: NudgeStrings.t("nudge.weekly.title", "Your week"),
+            body: NudgeStrings.f("nudge.outOfReach.body", "%lld by Dec 31 is out of reach at this pace. Keep logging what you do.", target))
+    }
+
     /// "Your pace" / "About 24h behind the pace for 750 by Dec 31."
     static func behind(hoursBehind: Int, target: Int) -> NotificationText {
         NotificationText(
