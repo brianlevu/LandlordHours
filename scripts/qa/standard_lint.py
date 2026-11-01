@@ -372,6 +372,8 @@ SANCTIONED = {
         "§1.27 work pane: the in-pane push has its own back link (twoPane.detail.back), no bar title",
     ("hand-header", "Sources/Views/Adaptive/TodayWorkPane.swift", "detail(suggestion).toolbar(.hidden, for: .navigationBar)"):
         "§1.27 work pane: the in-pane detail, same back link",
+    ("hand-header", "Sources/Views/Adaptive/PaneDetail.swift", ".toolbar(.hidden, for: .navigationBar)"):
+        "§1.27 work pane: PaneDetail draws its own back link (twoPane.detail.back)",
 }
 
 

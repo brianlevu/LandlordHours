@@ -304,6 +304,7 @@
 		B580A8580F507A16764185EA /* DeleteAllDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704554FA174B868E4DADC6C6 /* DeleteAllDataView.swift */; };
 		B5F73CAE05D2C81BA12CFF27 /* WidgetSurfaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B096F094B4EC75F494CEA419 /* WidgetSurfaceViews.swift */; };
 		B65883E07587C07F132CC0FE /* D7-201-apple-plus-empty-local.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0C0D19B26171CFEE0E7ACE11 /* D7-201-apple-plus-empty-local.plist */; };
+		B6ACE27C6832BEF2180C2272 /* PaneDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBBABCF5E31B001866B46CA /* PaneDetail.swift */; };
 		B6ECA775D73C16F64314967A /* Identity.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5A198C4D0761DC85DCC7E433 /* Identity.xcstrings */; };
 		B6FC290317CCEE66FC6E7333 /* AppDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */; };
 		B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */; };
@@ -516,6 +517,7 @@
 		1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandTypographyTests.swift; sourceTree = "<group>"; };
 		1D6A18BDE3378CA9EE7B92F5 /* ShellTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellTabUITests.swift; sourceTree = "<group>"; };
 		1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
+		1FBBABCF5E31B001866B46CA /* PaneDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDetail.swift; sourceTree = "<group>"; };
 		2084B656B116C58A4F214944 /* LogTimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeTests.swift; sourceTree = "<group>"; };
 		2103E62B91A461716840A28E /* RentalLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalLogic.swift; sourceTree = "<group>"; };
 		22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitLocalIntegrationTests.swift; sourceTree = "<group>"; };
@@ -992,6 +994,7 @@
 				14692E31A3817431B4835258 /* LayoutMode.swift */,
 				D3E64B6E21AED248CA2261E8 /* OnTheRecordCard.swift */,
 				91CD83D159BA8BABADD2DF77 /* PaneContext.swift */,
+				1FBBABCF5E31B001866B46CA /* PaneDetail.swift */,
 				DF6062FB31092424B03A1C84 /* RentalShelf.swift */,
 				E901664ABEF4B50C0532CDFF /* TodayWorkPane.swift */,
 				36F4858F7001ACF37C4758BE /* TwoPaneHooks.swift */,
@@ -2087,6 +2090,7 @@
 				C13F913A67BC57432BB87A31 /* OnboardingView.swift in Sources */,
 				7ABC0EB90D3C20FC948B6FB9 /* PCCReceiptReader.swift in Sources */,
 				715E16CD866CB2288E172949 /* PaneContext.swift in Sources */,
+				B6ACE27C6832BEF2180C2272 /* PaneDetail.swift in Sources */,
 				A5F2323EADAAAD76805F1372 /* PaywallPreviewLaunch.swift in Sources */,
 				1BF2AAF51C0D0B26B8A4CE58 /* PaywallView.swift in Sources */,
 				9DF933FE2149E7F99C70A914 /* PickFreeRentalSheet.swift in Sources */,

@@ -117,6 +117,21 @@ struct TodayWorkPane: View {
     @State private var captureOn = CaptureOptIn.calendarSuggestionsEnabled()
     @State private var showCaptureSetup = false
 
+    // 2.3 on Today, kept in the pane (same slots, same rules as the phone's DashboardView).
+    @EnvironmentObject private var goalManager: GoalManager
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var houseEvents = TodayHouseEvents.shared
+    @Environment(\.todayShellUncovered) private var shellUncovered
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var onScreen = false
+    @State private var showRecordExport = false
+    @State private var shownCelebration: TodayCelebration?
+    @State private var shownBackfill: HouseBackfillReveal?
+    /// The 2.3 slots above To confirm (notice, timer) and below it (Learn, care, Your record),
+    /// measured so the fit leaves them room (`PaneConfirmFit`).
+    @State private var slotsAbove: CGFloat = 0
+    @State private var slotsBelow: CGFloat = 0
+
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var stacked: Bool { mode == .stacked }
     private var rentalID: UUID? { selection.selectedRentalID }
@@ -155,7 +170,113 @@ struct TodayWorkPane: View {
             AdaptiveDebug.applySelection(selection, app: viewModel)
         }
         #endif
+        .sheet(isPresented: $showRecordExport) { ExportPDFView(year: currentYear) }
+        .fullScreenCover(item: $shownCelebration, onDismiss: { presentBackfillIfNeeded(); presentNextCelebration() }) { item in
+            MilestoneCelebrationView(celebration: item.celebration, hours: countedHours,
+                                     windowsLit: TodayWindowState.loggedToday(entries: viewModel.timeEntries, now: InboxClock.now()),
+                                     onContinue: { shownCelebration = nil })
+        }
+        .fullScreenCover(item: $shownBackfill, onDismiss: presentNextCelebration) { reveal in
+            BackfillRevealView(
+                foundHours: reveal.foundHours,
+                suggestionCount: reveal.suggestionCount,
+                confirmedHours: countedHours,
+                onReview: {
+                    shownBackfill = nil
+                    NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
+                },
+                onSkip: { shownBackfill = nil }
+            )
+        }
+        .onAppear {
+            onScreen = true
+            if isVisible { becameVisible() }
+        }
+        .onDisappear { onScreen = false }
+        .onChange(of: isVisible) { _, visible in if visible { becameVisible() } }
+        .onChange(of: houseEvents.celebrationTick) { _, _ in if isVisible { schedulePresentations() } }
+        .onChange(of: houseEvents.pendingBackfill) { _, reveal in if reveal != nil, isVisible { presentBackfillIfNeeded() } }
+        .onReceive(NotificationCenter.default.publisher(for: .userChangeRecorded)) { _ in
+            // The user changed it while looking at Today: the house pane already shows the result.
+            if isVisible { UserChangeSignal.shared.discard() }
+        }
         .accessibilityIdentifier("pane.today")
+    }
+
+    // MARK: 2.3 Today behaviour in the pane (package E arrival, milestones, the Day-1 reveal)
+
+    private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
+    private var countedHours: Double { viewModel.houseCountableHours(goal: goalManager.houseGoal, year: currentYear) }
+
+    /// The phone's rule (DashboardView.isVisible), minus its local sheets.
+    private var isVisible: Bool {
+        onScreen && shellUncovered && scenePhase == .active && selection.route == nil
+            && !showRecordExport && !showCaptureSetup && shownCelebration == nil && shownBackfill == nil
+    }
+
+    private func becameVisible() {
+        arriveAtChangedRental()
+        schedulePresentations()
+    }
+
+    /// "Show the result where it happened" (§E.1): the house pane moves to the rental the user just
+    /// changed, once; a manual pick afterwards is left alone.
+    private func arriveAtChangedRental() {
+        guard !viewModel.isAwaitingInitialPull, let change = UserChangeSignal.shared.take(),
+              viewModel.properties.contains(where: { $0.id == change.rentalID }) else { return }
+        withAnimation(CraftHouseView.rentalSlideAnimation(reduceMotion: reduceMotion)) {
+            selection.select(change.rentalID.uuidString)
+        }
+    }
+
+    private func schedulePresentations() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(reduceMotion ? 0.3 : 0.45))
+            presentBackfillIfNeeded()
+            presentNextCelebration()
+        }
+    }
+
+    private func presentNextCelebration() {
+        guard isVisible, let next = houseEvents.nextCelebration else { return }
+        houseEvents.markPresented(next.celebration, year: next.year)
+        shownCelebration = TodayCelebration(celebration: next.celebration, year: next.year)
+    }
+
+    private func presentBackfillIfNeeded() {
+        guard isVisible, !OnbBackfill.flowActive, let reveal = houseEvents.pendingBackfill else { return }
+        houseEvents.markBackfillShown()
+        shownBackfill = reveal
+    }
+
+    private var showsRecordSlot: Bool {
+        !viewModel.isAwaitingInitialPull && !viewModel.timeEntries.isEmpty
+            && TodayRecordSlot.isShown(isPro: subscriptionManager.isPro, confirmedHours: countedHours)
+    }
+
+    /// Package K's notice and the running timer: above To confirm, as on the phone.
+    @ViewBuilder private var slotsAboveConfirm: some View {
+        VStack(spacing: PaneConfirmFit.gap) {
+            if let notice = viewModel.todayNotice {
+                TodayIdentityCard(notice: notice).transition(.opacity)
+            }
+            TodayTimerSlot()
+        }
+    }
+
+    /// Learn (C), care (B) and Your record (A): under To confirm, as on the phone. Learn and care
+    /// own their padding (the phone gutter and the section gap); the phone gutter is taken back
+    /// here, because the pane's own gutter already insets the column, so every card shares one edge.
+    @ViewBuilder private var slotsBelowConfirm: some View {
+        VStack(spacing: 0) {
+            TodayLearnSlot(rentalID: rentalID).padding(.horizontal, -LHMetrics.gutter)
+            TodayCareSlot(rentalID: rentalID).padding(.horizontal, -LHMetrics.gutter)
+            if showsRecordSlot {
+                TodayRecordSlot(year: currentYear, confirmedHours: countedHours) { showRecordExport = true }
+                    .padding(.top, LHMetrics.sectionGap)
+                    .id("today.section.record")
+            }
+        }
     }
 
     /// The pane's push path, derived from the selection's route.
@@ -191,7 +312,9 @@ struct TodayWorkPane: View {
         let hidden = PaneConfirmFilter.hiddenCount(visible, rentalID: rentalID)
         let measureKey = EarlierMeasure.key(items.map(\.id), typeSize: typeSize) ^ hidden
         return GeometryReader { g in
-            let room = PaneReach.room(visible: g.size.height, columnTop: g.frame(in: .global).minY, windowHeight: windowHeight)
+            let reach = PaneReach.room(visible: g.size.height, columnTop: g.frame(in: .global).minY, windowHeight: windowHeight)
+            // The 2.3 slots come first; To confirm and On the record fit in what is left.
+            let room = max(0, reach - slotsAbove - slotsBelow)
             let plan: PaneConfirmFit.Plan = state != .rows
                 ? PaneConfirmFit.Plan(rows: items.count, showsRecord: true)
                 : PaneConfirmFit.plan(ends: confirmMeasure.key == measureKey ? confirmMeasure.ends : [:], count: items.count,
@@ -206,6 +329,8 @@ struct TodayWorkPane: View {
                 // so a tall pane fills with rows, not with an empty card or bare wall (§1.27, D4,
                 // D6, DU4), and a short one never has a card under the bar.
                 VStack(spacing: PaneConfirmFit.gap) {
+                    slotsAboveConfirm
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { slotsAbove = $0 > 0 ? $0 + PaneConfirmFit.gap : 0 }
                     if state == .rows {
                         confirmCard(items: items, hidden: hidden, total: visible.count, limit: plan.rows)
                     } else {
@@ -213,6 +338,8 @@ struct TodayWorkPane: View {
                                           onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
                                           onTurnOn: { showCaptureSetup = true })
                     }
+                    slotsBelowConfirm
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { slotsBelow = $0 > 0 ? $0 + PaneConfirmFit.gap : 0 }
                     if plan.showsRecord {
                         OnTheRecordCard(rentalID: rentalID, fitHeight: room)
                     }

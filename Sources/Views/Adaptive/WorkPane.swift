@@ -168,6 +168,7 @@ struct WorkPaneEnvironment: ViewModifier {
             .environment(\.paneGutter, gutter)
             .environment(\.paneWindowHeight, windowHeight)
             .environment(\.paneLogRental, context == .pane ? selection.selectedRentalID : nil)
+            .environment(\.paneSelection, context == .pane ? selection : nil)
             .environment(\.dynamicTypeSize, typeSize)
             .environment(\.colorScheme, colorScheme)
     }

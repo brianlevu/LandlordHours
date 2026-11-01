@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import LandlordHours
 
 /// Package J (§1.27): the one mode function, the pane sizes, the shelf's honest "All rentals", and
@@ -40,6 +41,72 @@ final class AdaptiveLayoutTests: XCTestCase {
         // From two-pane, it stays on down to 800 / 645.
         XCTAssertEqual(mode(800, 1000, previous: .twoPane, live: true), .twoPane)
         XCTAssertEqual(mode(799, 1000, previous: .twoPane, live: true), .compact)
+    }
+
+    /// iPad multitasking and windows (§1.27 "Sizes by mode"): Split View tiles, Slide Over,
+    /// rotation and Stage Manager sizes, each settled (no history).
+    func testMultitaskingEdgeCases() {
+        // Split View on the 11" / 10th gen in landscape (1180 × 820): 1/3, 1/2, 2/3.
+        XCTAssertEqual(mode(375, 820), .compact)
+        XCTAssertEqual(mode(590, 820), .compact)
+        XCTAssertEqual(mode(785, 820), .compact)            // 2/3 on 11" stays compact (< 800)
+        // Split View on 13" landscape (1376 × 1032): 1/2 and 2/3.
+        XCTAssertEqual(mode(678, 1032), .compact)
+        XCTAssertEqual(mode(912, 1032), .twoPane)           // 2/3 on 13": panes ≈ 444
+        // Split View in portrait (820 × 1180): halves are compact.
+        XCTAssertEqual(mode(405, 1180), .compact)
+        // Slide Over (≈ 320–375 wide).
+        XCTAssertEqual(mode(320, 1000), .compact)
+        XCTAssertEqual(mode(375, 760), .compact)
+        // Rotation of the same device keeps two-pane (10th gen and 13").
+        XCTAssertEqual(mode(820, 1180), mode(1180, 820))
+        XCTAssertEqual(mode(1032, 1376), mode(1376, 1032))
+        // iPad mini: portrait compact, landscape two-pane.
+        XCTAssertNotEqual(mode(744, 1133), mode(1133, 744))
+        // Stage Manager windows: 800 × 645 is the smallest two-pane; 700 wide or a short window is compact.
+        XCTAssertEqual(mode(800, 645), .twoPane)
+        XCTAssertEqual(mode(700, 900), .compact)
+        XCTAssertEqual(mode(1000, 600), .compact)
+        XCTAssertEqual(mode(1366, 1024), .twoPane)
+    }
+
+    /// The mode boundary is the same from either side once settled (must-prove 16), and a live
+    /// resize that stops inside the hysteresis band flips on the settle pass.
+    func testBoundarySettlesTheSameFromBothSides() {
+        for (w, h) in [(CGFloat(799), CGFloat(1000)), (800, 1000), (1000, 644), (1000, 645)] {
+            let fromCompact = mode(w, h, previous: .compact)
+            let fromSplit = mode(w, h, previous: .twoPane)
+            XCTAssertEqual(fromCompact, fromSplit, "\(w)×\(h)")
+        }
+        // Live from compact at 804: still compact; the settle pass (no history) makes it two-pane.
+        XCTAssertEqual(mode(804, 1000, previous: .compact, live: true), .compact)
+        XCTAssertEqual(mode(804, 1000, previous: nil, live: false), .twoPane)
+    }
+
+    /// Degenerate sizes never split.
+    func testDegenerateSizesAreCompact() {
+        XCTAssertEqual(mode(0, 0), .compact)
+        XCTAssertEqual(mode(.infinity, 1000), .compact)
+        XCTAssertEqual(mode(-10, 1000), .compact)
+    }
+
+    /// Must-prove 12: the compact bar bridge only where it is proven (iPadOS 26+); iPadOS 18–25
+    /// gets the system's own iPad bar (§1.27 fallback).
+    func testCompactBarBridgeOnlyOnProvenOSes() {
+        XCTAssertFalse(WorkPane<EmptyView>.bridgeProven(osMajor: 18))
+        XCTAssertFalse(WorkPane<EmptyView>.bridgeProven(osMajor: 25))
+        XCTAssertTrue(WorkPane<EmptyView>.bridgeProven(osMajor: 26))
+        XCTAssertTrue(WorkPane<EmptyView>.bridgeProven(osMajor: 27))
+    }
+
+    /// The iPad has no Duo code path: the installed hooks are empty until the Duo lane fills its file.
+    @MainActor
+    func testHooksAreEmptyByDefault() {
+        let hooks = TwoPaneHooks.none
+        XCTAssertNil(hooks.arrangement)
+        XCTAssertNil(hooks.heroOverlay)
+        XCTAssertNil(hooks.workOverlay)
+        XCTAssertNil(hooks.root)
     }
 
     func testDivisionSplitsAtTheFold() {

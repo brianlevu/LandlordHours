@@ -137,3 +137,17 @@ final class AdaptiveSelection: ObservableObject {
     func open(_ route: WorkPaneRoute) { self.route = route }
     func close() { route = nil }
 }
+
+private struct PaneSelectionKey: EnvironmentKey {
+    static let defaultValue: AdaptiveSelection? = nil
+}
+
+extension EnvironmentValues {
+    /// The shelf's selection, inside a two-pane or stacked work pane only (nil in compact), for
+    /// screens outside `Views/Adaptive/` that change what they show in a pane (the Rentals tab
+    /// shows the shelf's rental). Optional, so a screen used anywhere else never needs it.
+    var paneSelection: AdaptiveSelection? {
+        get { self[PaneSelectionKey.self] }
+        set { self[PaneSelectionKey.self] = newValue }
+    }
+}

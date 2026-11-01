@@ -40,6 +40,8 @@ struct PropertyDetailView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutBand) private var band
     @Environment(\.dismiss) private var dismiss
+    /// §1.27 J1: in a work pane showing this rental, the hero is the house pane's.
+    @Environment(\.paneLogRental) private var paneRental
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var window: CGSize = .zero
@@ -107,7 +109,9 @@ struct PropertyDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    RentalHero(property: property, side: side, windowHeight: window.height)
+                    if paneRental != property.id {
+                        RentalHero(property: property, side: side, windowHeight: window.height)
+                    }
                     RentalAccessSlot(property: property)   // 2.3 seam: package A
                     RentalBody(property: property)
                         .padding(.horizontal, LHMetrics.gutter)
