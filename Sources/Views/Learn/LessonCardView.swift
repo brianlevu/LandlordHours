@@ -22,14 +22,12 @@ struct LessonCardView: View {
             Text(card.title)
                 .font(LHFont.screenTitle(size: 28))
                 .foregroundStyle(colors.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("lesson.card.title")
             Text(card.text)
                 .font(.body)
                 .foregroundStyle(colors.textSecondary)
                 .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
             bodyContent
                 .padding(.top, LHMetrics.sectionGap)
@@ -44,7 +42,6 @@ struct LessonCardView: View {
                         .font(.subheadline)
                         .foregroundStyle(colors.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(LHMetrics.cardPadding)
                 .background(colors.actionSurface, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
@@ -100,7 +97,6 @@ struct LessonCardView: View {
                             .font(.body)
                             .foregroundStyle(colors.textPrimary)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(LHRow.insets)
                     .frame(minHeight: LHMetrics.rowMinHeight)

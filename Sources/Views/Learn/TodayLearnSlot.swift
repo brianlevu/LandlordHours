@@ -70,7 +70,6 @@ struct TodayLearnSlot: View {
                     Text(headline(card, lesson: lesson))
                         .font(.headline)
                         .foregroundStyle(colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
                     Button(LearnLibrary.format("lesson.readButton", lesson.minutes)) {
                         pendingMilestone = card.milestone
                         LessonLauncher.open(lesson.id, into: $open)

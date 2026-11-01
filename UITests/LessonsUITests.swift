@@ -154,7 +154,7 @@ final class LessonsUITests: XCTestCase {
     // MARK: Helpers
 
     private func launchToday(scenario: String, hours: String = "420", scheme: String = "light", size: String? = nil, extra: [String] = []) {
-        launch(["-LHMockScenario", scenario, "-LHInitialTab", "0", "-LHLearnHours", hours, "-LHLearnReset"] + extra, scheme: scheme, size: size)
+        launch(["-LHMockScenario", scenario, "-LHInitialTab", "0", "-LHLearnHours", hours, "-LHLearnReset", "-LHSeedSuggestions", "inbox"] + extra, scheme: scheme, size: size)
     }
 
     private func launch(_ extra: [String], scheme: String = "light", size: String? = nil) {
