@@ -644,9 +644,41 @@ class AppViewModel: ObservableObject {
         Task { await syncService.syncNow() }
     }
 
-    // MARK: - Subscription Features
+    // MARK: - Subscription Features (2.3: every lock reads the plan through EntitlementStore)
+
+    /// The first rental is free; more need Pro (`EntitlementStore.canAddRental`).
     func canAddProperty() -> Bool {
-        ProGate.canAddProperty(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
+        EntitlementStore.shared.canAddRental(rentalCount: properties.count)
+    }
+
+    /// Each rental as the free-rental policy sees it: all hours ever logged there, and when it was made.
+    var rentalUsages: [RentalUsage] {
+        var hours: [UUID: Double] = [:]
+        for entry in timeEntries { hours[entry.propertyId, default: 0] += entry.hours }
+        return properties.map { RentalUsage(id: $0.id, hours: hours[$0.id] ?? 0, createdAt: $0.createdAt) }
+    }
+
+    /// Full on Pro and at the free rental; view-only elsewhere. Hours count either way.
+    func rentalAccess(_ rentalID: UUID) -> RentalAccess {
+        EntitlementStore.shared.access(for: rentalID, rentals: rentalUsages)
+    }
+
+    func canLog(at rentalID: UUID) -> Bool { rentalAccess(rentalID) == .full }
+
+    /// The rental a free user logs at (nil with no rentals).
+    var freeRentalID: UUID? { EntitlementStore.shared.freeRentalID(rentals: rentalUsages) }
+
+    var freeRentalName: String? {
+        guard let id = freeRentalID else { return nil }
+        return properties.first { $0.id == id }?.name
+    }
+
+    /// The save-time refusal at a view-only rental, naming the free rental.
+    var viewOnlyLogMessage: String {
+        if let name = freeRentalName {
+            return String(localized: "log.viewOnly", defaultValue: "The free plan logs at \(name). Pro logs at every rental.", table: "Pricing")
+        }
+        return String(localized: "log.viewOnlyNoName", defaultValue: "The free plan logs at one rental. Pro logs at every rental.", table: "Pricing")
     }
     
     func canAddTimeEntry() -> Bool {
@@ -727,6 +759,8 @@ class AppViewModel: ObservableObject {
         attachments: [TimeAttachment] = [],
         source: EntrySource = .manual
     ) {
+        // 2.3: a view-only rental never takes a new entry (the same rule as `logTimeEntry`).
+        guard canLog(at: propertyId) else { return }
         let houseHoursBefore = houseCountableHours()
         let entry = TimeEntry(
             propertyId: propertyId,
@@ -764,6 +798,8 @@ class AppViewModel: ObservableObject {
         guard properties.contains(where: { $0.id == propertyId }) else {
             return .failed(LogSaveResult.missingPropertyMessage)
         }
+        // 2.3: a view-only rental (free plan, not the free rental) never takes a new entry.
+        guard canLog(at: propertyId) else { return .failed(viewOnlyLogMessage) }
         guard hours > 0 else { return .failed(LogSaveResult.missingHoursMessage) }
         let houseHoursBefore = houseCountableHours()
         let entry = TimeEntry(
@@ -830,6 +866,8 @@ class AppViewModel: ObservableObject {
 
     func updateTimeEntry(_ entry: TimeEntry) {
         if let index = timeEntries.firstIndex(where: { $0.id == entry.id }) {
+            // 2.3: an edit may not move hours onto a view-only rental (editing in place is fine).
+            if timeEntries[index].propertyId != entry.propertyId, !canLog(at: entry.propertyId) { return }
             timeEntries[index] = entry
             saveData()
         }

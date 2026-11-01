@@ -16,9 +16,13 @@ final class PropertyCountableHoursTests: CaptureTestCase {
         savedSpouseTracking = TaxProfileManager.shared.spouseTracking
         savedGrouping = TaxProfileManager.shared.groupingElection
         savedGoal = GoalManager.shared.globalGoalType
+        // 2.3: these count hours at two rentals; on the free plan the second would be view-only
+        // and refuse the entries, so they run with Pro (founding). Access never changes counts.
+        EntitlementStore.shared.setFoundingFlag(true)
     }
 
     override func tearDown() async throws {
+        EntitlementStore.shared.setFoundingFlag(false)
         TaxProfileManager.shared.spouseTracking = savedSpouseTracking
         TaxProfileManager.shared.groupingElection = savedGrouping
         GoalManager.shared.globalGoalType = savedGoal
@@ -304,15 +308,8 @@ final class PropertyMetaTests: XCTestCase {
 
 @MainActor
 final class PropertyLimitTests: CaptureTestCase {
-    private var savedPro = false
-
-    override func setUp() async throws {
-        try await super.setUp()
-        savedPro = SubscriptionManager.shared.isPro
-    }
-
     override func tearDown() async throws {
-        SubscriptionManager.shared.isPro = savedPro
+        EntitlementStore.shared.setFoundingFlag(false)
         try await super.tearDown()
     }
 
@@ -324,12 +321,25 @@ final class PropertyLimitTests: CaptureTestCase {
         XCTAssertFalse(PropertyLimit.isAtLimit(isPro: true, propertyCount: 40))
     }
 
-    func testViewModelGatesAddingThroughSubscriptionManager() {
+    /// 2.3: the plan decides; a trial adds rentals like paid Pro, founding too.
+    func testFreeCoversOneRentalForEveryPlan() {
+        let trial = Plan.trial(.init(startedAt: Date(), expiresAt: Date().addingTimeInterval(86_400), willAutoRenew: true,
+                                     inGracePeriod: false, originalTransactionID: 1))
+        XCTAssertFalse(PropertyLimit.isAtLimit(plan: .free, propertyCount: 0))
+        XCTAssertTrue(PropertyLimit.isAtLimit(plan: .free, propertyCount: 1))
+        XCTAssertTrue(PropertyLimit.isAtLimit(plan: .free, propertyCount: 3))
+        for plan in [trial, .founding(alsoSubscribed: false)] {
+            XCTAssertFalse(PropertyLimit.isAtLimit(plan: plan, propertyCount: 1))
+            XCTAssertFalse(PropertyLimit.isAtLimit(plan: plan, propertyCount: 40))
+        }
+    }
+
+    func testViewModelGatesAddingThroughThePlan() {
         let (vm, _) = makeViewModel()
-        SubscriptionManager.shared.isPro = false
+        EntitlementStore.shared.setFoundingFlag(false)
         XCTAssertTrue(vm.propertiesAtFreeLimit)
         XCTAssertFalse(vm.canAddProperty())
-        SubscriptionManager.shared.isPro = true
+        EntitlementStore.shared.setFoundingFlag(true)
         XCTAssertFalse(vm.propertiesAtFreeLimit)
         XCTAssertTrue(vm.canAddProperty())
     }

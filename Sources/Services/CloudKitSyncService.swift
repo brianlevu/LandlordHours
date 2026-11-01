@@ -671,6 +671,7 @@ final class CloudKitSyncService: ObservableObject {
             }
             lastSyncDate = Date()
             UserDefaults.standard.set(true, forKey: IdentityKeys.hasSynced)
+            await syncFreeRentalPick()
             return true
         } catch ZoneSourceError.zoneGone {
             if let engine { _ = engine.handleZoneGone(); onIdentityChange?() }
@@ -716,7 +717,20 @@ final class CloudKitSyncService: ObservableObject {
         saveZoneToken(snapshot.tokenData)   // after the read is applied, never before
         onIdentityChange?()
         lastSyncDate = Date()
+        await syncFreeRentalPick()
         return true
+    }
+
+    // MARK: - The free-rental pick (2.3, package A)
+
+    /// After a pull from the same iCloud account: hand the pick's record to `FreeRentalSync`
+    /// (later `chosenAt` wins; a defaulted pick never beats a picked one). One record per record
+    /// set, in the same zone; the engine ignores its type. Skipped while pushes are blocked.
+    func syncFreeRentalPick() async {
+        guard !pushesBlocked, let database, accountAvailable else { return }
+        let owner = ownerTag ?? IdentityZone.household
+        FreeRentalSync.shared.cloud = CloudKitFreeRentalStore(database: database, zoneID: zoneID, owner: owner)
+        await FreeRentalSync.shared.syncNow()
     }
 
     // MARK: - Delete from Cloud
@@ -1390,5 +1404,87 @@ extension CloudKitSyncService: IdentityZoneSource {
             }
         }
         throw lastError ?? CloudKitSyncUnavailableError()
+    }
+}
+
+
+// MARK: - The free-rental pick's record (2.3)
+
+/// `FreeRental-<owner>` in the record set's zone. Fields (scripts/qa/cloudkit_schema_expected.json):
+/// `appUserId` STRING, `rentalId` STRING, `chosenAt` TIMESTAMP, `source` STRING. Saved with
+/// `.ifServerRecordUnchanged`, so two devices never overwrite each other blind.
+final class CloudKitFreeRentalStore: FreeRentalCloudStore {
+    static let recordType = "FreeRental"
+    enum Field {
+        static let appUserId = "appUserId"
+        static let rentalId = "rentalId"
+        static let chosenAt = "chosenAt"
+        static let source = "source"
+    }
+
+    static func recordName(owner: String) -> String { "FreeRental-\(owner)" }
+
+    private let database: CKDatabase
+    private let recordID: CKRecord.ID
+    private let owner: String
+    /// The server copy from the last fetch (its change tag makes the save conditional).
+    private var fetched: CKRecord?
+
+    init(database: CKDatabase, zoneID: CKRecordZone.ID, owner: String) {
+        self.database = database
+        self.owner = owner
+        self.recordID = CKRecord.ID(recordName: Self.recordName(owner: owner), zoneID: zoneID)
+    }
+
+    func fetch() async throws -> FreeRentalSelection? {
+        do {
+            let record = try await database.record(for: recordID)
+            fetched = record
+            return Self.selection(from: record)
+        } catch let error as CKError where error.code == .unknownItem {
+            fetched = nil
+            return nil
+        } catch {
+            throw FreeRentalCloudError.unavailable
+        }
+    }
+
+    func save(_ selection: FreeRentalSelection) async throws {
+        let record = fetched ?? CKRecord(recordType: Self.recordType, recordID: recordID)
+        Self.write(selection, owner: owner, into: record)
+        do {
+            let result = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .ifServerRecordUnchanged,
+                                                          atomically: true)
+            if case .failure(let error)? = result.saveResults[recordID] { throw error }
+            if case .success(let saved)? = result.saveResults[recordID] { fetched = saved }
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            let server = error.serverRecord
+            fetched = server
+            throw FreeRentalCloudError.conflict(server.flatMap(Self.selection(from:)))
+        } catch let error as FreeRentalCloudError {
+            throw error
+        } catch {
+            throw FreeRentalCloudError.unavailable
+        }
+    }
+
+    static func write(_ selection: FreeRentalSelection, owner: String, into record: CKRecord) {
+        record[Field.appUserId] = owner as NSString
+        record[Field.rentalId] = selection.rentalID.uuidString as NSString
+        record[Field.chosenAt] = selection.chosenAt as NSDate
+        record[Field.source] = selection.source.rawValue as NSString
+    }
+
+    static func record(for selection: FreeRentalSelection, owner: String, zoneID: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(recordType: recordType, recordID: CKRecord.ID(recordName: recordName(owner: owner), zoneID: zoneID))
+        write(selection, owner: owner, into: record)
+        return record
+    }
+
+    static func selection(from record: CKRecord) -> FreeRentalSelection? {
+        guard let raw = record[Field.rentalId] as? String, let id = UUID(uuidString: raw),
+              let chosenAt = record[Field.chosenAt] as? Date,
+              let source = (record[Field.source] as? String).flatMap(FreeRentalSelection.Source.init(rawValue:)) else { return nil }
+        return FreeRentalSelection(rentalID: id, chosenAt: chosenAt, source: source)
     }
 }

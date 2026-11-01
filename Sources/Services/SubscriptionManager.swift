@@ -18,7 +18,12 @@ class SubscriptionManager: ObservableObject {
     /// purchase deadline: the paywall keeps Buy off so a second purchase can't start meanwhile.
     @Published private(set) var isPurchaseInFlight = false
     
-    private let proProductID = ProductIDs.founding
+    /// 2.3: the paywall sells the yearly subscription (Apple's 14-day trial, then yearly). The
+    /// founding lifetime is no longer sold; its buyers keep Pro (restore still finds it).
+    private let proProductID = ProductIDs.yearly
+    /// Days of the yearly plan's free trial for this Apple Account: nil when it has none or the
+    /// account already used it (the paywall then says "Subscribe").
+    @Published private(set) var introTrialDays: Int?
     /// StoreKit behind a protocol (2.3). Entitlement rules live in `EntitlementResolver`; this
     /// manager only gathers, purchases and mirrors `EntitlementStore.shared.plan` into `isPro`.
     let storeClient: StoreClient = StoreKit2Client()
@@ -125,14 +130,23 @@ class SubscriptionManager: ObservableObject {
         do {
             // Request products from App Store
             logger.debug("Loading products for: \(self.proProductID)")
-            let storeProducts = try await Product.products(for: [proProductID])
+            let storeProducts = try await Product.products(for: ProductIDs.all)
             logger.debug("Loaded \(storeProducts.count) products")
             products = storeProducts.sorted { $0.price < $1.price }
+            await refreshIntroOffer()
         } catch {
             logger.error("Failed to load products: \(error.localizedDescription)")
         }
     }
     
+    /// The trial the paywall can offer: StoreKit's intro length, only while this account is eligible.
+    @MainActor
+    func refreshIntroOffer() async {
+        guard let product = proProduct, let subscription = product.subscription else { introTrialDays = nil; return }
+        let eligible = await subscription.isEligibleForIntroOffer
+        introTrialDays = eligible ? StoreKit2Client.info(product).introTrialDays : nil
+    }
+
     /// The current plan (free, trial, Pro or founding). `isPro` is its `hasProAccess`.
     var plan: Plan { EntitlementStore.shared.plan }
 
@@ -214,8 +228,14 @@ class SubscriptionManager: ObservableObject {
                     case .success(let verification):
                         // Verify and finish transaction
                         if case .verified(let transaction) = verification {
-                            unlockPro()
                             await transaction.finish()
+                            if transaction.productID == ProductIDs.founding {
+                                unlockPro()
+                            } else {
+                                // The yearly plan: the resolver decides (trial or paid), never the
+                                // founding flag. StoreKit can take a moment to list it.
+                                await settleAfterPurchase()
+                            }
                             return (.purchased, nil)
                         }
                         return (.failed, "The App Store couldn’t confirm this purchase. Please try again.")
@@ -243,6 +263,17 @@ class SubscriptionManager: ObservableObject {
         return outcome
     }
     
+    /// After a verified yearly purchase: refresh until the plan shows it (at most ~2 s).
+    @MainActor
+    private func settleAfterPurchase() async {
+        for _ in 0..<10 {
+            await refreshEntitlements()
+            if isPro { break }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        await refreshIntroOffer()
+    }
+
     /// Returns true when an earlier Pro purchase was found and applied.
     @MainActor
     @discardableResult

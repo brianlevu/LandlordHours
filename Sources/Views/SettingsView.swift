@@ -28,6 +28,9 @@ struct SettingsView: View {
     @State private var showExport = false
     @State private var restoreStatusMessage: String?
     @State private var route: SettingsRoute?
+    /// 2.3: the plan and the free-rental pick.
+    @ObservedObject private var entitlements = EntitlementStore.shared
+    @State private var showManageSubscriptions = false
     /// Backs the "Share anonymous usage stats" toggle. Stores whether the user opted OUT (default
     /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
     /// view and `Analytics` always read the same UserDefaults value.
@@ -109,8 +112,10 @@ struct SettingsView: View {
                 case .deleteData: DeleteAllDataView()
                 case .icloud: ICloudRecordsView()
                 case .earlierRecords: EarlierRecordsView()
+                case .freeRental: FreeRentalSettingsView()
                 }
             }
+            .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
             .sheet(isPresented: $showingProfileEdit) {
                 YourNameSheet().environmentObject(viewModel)
             }
@@ -140,6 +145,9 @@ struct SettingsView: View {
                     } else if args.contains("-LHOpenMutedFromSettings") {
                         Self.didApplyDebugRoute = true
                         route = .muted
+                    } else if args.contains("-LHOpenFreeRental") {
+                        Self.didApplyDebugRoute = true
+                        route = .freeRental
                     }
                 }
                 #endif
@@ -195,16 +203,17 @@ struct SettingsView: View {
     }
 
     private var planBadge: some View {
-        let isPro = subscriptionManager.isPro
-        return LHTag(isPro ? HS.t("settings.plan.pro", "Pro · Paid once") : HS.t("settings.plan.free", "Free plan"),
-                     tone: isPro ? .positive : .neutral)
+        let plan = entitlements.plan
+        return LHTag(PlanCopy.tag(plan), tone: plan.hasProAccess ? .positive : .neutral)
+            .accessibilityIdentifier("settings.planTag")
     }
 
     // MARK: Plan
 
     @ViewBuilder
     private var planSection: some View {
-        if ProGate.isLocked(.settingsPro, isPro: subscriptionManager.isPro) {
+        let plan = entitlements.plan
+        if ProGate.isLocked(.settingsPro, plan: plan) {
             Section {
                 proCard
                     .listRowInsets(EdgeInsets())
@@ -213,7 +222,7 @@ struct SettingsView: View {
             }
         }
         Section {
-            if ProGate.isLocked(.settingsPro, isPro: subscriptionManager.isPro) {
+            if ProGate.isLocked(.settingsExport, plan: plan) {
                 LockedPreview(
                     size: .row,
                     entry: .settingsExport,
@@ -230,11 +239,33 @@ struct SettingsView: View {
                 }
                 .longTailRow()
             } else {
-                LHRow.Browse(title: HS.t("settings.pro.active.title", "Pro is active"),
-                             meta: HS.t("settings.pro.active.meta", "Paid once. Everything is unlocked."),
-                             systemImage: "checkmark.seal", tint: .positive, showsChevron: false)
+                LHRow.Browse(title: PlanCopy.title(plan),
+                             meta: PlanCopy.body(plan, price: subscriptionManager.proDisplayPrice),
+                             systemImage: plan.isFounding ? "checkmark.seal" : "star", tint: .positive, showsChevron: false,
+                             wrapsMeta: true)
                     .longTailRow()
                     .accessibilityIdentifier("settings.proActive")
+            }
+
+            // 2.3: the free plan's one rental, switchable once a month.
+            if !plan.hasProAccess && viewModel.properties.count > 1 {
+                LHRow.Browse(title: String(localized: "settings.freeRental.title", defaultValue: "Free rental", table: "Pricing"),
+                             meta: viewModel.freeRentalName ?? "",
+                             systemImage: "house", tint: .neutral,
+                             action: { route = .freeRental })
+                    .longTailRow()
+                    .accessibilityIdentifier("settings.freeRental")
+            }
+
+            // Trial and yearly: Apple's Manage subscriptions (cancel, see the renewal). Founding
+            // buyers who also subscribed get one line saying they needn't.
+            if PlanCopy.showsManage(plan) {
+                LHRow.Browse(title: String(localized: "plan.manage", defaultValue: "Manage subscriptions", table: "Pricing"),
+                             meta: PlanCopy.alsoSubscribedLine(plan),
+                             systemImage: "creditcard", tint: .neutral, wrapsMeta: true,
+                             action: { showManageSubscriptions = true })
+                    .longTailRow()
+                    .accessibilityIdentifier("settings.manageSubscriptions")
             }
 
             LHRow.Browse(
@@ -246,11 +277,11 @@ struct SettingsView: View {
                 action: {
                     Task {
                         restoreStatusMessage = nil
-                        await subscriptionManager.restorePurchases()
+                        let found = await subscriptionManager.restorePurchases()
                         // The result shows inline under the row (not a system alert, whose message
                         // text iOS draws below AA); the row stays tappable to try again.
-                        restoreStatusMessage = subscriptionManager.hasPurchased
-                            ? HS.t("settings.restore.done", "Your Pro purchase is back.")
+                        restoreStatusMessage = found
+                            ? String(localized: "settings.restore.found", defaultValue: "Your Pro is back.", table: "Pricing")
                             : (subscriptionManager.restoreFailureMessage ?? subscriptionManager.purchaseError
                                 ?? HS.t("settings.restore.none", "No earlier purchase found."))
                     }
@@ -263,6 +294,17 @@ struct SettingsView: View {
         } header: {
             header(HS.t("settings.section.plan", "Plan"))
         }
+    }
+
+    /// "$49.99 a year · 14 days free" (StoreKit's price and trial); "Every rental, the PDF…" before it loads.
+    private var proCardLine: String {
+        guard let price = subscriptionManager.proDisplayPrice else {
+            return String(localized: "settings.proCard.noPrice", defaultValue: "Every rental, the PDF, care plans", table: "Pricing")
+        }
+        if let days = subscriptionManager.introTrialDays {
+            return String(localized: "settings.proCard.trial", defaultValue: "\(price) a year · \(days) days free", table: "Pricing")
+        }
+        return String(localized: "settings.proCard.price", defaultValue: "\(price) a year", table: "Pricing")
     }
 
     /// Not a lock: a plain card above the plan rows (redesign-specs §1b). Radius 20, one
@@ -280,10 +322,10 @@ struct SettingsView: View {
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(subscriptionManager.proDisplayPrice.map { HS.f("settings.proCard.price", "Pay once, %@", $0) }
-                     ?? HS.t("settings.proCard.payOnce", "Pay once"))
+                Text(proCardLine)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
+                    .accessibilityIdentifier("settings.proCard.line")
             }
             .fixedSize(horizontal: false, vertical: true)
             if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
@@ -329,7 +371,7 @@ struct SettingsView: View {
     private var recordsSection: some View {
         Section {
             // Free users get Export as the `.row` lock under the Pro card (WP-P): one route each.
-            if !ProGate.isExportLocked(isPro: subscriptionManager.isPro) {
+            if !ProGate.isLocked(.settingsExport, plan: entitlements.plan) {
                 LHRow.Browse(title: HS.t("settings.export.title", "Export the record"),
                              meta: HS.t("settings.export.meta", "PDF and CSV for your CPA"),
                              systemImage: "square.and.arrow.up", tint: .neutral,
@@ -544,6 +586,8 @@ struct ProfileAvatar: View {
 /// each row is a plain button for VoiceOver and UI tests, with its own chevron.
 enum SettingsRoute: Hashable {
     case taxProfile, learningCenter, contactSupport, muted, deleteData, icloud, earlierRecords
+    /// 2.3: Settings › Free rental (switch once a month).
+    case freeRental
 }
 
 private struct AutoCaptureSettingsSection: View {

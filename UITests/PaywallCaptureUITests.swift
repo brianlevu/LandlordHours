@@ -1,8 +1,8 @@
 import XCTest
 
-/// Frames for the visual gate: every paywall state and every lock, light and dark, at the
-/// default text size, XXL and AX3. PNGs go straight to the host's
-/// `~/AgentScratch/landlordhours/<LH_CAPTURE_DATE or 2026-10-19>/paywall-prod-frames-r3/raw/`.
+/// Frames for the visual gate: every paywall state (2.3: the trial offer, Subscribe, owned) and
+/// every lock, light and dark, at the default text size, XXL and AX3. PNGs go straight to the
+/// host's `~/AgentScratch/landlordhours/<LH_CAPTURE_DATE or 2026-11-01>/2.3-pricing/states/`.
 /// Run with `-only-testing:LandlordHoursUITests/PaywallCaptureUITests`.
 final class PaywallCaptureUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -23,9 +23,9 @@ final class PaywallCaptureUITests: XCTestCase {
 
     private var outDir: URL {
         let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] ?? NSHomeDirectory()
-        let date = ProcessInfo.processInfo.environment["LH_CAPTURE_DATE"] ?? "2026-10-19"
+        let date = ProcessInfo.processInfo.environment["LH_CAPTURE_DATE"] ?? "2026-11-01"
         let url = URL(fileURLWithPath: home)
-            .appendingPathComponent("AgentScratch/landlordhours/\(date)/paywall-prod-frames-r3/raw", isDirectory: true)
+            .appendingPathComponent("AgentScratch/landlordhours/\(date)/2.3-pricing/states", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -33,13 +33,11 @@ final class PaywallCaptureUITests: XCTestCase {
     // MARK: Paywall states
 
     private static let paywallStates: [(name: String, args: [String])] = [
-        ("paywall-export", ["-LHPaywallPreview", "export"]),
-        ("paywall-export-below", ["-LHPaywallPreview", "export", "-LHPaywallBelowFold"]),
-        ("paywall-second", ["-LHPaywallPreview", "secondProperty", "-LHPaywallProperty", "Pine Cabin"]),
-        ("paywall-today", ["-LHPaywallPreview", "todayUnlock", "-LHPaywallHours", "14.5"]),
-        ("paywall-settings", ["-LHPaywallPreview", "settings"]),
-        ("paywall-sample", ["-LHPaywallPreview", "export", "-LHPaywallSample"]),
-        ("paywall-pageloading", ["-LHPaywallPreview", "export", "-LHPaywallPageLoading"]),
+        ("paywall-trial", ["-LHPaywallPreview", "settings"]),
+        ("paywall-subscribe", ["-LHPaywallPreview", "settings", "-LHPaywallOffer", "subscribe"]),
+        ("paywall-founding", ["-LHPaywallPreview", "settings", "-LHPaywallOffer", "founding"]),
+        ("paywall-founding-subscribed", ["-LHPaywallPreview", "settings", "-LHPaywallOffer", "foundingSubscribed"]),
+        ("trial-start", ["-LHPaywallPreview", "settings", "-LHTrialStartPreview"]),
         ("paywall-price-loading", ["-LHPaywallPreview", "export", "-LHPaywallPhase", "priceLoading"]),
         ("paywall-price-failed", ["-LHPaywallPreview", "export", "-LHPaywallPhase", "priceFailed"]),
         ("paywall-buying", ["-LHPaywallPreview", "export", "-LHPaywallPhase", "buying"]),
@@ -73,17 +71,19 @@ final class PaywallCaptureUITests: XCTestCase {
         }
     }
 
-    /// v2 (standard §1.23): no blueprint band. The header (title + close) stays pinned on the plain
-    /// canvas while the page scrolls, and "What you get" is reachable.
-    func testHeaderStaysPinnedWithoutABand() {
+    /// 2.3 (standard §1.23): no blueprint band. The foot (the primary, the cancel rule, Restore,
+    /// Terms and Privacy) stays pinned while the page scrolls, and "In Pro" is reachable.
+    func testFootStaysPinnedWithoutABand() {
         launch(scenario: "occasional", scheme: "light", size: "UICTContentSizeCategoryXXL", extra: ["-LHPaywallPreview", "export"])
         XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 12))
         XCTAssertFalse(app.descendants(matching: .any)["paywall.band.hero"].exists, "The blueprint band is retired")
         app.swipeUp(velocity: .fast); app.swipeUp(velocity: .fast)
         Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertTrue(app.staticTexts["paywall.title"].isHittable, "The header stays pinned")
-        XCTAssertTrue(app.buttons["paywall.close"].isHittable, "Close stays reachable")
-        XCTAssertTrue(app.descendants(matching: .any)["paywall.benefits"].exists, "What you get")
+        for id in ["paywall.buy", "paywall.restore", "paywall.terms", "paywall.privacy"] {
+            XCTAssertTrue(app.buttons[id].isHittable, "\(id) stays pinned")
+        }
+        XCTAssertTrue(app.staticTexts["paywall.cancelRule"].isHittable, "The cancel rule stays beside the button")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.benefits"].exists, "In Pro")
     }
 
     /// Properties at the free limit: the shared `.row` lock (entry properties_limit).
