@@ -105,17 +105,14 @@ final class ConversionPathTests: XCTestCase {
         XCTAssertEqual(RecordPagePreview.title(year: 2026), "Rental hours record 2026")
     }
 
-    func testPaywallPreviewStaysUnderTheCap() {
-        XCTAssertLessThanOrEqual(PaywallView.previewShare, 0.40)
-        XCTAssertLessThanOrEqual(PaywallView.previewShareAccessibility, 0.40)
-    }
-
-    func testBenefitRowsFitOneLine() {
-        for row in PaywallView.benefitRows {
+    /// 2.3 paywall: the "In Pro" rows stay on one line at default size (approved copy; the meta
+    /// cap is 25 for "Log at as many as you own"), and say "your CPA", never "accountant".
+    func testInProRowsFitOneLine() {
+        for row in PaywallView.inProRows {
             XCTAssertLessThanOrEqual(row.title.count, 26, row.title)
-            XCTAssertLessThanOrEqual(row.meta.count, 24, row.meta)
+            XCTAssertLessThanOrEqual(row.meta.count, 25, row.meta)
         }
-        let words = PaywallView.benefitRows.flatMap { [$0.title, $0.meta] }.joined(separator: " ").lowercased()
+        let words = PaywallView.inProRows.flatMap { [$0.title, $0.meta] }.joined(separator: " ").lowercased()
         XCTAssertFalse(words.contains("accountant"), "C.4: your CPA")
     }
 
@@ -136,12 +133,6 @@ final class ConversionPathTests: XCTestCase {
                        "Turn 46 confirmed hours into a clean record.")
         XCTAssertEqual(PaywallCopy.localized(.todayUnlock, year: 2026).planLine,
                        "Turn your confirmed hours into a clean record.")
-    }
-
-    func testBuyTitleUsesTheStorePriceAndDropsItAtLargeSizes() {
-        XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: false), "Unlock for $29.99")
-        XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: true), "Unlock")
-        XCTAssertEqual(PaywallCopy.buyTitle(billed: nil, large: false), "Unlock")
     }
 
     func testOnboardingHouseFitsItsFrameAtEveryStage() {

@@ -116,6 +116,35 @@ final class PricingJourneyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["log.property"].label.contains("Oak Street Duplex"), "The locked rental was not picked")
     }
 
+    /// 2.3: at a view-only rental a record's hours can go down (typos get fixed) but never up.
+    /// A refused edit puts the saved values back and says why.
+    func testAViewOnlyRecordCanBeLoweredButNotRaised() {
+        launchFreeWithTwoRentals()
+        tap(app.buttons["tab.records"].firstMatch)
+        let oakRow = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "records.row.", "Oak Street Duplex")).firstMatch
+        scrollTo(oakRow, maxSwipes: 12)
+        tap(oakRow)
+        let edit = app.buttons["entry.edit"]
+        tap(edit)
+        let stepper = app.descendants(matching: .any)["record.hours.stepper"].firstMatch
+        XCTAssertTrue(stepper.waitForExistence(timeout: 5))
+        let before = stepper.value as? String ?? ""
+        stepper.increment()
+        tap(app.buttons["entry.save"])
+        let refused = app.descendants(matching: .any)["entry.refused"]
+        XCTAssertTrue(refused.waitForExistence(timeout: 5), "Raising hours at a view-only rental is refused, with the reason")
+        XCTAssertTrue(refused.label.contains("Pine Cabin"), "It names the free rental: \(refused.label)")
+        XCTAssertTrue(edit.waitForExistence(timeout: 3), "Back to the saved record")
+        // Lowering is allowed: a typo can be fixed.
+        tap(edit)
+        XCTAssertEqual(stepper.value as? String ?? "", before, "The refused hours were put back")
+        stepper.decrement()
+        tap(app.buttons["entry.save"])
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        XCTAssertFalse(refused.exists, "Lowering hours saves")
+    }
+
     // MARK: Helpers
 
     private func launch(extra: [String]) {

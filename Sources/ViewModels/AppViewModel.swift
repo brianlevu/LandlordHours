@@ -866,26 +866,36 @@ class AppViewModel: ObservableObject {
     static var debugFailNextWrite = false
 #endif
 
-    func updateTimeEntry(_ entry: TimeEntry) {
-        if let index = timeEntries.firstIndex(where: { $0.id == entry.id }) {
-            // 2.3: a view-only rental takes no new hours. An edit that moves an entry onto one, or
-            // changes what counts (hours, date, kind, who) at one, is refused with the reason;
-            // notes and photos stay editable.
-            if !Self.editAllowed(from: timeEntries[index], to: entry, canLog: canLog(at:)) {
-                AppToastCenter.shared.show(viewOnlyLogMessage, kind: .problem)
-                return
-            }
-            timeEntries[index] = entry
-            saveData()
-        }
+    /// What happened to an edit (2.3).
+    enum EntryEditResult: Equatable {
+        case saved
+        /// Refused at a view-only rental; the reason names the free rental. Nothing changed.
+        case refused(String)
+        case notFound
     }
 
-    /// The view-only rule for an edit (pure, unit-tested).
+    @discardableResult
+    func updateTimeEntry(_ entry: TimeEntry) -> EntryEditResult {
+        guard let index = timeEntries.firstIndex(where: { $0.id == entry.id }) else { return .notFound }
+        // 2.3: a view-only rental takes no new hours. Raising hours there, making them count, or
+        // moving an entry onto one is refused with the reason; lowering hours, fixing the date,
+        // notes or who, and moving hours away are allowed, so typos can be fixed.
+        guard Self.editAllowed(from: timeEntries[index], to: entry, canLog: canLog(at:)) else {
+            return .refused(viewOnlyLogMessage)
+        }
+        timeEntries[index] = entry
+        saveData()
+        return .saved
+    }
+
+    /// The view-only rule for an edit (pure, unit-tested): never adds hours at a view-only rental.
     nonisolated static func editAllowed(from old: TimeEntry, to new: TimeEntry, canLog: (UUID) -> Bool) -> Bool {
         if old.propertyId != new.propertyId { return canLog(new.propertyId) }
         guard !canLog(new.propertyId) else { return true }
-        return old.hours == new.hours && old.date == new.date && old.category == new.category
-            && old.participant == new.participant
+        if new.hours > old.hours { return false }
+        // A kind that never counted becoming one that does adds counted hours too.
+        if new.category.countsForREPS && !old.category.countsForREPS { return false }
+        return true
     }
 
     func deleteTimeEntry(_ entry: TimeEntry) {

@@ -449,15 +449,6 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: Retired 2.2 names (kept only so ConversionPathTests, a frozen file, still compiles;
-    // the conductor removes them with that file's three 2.2 paywall tests)
-
-    /// 2.3 has no record preview on the paywall: its share of the viewport is zero.
-    static let previewShare: CGFloat = 0
-    static let previewShareAccessibility: CGFloat = 0
-    /// The "In Pro" rows under their 2.2 name.
-    static var benefitRows: [(symbol: String, title: String, meta: String)] { inProRows }
-
     // MARK: In Pro
 
     static var inProRows: [(symbol: String, title: String, meta: String)] {
@@ -850,16 +841,5 @@ extension PaywallCopy {
                 planLine: String(localized: "paywall.learn.line", defaultValue: "What counts toward your hours, one card at a time. Each ends with what to ask your CPA.", table: "Pricing"),
                 nextStep: String(localized: "paywall.learn.next", defaultValue: "Keep reading", table: "Pricing"))
         }
-    }
-}
-
-extension PaywallCopy {
-    /// Retired: the 2.2 "Unlock for <price>" button. 2.3's primary is "Start free trial" or
-    /// "Subscribe" (`PriceDisplay.buttonTitle`) and never carries a price. Kept only for the frozen
-    /// ConversionPathTests; nothing in the app calls it.
-    @available(*, deprecated, message: "2.2 paywall; use PriceDisplay.buttonTitle")
-    static func buyTitle(billed: String?, large: Bool) -> String {
-        guard let billed, !large else { return String(localized: "Unlock", table: "ConversionPath") }
-        return String(localized: "Unlock for \(billed)", table: "ConversionPath")
     }
 }

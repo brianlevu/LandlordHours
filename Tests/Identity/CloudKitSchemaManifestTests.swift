@@ -20,9 +20,12 @@ final class CloudKitSchemaManifestTests: XCTestCase {
             .record(name: "GoalSettings-household", owner: "household").ckRecord()
         let tax = TaxProfileValues(filingStatus: "Single", spouseTracking: true, taxYear: 2026, groupingElection: false,
                                    nonREWorkHours: 1.5, displayName: "Sam").record(name: "TaxProfile-household", owner: "household").ckRecord()
+        // 2.3: the free-rental pick (package A, FreeRentalSync).
+        let freeRental = CloudKitFreeRentalStore.record(
+            for: FreeRentalSelection(rentalID: UUID(), chosenAt: Date(), source: .picked), owner: "household", zoneID: zone)
         let records = [CloudKitSyncService.record(for: property, zoneID: zone, appUserId: "household"),
                        CloudKitSyncService.record(for: entry, zoneID: zone, appUserId: "household"),
-                       CloudKitSyncService.record(for: category, zoneID: zone, appUserId: "household"), goal, tax]
+                       CloudKitSyncService.record(for: category, zoneID: zone, appUserId: "household"), goal, tax, freeRental]
         var out: [String: [String: String]] = [:]
         for record in records {
             var fields: [String: String] = [:]

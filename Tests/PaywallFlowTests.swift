@@ -246,12 +246,19 @@ final class ViewOnlyRentalSaveTests: CaptureTestCase {
         moved.propertyId = oak
         vm.updateTimeEntry(moved)
         XCTAssertEqual(vm.timeEntries[0].propertyId, pine, "an edit can't move hours onto a view-only rental")
-        // At the view-only rental itself: no counted change, but notes stay editable.
+        // At the view-only rental itself: hours never go up, but typos can be fixed.
         let oakIndex = vm.timeEntries.firstIndex { $0.propertyId == oak }!
         var more = vm.timeEntries[oakIndex]
         more.hours = 50
-        vm.updateTimeEntry(more)
+        XCTAssertEqual(vm.updateTimeEntry(more), .refused(vm.viewOnlyLogMessage))
         XCTAssertEqual(vm.timeEntries[oakIndex].hours, 5, "hours at a view-only rental can't grow")
+        var less = vm.timeEntries[oakIndex]
+        less.hours = 3
+        XCTAssertEqual(vm.updateTimeEntry(less), .saved, "lowering hours fixes a typo")
+        XCTAssertEqual(vm.timeEntries[oakIndex].hours, 3)
+        var redated = vm.timeEntries[oakIndex]
+        redated.date = redated.date.addingTimeInterval(-86_400)
+        XCTAssertEqual(vm.updateTimeEntry(redated), .saved, "the date can be fixed")
         var noted = vm.timeEntries[oakIndex]
         noted.notes = "fixed the gate"
         vm.updateTimeEntry(noted)
@@ -260,6 +267,35 @@ final class ViewOnlyRentalSaveTests: CaptureTestCase {
         let suggestion = calendarSuggestion(start: Date().addingTimeInterval(-3600), propertyId: oak)
         store.ingest([suggestion], existingEntries: vm.timeEntries, calendar: calendar)
         XCTAssertEqual(vm.confirm(suggestion, store: store), .needsInput(missing: [.plan]))
+    }
+
+    func testAViewOnlyEntryCanBeDeletedButNeverMadeToCount() {
+        let oakEntry = vm.timeEntries.first { $0.propertyId == oak }!
+        var counted = oakEntry
+        counted.category = .investing               // never counts
+        XCTAssertEqual(vm.updateTimeEntry(counted), .saved, "making it count less is fine")
+        var back = vm.timeEntries.first { $0.id == oakEntry.id }!
+        back.category = .repairs                    // counts again: adds counted hours
+        XCTAssertEqual(vm.updateTimeEntry(back), .refused(vm.viewOnlyLogMessage))
+        vm.deleteTimeEntry(vm.timeEntries.first { $0.id == oakEntry.id }!)
+        XCTAssertFalse(vm.timeEntries.contains { $0.id == oakEntry.id }, "a view-only entry can be deleted")
+        // Moving hours away from the view-only rental to the free one is allowed.
+        vm.timeEntries.append(TimeEntry(propertyId: oak, participant: .selfParticipant, category: .repairs, hours: 2, date: Date(), notes: ""))
+        var moved = vm.timeEntries.last!
+        moved.propertyId = pine
+        XCTAssertEqual(vm.updateTimeEntry(moved), .saved)
+    }
+
+    func testTheEditRuleIsPure() {
+        let a = TimeEntry(propertyId: oak, participant: .selfParticipant, category: .repairs, hours: 4, date: Date(), notes: "")
+        let viewOnly: (UUID) -> Bool = { [pine] in $0 == pine }
+        var up = a; up.hours = 5
+        var down = a; down.hours = 1
+        var who = a; who.participant = .spouse
+        XCTAssertFalse(AppViewModel.editAllowed(from: a, to: up, canLog: viewOnly))
+        XCTAssertTrue(AppViewModel.editAllowed(from: a, to: down, canLog: viewOnly))
+        XCTAssertTrue(AppViewModel.editAllowed(from: a, to: who, canLog: viewOnly))
+        XCTAssertTrue(AppViewModel.editAllowed(from: a, to: up, canLog: { _ in true }), "Pro: anything")
     }
 
     func testViewOnlyHoursStayCounted() {
