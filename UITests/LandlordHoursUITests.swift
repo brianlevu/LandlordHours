@@ -189,7 +189,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("frequent", 1, "3 rentals ·", "frequent-properties"),
             ("frequent", 2, "Log time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
-            ("frequent", 4, "Pro is active", "frequent-settings")
+            ("frequent", 4, "Pro for life", "frequent-settings")   // 2.3 A: the founding plan row (PlanCopy.title)
         ]
 
         for item in matrix {

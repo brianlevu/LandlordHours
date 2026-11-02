@@ -54,8 +54,11 @@ final class PaywallCaptureUITests: XCTestCase {
             for (sizeName, size) in Self.sizes {
                 for scheme in Self.schemes {
                     launch(scenario: "occasional", scheme: scheme, size: size, extra: state.args)
-                    let title = app.staticTexts["paywall.title"]
-                    XCTAssertTrue(title.waitForExistence(timeout: 12), "\(state.name): paywall missing")
+                    // 2.3 A: the trial-start state is its own screen (hi-fi p2, TrialStartView), titled
+                    // `trial.title`, not the paywall.
+                    let titleID = state.name == "trial-start" ? "trial.title" : "paywall.title"
+                    let title = app.descendants(matching: .any)[titleID].firstMatch
+                    XCTAssertTrue(title.waitForExistence(timeout: 12), "\(state.name): \(titleID) missing")
                     Thread.sleep(forTimeInterval: state.name.contains("below") ? 2.0 : 1.4)
                     // Large sizes push a state's status line below the fold: bring it into view
                     // so every state is captured for real (the r1 gate found identical frames).
