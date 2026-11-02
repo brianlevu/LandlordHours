@@ -486,7 +486,9 @@ final class AppearanceManager: ObservableObject {
         preference.preferredColorScheme
     }
 
+    /// DEBUG only (captures and UI tests): `-LHColorScheme dark|light`. Release ignores it.
     static var forcedColorSchemeFromLaunchArguments: ColorScheme? {
+        #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: "-LHColorScheme"),
               args.indices.contains(index + 1) else {
@@ -498,6 +500,9 @@ final class AppearanceManager: ObservableObject {
         case "light": return .light
         default: return nil
         }
+        #else
+        return nil
+        #endif
     }
 
     private init() {

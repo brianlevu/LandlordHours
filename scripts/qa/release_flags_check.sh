@@ -5,6 +5,10 @@
 # the Release binary holds none of their strings. The 2.3 release gate found `-LHOpenLearningCenter`
 # read outside `#if DEBUG` (DashboardView). This check keeps that from coming back.
 #
+# Two layers: Swift keeps strings of 15 bytes or fewer inline in the code, so `strings` never sees
+# short flags such as `-LHInitialTab`. release_flags_source_check.py therefore runs first and fails
+# on any `-LH` literal outside `#if DEBUG`; the binary grep below then checks the long ones.
+#
 # Allowed in Release (one entry, deliberate):
 #   -LHAnalyticsForce  Sources/App/Analytics.swift. The opt-in switch that turns analytics ON under
 #                      other `-LH` QA flags so event flow can be checked on a QA launch. It only
@@ -21,6 +25,8 @@ set -euo pipefail
 ALLOWED=("-LHAnalyticsForce")
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
+
+python3 "$HERE/release_flags_source_check.py" "$ROOT" || exit 1
 
 if [[ "${1:-}" == "--build" ]]; then
   DD="${2:-$HOME/tmp/DerivedData/landlordhours-release-flags}"

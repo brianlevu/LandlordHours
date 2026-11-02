@@ -90,12 +90,16 @@ enum CaptureOptIn {
         guard !whatsNewSeen(userId: userId, defaults: defaults) else { return false }
         // Debug / UI-test launches (any -LH… argument) stay quiet unless a test asks for it, so
         // existing journeys are not interrupted by a sheet.
+        #if DEBUG
         if arguments.contains(showWhatsNewArgument) { return true }
+        #endif
         return !arguments.contains { $0.hasPrefix("-LH") }
     }
 
+    #if DEBUG
     /// DEBUG / UI tests: force the upgrader intro on a seeded launch.
     static let showWhatsNewArgument = "-LHShowWhatsNew"
+    #endif
 
     /// Records an explicit answer from the intro or onboarding step.
     static func recordChoice(

@@ -149,7 +149,9 @@ struct ContentView: View {
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
+    /// DEBUG only (captures and UI tests): `-LHInitialTab <n>`. Release always opens on Today.
     private static func initialTabFromLaunchArguments() -> Int {
+        #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: "-LHInitialTab"),
               args.indices.contains(index + 1),
@@ -157,6 +159,9 @@ struct ContentView: View {
             return 0
         }
         return min(max(tab, 0), ShellTab.maxIndex)
+        #else
+        return 0
+        #endif
     }
 
     var body: some View {

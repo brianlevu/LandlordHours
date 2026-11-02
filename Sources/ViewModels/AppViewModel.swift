@@ -286,7 +286,11 @@ class AppViewModel: ObservableObject {
 
     /// UI tests, captures and screenshot runs drive the app from DEBUG fixtures, not iCloud.
     static var isMockLaunch: Bool {
+        #if DEBUG
         ProcessInfo.processInfo.arguments.contains("-LHMockScenario")
+        #else
+        false
+        #endif
     }
 
 #if DEBUG

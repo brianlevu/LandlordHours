@@ -119,8 +119,10 @@ struct SystemPCCStatus: PCCSystemStatusProviding {
 /// The one place that decides whether PCC may run now: the user's setting, the remote kill
 /// switch, then the system (OS, eligibility, readiness, quota).
 struct PCCGate {
+    #if DEBUG
     /// DEBUG launch argument that opens the remote-flag gate for on-device PCC testing.
     static let forceLaunchArgument = "-LHForcePCC"
+    #endif
 
     let settings: PCCSettings
     let isFlagEnabled: () -> Bool
