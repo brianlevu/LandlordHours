@@ -78,6 +78,12 @@ final class InboxViewModel: ObservableObject {
     let waitList: ProWaitList
     /// Seconds the toast (and its Undo) stays.
     var undoWindow: TimeInterval
+    /// The one toast's hold with an action (§1.19: 8 s). Today shows its Undo toast through the
+    /// shared toast center for that long and calls `undo()`, so the model must keep the undo
+    /// alive for the same time: a shorter window made Undo a no-op in its last seconds.
+    nonisolated static var defaultUndoWindow: TimeInterval {
+        LHToastSpec(kind: .success, message: "", actionTitle: "Undo").duration
+    }
     private var toastTask: Task<Void, Never>?
 
     init(
@@ -89,7 +95,7 @@ final class InboxViewModel: ObservableObject {
         // 2.3: the plan decides (a trial counts), never the legacy `isPro` flag.
         isPro: @escaping () -> Bool = { EntitlementStore.shared.plan.allows(.allRentals) },
         waitList: ProWaitList = .shared,
-        undoWindow: TimeInterval = 5
+        undoWindow: TimeInterval = InboxViewModel.defaultUndoWindow
     ) {
         self.app = app
         self.storeProvider = storeProvider

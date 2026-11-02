@@ -164,7 +164,7 @@ final class TodayConfirmUITests: XCTestCase {
         XCTAssertFalse(row("inspection").exists)
         XCTAssertEqual(heroHours(), before, "Not rental work never counts: \(number.label)")
         // The badge needs the tab bar, which may have tucked away; Undo must still land inside the
-        // toast's 5 s, so read the badge last and undo straight after.
+        // toast's 8 s (§1.19), so read the badge last and undo straight after.
         XCTAssertEqual(badgeCount(), 2)
         undo.tap()
         XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 3'"))

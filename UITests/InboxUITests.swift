@@ -190,7 +190,7 @@ final class InboxUITests: XCTestCase {
         swipeLog(row("showing"))
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
         XCTAssertTrue(waitForBadge("5 to confirm"))
-        XCTAssertTrue(undo.waitForNonExistence(timeout: 9), "Toast times out and the log is written")
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 12), "Toast times out (8 s, §1.19) and the log is written")
         XCTAssertFalse(row("showing").exists)
         // The confirmed entry is in Records.
         app.tabBars.firstMatch.buttons["Records"].tap()

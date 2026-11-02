@@ -105,7 +105,7 @@ final class InboxCaptureUITests: XCTestCase {
         print("VIDEO_MARK_START \(Date().timeIntervalSince1970)")
         Thread.sleep(forTimeInterval: 1.0)
 
-        // Swipe right: log (saved at once, Undo for 5 s).
+        // Swipe right: log (saved at once, Undo for 8 s, §1.19).
         drag(showing, right: true)
         let undo = app.buttons["inbox.undo"]
         XCTAssertTrue(undo.waitForExistence(timeout: 3), "Swipe-right logged")

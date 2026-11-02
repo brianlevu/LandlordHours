@@ -371,6 +371,16 @@ final class InboxViewModelTests: CaptureTestCase {
         seed([old, item("NEW")])
         XCTAssertEqual(model().backfillCount, 1)
     }
+
+    /// Today's Undo toast holds for the one toast's action time (§1.19, 8 s) and calls the inbox's
+    /// `undo()`. The inbox must keep the undo alive at least that long, or Undo silently does
+    /// nothing in the toast's last seconds (the 2.3 release gate's TodayConfirm flake).
+    func testUndoLastsAsLongAsTheToastThatOffersIt() {
+        let toastHold = LHToastSpec(kind: .neutral, message: "Marked not rental work", actionTitle: "Undo").duration
+        XCTAssertEqual(toastHold, 8, "§1.19: 8 s with an action")
+        let live = InboxViewModel(app: app, storeProvider: { [store] in store })
+        XCTAssertGreaterThanOrEqual(live.undoWindow, toastHold)
+    }
 }
 
 // MARK: - Opt-in gating
