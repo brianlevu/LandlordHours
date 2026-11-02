@@ -102,10 +102,12 @@ final class TodayConfirmUITests: XCTestCase {
         launch(limit: nil)
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         bringIntoView(count)
-        XCTAssertEqual(count.label, "To confirm · 8")
-        XCTAssertEqual(badgeCount(), 8, "One number: Today's count is the Inbox badge (\(inboxTab.value ?? "nil"))")
-        XCTAssertTrue(app.buttons["today.confirm.seeAll"].exists, "More than the rows hold: See all 8")
-        XCTAssertEqual(app.buttons["today.confirm.seeAll"].label, "See all 8")
+        // The inbox seed has 8 items; 2.3 F keeps the 2 "Not sure" ones (call-sam 0.42, hoa 0.66,
+        // under the Likely line 0.70) out of every count, as InboxQuietUITests and InboxUITests assert.
+        XCTAssertEqual(count.label, "To confirm · 6")
+        XCTAssertEqual(badgeCount(), 6, "One number: Today's count is the Inbox badge (\(inboxTab.value ?? "nil"))")
+        XCTAssertTrue(app.buttons["today.confirm.seeAll"].exists, "More than the rows hold: See all 6")
+        XCTAssertEqual(app.buttons["today.confirm.seeAll"].label, "See all 6")
     }
 
     func testConfirmFromTodayLogsBuildsTheHouseAndDropsTheBadge() {
@@ -247,6 +249,10 @@ final class TodayConfirmUITests: XCTestCase {
             UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", "emptyMainTabs",
             "-LHSeedSuggestions", "inbox",
+            // The Showing confirmed here is at Oak Street Duplex, the second rental. On the 2.3 free
+            // plan that rental is view-only and logging there is refused at save (plan §1 A.2,
+            // PricingJourneyUITests), so this arrival journey runs as a Pro (founding) owner.
+            "-LHPlanFounding",
             "-LHNoSwipePeek",
             "-LHRevealProbe",
             "-LHFixedNow", Self.todayAt3pm,

@@ -92,7 +92,9 @@ final class InboxCaptureUITests: XCTestCase {
     /// Swipe-right log + Undo, then swipe-left dismiss, for the 30 fps video. The run script
     /// records the simulator and trims to the VIDEO_MARK lines, so the clip starts on the inbox.
     func testRecordSwipeLogUndo() {
-        launch(seed: "inbox", scheme: "light")
+        // The Showing is at Oak Street Duplex, the second rental: view-only on the 2.3 free plan
+        // (logging there needs Pro), so the recording runs as a Pro owner, like InboxUITests.
+        launch(seed: "inbox", scheme: "light", extra: ["-LHPlanFounding"])
         let showing = app.descendants(matching: .any)["inbox.row.cal:debug-showing"]
         XCTAssertTrue(showing.waitForExistence(timeout: 20))
         let tab = app.tabBars.firstMatch.buttons["Inbox"]
