@@ -172,7 +172,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Pick a property"].exists, "The only property was attached to every suggestion")
         tap(confirm)
         XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 2), "No sheet: nothing was missing")
-        XCTAssertTrue(waitForInboxBadge(21), "Confirm logged the row")
+        XCTAssertTrue(waitForInboxBadge(13), "Confirm logged the row (14 likely, one confirmed)")
     }
 
     // MARK: Skip path: seven taps to Today
