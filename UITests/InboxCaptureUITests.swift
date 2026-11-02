@@ -18,9 +18,9 @@ final class InboxCaptureUITests: XCTestCase {
 
     /// Integration frames: the Inbox and its confirm sheet at default and XXL, light and dark,
     /// written as PNGs to `TEST_RUNNER_LH_CAPTURE_DIR` (`inbox-<size>-<scheme>.png`).
-    func testCaptureSizesToDirectory() {
+    func testCaptureSizesToDirectory() throws {
         guard let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty else {
-            XCTFail("Set TEST_RUNNER_LH_CAPTURE_DIR"); return
+            throw XCTSkip("Captures only (set TEST_RUNNER_LH_CAPTURE_DIR)")
         }
         let out = URL(fileURLWithPath: dir)
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
@@ -53,9 +53,9 @@ final class InboxCaptureUITests: XCTestCase {
 
     /// The free-limit confirm sheet (conversion path) at default, XXL and AX3, light and dark:
     /// `limit-sheet-<size>-<scheme>.png` plus a scrolled frame, to `TEST_RUNNER_LH_CAPTURE_DIR`.
-    func testCaptureFreeLimitSheetToDirectory() {
+    func testCaptureFreeLimitSheetToDirectory() throws {
         guard let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty else {
-            XCTFail("Set TEST_RUNNER_LH_CAPTURE_DIR"); return
+            throw XCTSkip("Captures only (set TEST_RUNNER_LH_CAPTURE_DIR)")
         }
         let out = URL(fileURLWithPath: dir)
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
