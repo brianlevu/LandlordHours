@@ -127,7 +127,17 @@ struct DashboardView: View {
     @State private var showParticipationSheet = false
     @State private var showRecordExport = false
     @State private var showCaptureSetup = false
-    @State private var showLearningCenter = ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
+    @State private var showLearningCenter = Self.opensLearningCenterAtLaunch
+
+    /// DEBUG only: `-LHOpenLearningCenter` opens the Learning center at launch for captures.
+    /// Release builds carry no `-LH` fixture strings (scripts/qa/release_flags_check.sh).
+    private static var opensLearningCenterAtLaunch: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
+        #else
+        false
+        #endif
+    }
     @State private var shownCelebration: TodayCelebration?
     @State private var shownBackfill: HouseBackfillReveal?
     @ScaledMetric(relativeTo: .largeTitle) private var scaledNumeral: CGFloat = 84
