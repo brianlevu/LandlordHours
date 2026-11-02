@@ -136,18 +136,27 @@ final class OnboardingUITests: XCTestCase {
         tap(yes)                                                   // fake notifications "Allow"
         let found = stakedFound
         XCTAssertTrue(found.waitForExistence(timeout: 10))
-        XCTAssertEqual(found.label, "35 hours found. 0 counted.", "The fixture look-back: 22 items, 35h")
+        // The fixture look-back finds 22 items, 35h. 2.3 F: the 8 under the Likely line (0.70: the
+        // fixture's 0.64/0.55/0.45/0.38 band) are "Not sure", so they sit behind the Inbox's Not sure
+        // row and are counted nowhere. What is found and counted is the 14 likely items, 22.5h.
+        XCTAssertEqual(found.label, "22.5 hours found. 0 counted.", "The fixture look-back: 14 likely items, 22.5h")
         let review = app.buttons["onb-today"]
-        XCTAssertEqual(review.label, "Review 22 suggestions")
+        XCTAssertEqual(review.label, "Review 14 suggestions")
         tap(review)
         XCTAssertTrue(inboxTab.waitForExistence(timeout: 10))
-        XCTAssertTrue(waitForInboxBadge(22),
+        XCTAssertTrue(waitForInboxBadge(14),
                       "Every hour found is in the Inbox: \(inboxTab.value ?? "nil")")
-        // The count was shown once on Staked: Today does not replay it, and keeps the 22 under "To confirm".
+        // The other 8 are still reachable: one collapsed Not sure row under the To confirm card.
+        let maybe = app.descendants(matching: .any)["inbox.maybe.row"]
+        for _ in 0..<10 where !(maybe.exists && maybe.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(maybe.exists, "The Not sure row holds the rest of the look-back")
+        XCTAssertTrue(maybe.label.contains("8"), "8 Not sure look-back items: \(maybe.label)")
+        for _ in 0..<5 { app.swipeDown() }
+        // The count was shown once on Staked: Today does not replay it, and keeps the 14 under "To confirm".
         tap(todayTab)
         XCTAssertFalse(app.buttons["backfill-review"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["today.confirm.count"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["today.confirm.count"].label, "To confirm · 22", "Today keeps what was found")
+        XCTAssertEqual(app.staticTexts["today.confirm.count"].label, "To confirm · 14", "Today keeps what was found")
         XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
         tap(inboxTab)
         // Found before the property existed, placed on it when it was saved: Confirm logs in one tap.
@@ -339,10 +348,11 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-secondary"])                          // note: Not now
         let line = app.staticTexts["staked-nothing-countable"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
-        XCTAssertEqual(line.label.lowercased(), "we found 22 things, but none count toward your hours yet.")
+        // 22 look-back items; 8 are Not sure (2.3 F) and counted nowhere, so 14 are found.
+        XCTAssertEqual(line.label.lowercased(), "we found 14 things, but none count toward your hours yet.")
         XCTAssertTrue(stakedSetup.exists)
         XCTAssertFalse(stakedFound.exists, "Never a found-hours headline")
-        XCTAssertEqual(app.buttons["onb-today"].label, "Review 22 suggestions", "They still wait in the Inbox")
+        XCTAssertEqual(app.buttons["onb-today"].label, "Review 14 suggestions", "They still wait in the Inbox")
         tap(app.buttons["onb-today"])
         tap(todayTab)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'found'")).firstMatch.waitForExistence(timeout: 3), "Today shows no found hours either")

@@ -163,7 +163,8 @@ final class OnboardingCaptureUITests: XCTestCase {
         tap(app.buttons["onb-secondary"])                       // note: Not now
         let none = app.staticTexts["staked-nothing-countable"]
         XCTAssertTrue(none.waitForExistence(timeout: 10))
-        XCTAssertEqual(none.label.lowercased(), "we found 22 things, but none count toward your hours yet.")
+        // 22 look-back items; 8 are Not sure (2.3 F) and counted nowhere, so 14 are found.
+        XCTAssertEqual(none.label.lowercased(), "we found 14 things, but none count toward your hours yet.")
         XCTAssertFalse(stakedFound.exists, "Never 0h found")
         shot("06c-staked-none-count", scheme, suffix)
 
