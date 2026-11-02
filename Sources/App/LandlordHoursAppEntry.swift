@@ -74,7 +74,14 @@ struct LandlordHoursApp: App {
         WindowGroup {
             #if DEBUG
             // House capture hook (-LHHousePreview <hours> <goal> <scheme>); see HousePreviewLaunchHook.swift.
-            if let board = SurfaceBoardLaunch.current {
+            if let quiet = QuietLaunch.current {
+                // 2.3.1 quiet sandbox (-LHQuiet <scene>); see Views/Debug/Quiet231.
+                QuietRoot(scene: quiet)
+                    .environmentObject(viewModel)
+                    .environmentObject(categoryManager)
+                    .environmentObject(appearanceManager)
+                    .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments)
+            } else if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
             } else if let craft = CraftLaunch.current {
