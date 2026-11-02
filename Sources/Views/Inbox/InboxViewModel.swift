@@ -82,7 +82,7 @@ final class InboxViewModel: ObservableObject {
     /// shared toast center for that long and calls `undo()`, so the model must keep the undo
     /// alive for the same time: a shorter window made Undo a no-op in its last seconds.
     nonisolated static var defaultUndoWindow: TimeInterval {
-        LHToastSpec(kind: .success, message: "", actionTitle: "Undo").duration
+        LHToastSpec(kind: .success, message: "", actionTitle: "").duration   // any action title: the action hold
     }
     private var toastTask: Task<Void, Never>?
 
