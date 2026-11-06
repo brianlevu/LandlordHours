@@ -1883,6 +1883,13 @@ final class AnalyticsOptOutTests: XCTestCase {
         XCTAssertFalse(Analytics.shouldSend(configured: true, optedOut: true), "Configured + opted out must never send")
         XCTAssertFalse(Analytics.shouldSend(configured: false, optedOut: false), "Never-configured must never send, opt-out state aside")
     }
+
+    /// The id handed to RevenueCat (`$posthogUserId`) must be nil whenever PostHog never
+    /// configured, which is always the case under XCTest; no mock needed, real local state.
+    func testDistinctIdIsNilWhenAnalyticsNeverConfigured() {
+        XCTAssertFalse(Analytics.isConfigured)
+        XCTAssertNil(Analytics.distinctId(), "No PostHog id may leave Analytics when it never configured")
+    }
 }
 
 // MARK: - Privacy: no network in the time entry parser

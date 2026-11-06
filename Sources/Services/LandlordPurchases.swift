@@ -55,8 +55,10 @@ import RevenueCat
 /// launch.
 ///
 /// Anonymous app user IDs ONLY: `Purchases.configure` here is never given an explicit `appUserID`,
-/// so RC generates and persists its own anonymous ID; `logIn`/`logOut`/`alias`/attribution APIs are
-/// never called anywhere in this app. No custom subscriber attributes are ever set.
+/// so RC generates and persists its own anonymous ID; `logIn`/`logOut`/`alias` are never called
+/// anywhere in this app. The one subscriber attribute ever set is `$posthogUserId` (PostHog's
+/// anonymous distinct id, only when analytics is configured and not opted out), written right after
+/// `Purchases.configure` so RevenueCat's PostHog integration can join purchases to PostHog users.
 enum LandlordPurchases {
     /// The single feature-gate bool. `false` would ship the integration completely dark — no
     /// network calls, no SDK initialization — regardless of whether a key is present.
@@ -202,6 +204,16 @@ enum LandlordPurchases {
         // app user ID is ever set, so this attaches to whatever anonymous RC identity this device
         // already has.
         Purchases.shared.syncPurchases { _, _ in }
+
+        // RC <-> PostHog join: sets a SUBSCRIBER ATTRIBUTE on the anonymous RC customer, never
+        // `Purchases.shared.logIn()` and never `PostHogSDK.shared.identify()`, so the privacy
+        // manifest's "not linked to identity" declarations still hold (a plain attribute carries no
+        // identify/login linkage semantics). `Analytics.distinctId()` is the only place PostHog's id
+        // leaves `Analytics.swift`, and it is `nil` when PostHog never configured (QA/DEBUG/XCTest)
+        // or the user opted out, so this is a total no-op in those cases.
+        if let distinctId = Analytics.distinctId() {
+            Purchases.shared.attribution.setAttributes(["$posthogUserId": distinctId])
+        }
     }
 
     #if DEBUG

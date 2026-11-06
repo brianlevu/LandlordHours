@@ -25,7 +25,9 @@
 		RevenueCat (LandlordPurchases.swift) — ANALYTICS/OBSERVER MODE ONLY
 		(purchasesAreCompletedBy: .myApp; StoreKit 2's own SubscriptionManager.swift keeps doing
 		real entitlement + transaction.finish()). RC never calls Purchases.shared.logIn(); its
-		anonymous appUserID is the only identifier, so this is not linked to identity. Purpose
+		anonymous appUserID is the only identity, so this is not linked to identity. The one
+		subscriber attribute set is $posthogUserId (PostHog's anonymous distinct id, only when analytics
+		is on and not opted out): an attribute value, not a login/identify call. Purpose
 		mirrors RevenueCat's own bundled PrivacyInfo.xcprivacy (App Functionality), which declares
 		the identical NSPrivacyCollectedDataTypePurchaseHistory / not-linked / not-tracking triple
 		for consistency between the app-level and SDK-level manifests.
