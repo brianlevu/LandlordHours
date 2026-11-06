@@ -110,9 +110,11 @@ Run `get_design_context` then `get_screenshot` for the exact node before impleme
 
 ## Xcode Build Rules (MANDATORY)
 
-- **DerivedData**: ALWAYS pass `-derivedDataPath /Volumes/Home/DerivedData` when running `xcodebuild`. The boot disk is only 228GB. Never use the default ~/Library/Developer/Xcode/DerivedData/.
-- **Simulators**: Local simulators OK — device files symlinked to external SSD. Use Device Hub to manage. Max 1-2 at a time (16GB RAM). Always use `-derivedDataPath /Volumes/Home/DerivedData`.
-- **Temp files**: Build artifacts in /tmp fill the boot disk. Prefer `/Volumes/Home/tmp` for large intermediate files.
+The old external SSD (`/Volumes/Home`) is retired and no longer mounted (checked 2026-11-06). Machine-wide build rules live in the `ios-dev-harness` skill; follow it over anything here.
+
+- **DerivedData**: ALWAYS pass `-derivedDataPath ~/tmp/DerivedData/LandlordHours-<lane>` when running `xcodebuild`. Never use the default ~/Library/Developer/Xcode/DerivedData/.
+- **Simulators**: boot only through `/Users/brian/.local/share/simboot/simboot.sh`, check free memory first, and release your sim when the run ends. Never touch other sessions' sims.
+- **Temp files**: large intermediate files go in `~/AgentScratch/dormer/<YYYY-MM-DD>/`, not `/tmp`.
 
 ## Release metadata
 
