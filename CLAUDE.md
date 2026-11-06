@@ -117,3 +117,9 @@ Run `get_design_context` then `get_screenshot` for the exact node before impleme
 ## Release metadata
 
 - **Copyright is "2026 Altai Ventures LLC"** (`fastlane/metadata/copyright.txt`). Never "OpenClaw". When creating a new App Store version, pass `--copyright "2026 Altai Ventures LLC"` to `asc versions create` (ASC copies the old "2026 OpenClaw" otherwise) and confirm with `asc versions list` before submit. Bundle IDs stay `com.openclaw.*` (permanent; users never see them).
+
+### Source of truth
+
+- The App Store listing name is **Dormer** (app id 6759508794). The internal code name LandlordHours stays valid for targets and source.
+- `metadata/` is a snapshot pulled from App Store Connect on 2026-11-06 (live version 2.3). Before any ASO or listing advice, re-pull (`asc metadata pull`) or check live with `asc`; never trust the snapshot alone.
+- `fastlane/metadata/` mirrors it for the `release` lane. The marketing site (https://altaiventures.co/products/dormer/) lives in the altaiventures repo, not here.

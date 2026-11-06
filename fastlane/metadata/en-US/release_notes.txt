@@ -1,1 +1,8 @@
-Adds a more polished first-run experience, improved voice-assisted time logging, Siri and Shortcuts actions, quieter engagement reminders, and broader visual polish across tracking, reports, learning, settings, and onboarding.
+New in 2.3: a care plan for each rental, short lessons, and reminders if you want them.
+
+• Care plan: each rental’s upkeep for the season. Tap to log it with your own hours.
+• A quieter Inbox: fewer wrong guesses, a Not sure row, and you pick the calendars.
+• Pro is now yearly, with a 14-day trial. It includes the care plan and lessons.
+• You can always log at one rental without Pro. Bought Pro for life? You keep it.
+
+Also: Today opens on the rental you just changed, plus iPad and note fixes.

@@ -1,17 +1,53 @@
-LandlordHours helps rental property owners track the work hours that matter for tax-year records.
+Keep a clean record of your rental hours, so your CPA has what they need. Dormer shows your hours next to the 750, 500 and 100 hour marks, and your pace to Dec 31.
 
-Log time by property, category, date, and participant. Monitor Real Estate Professional Status, material participation, and short-term rental activity in one focused iPhone app.
+It’s for landlords and short-term rental hosts. Couples can log each person’s hours separately.
 
-Key features:
+LOG IT YOUR WAY
+• Say it, type it or run a timer.
+• Say or type what you did, like “fixed the sink at Oak St, 2 hours yesterday”. Dormer fills in the rental, the kind of work, the hours and the date. You check it, then save.
+• Forgot the timer? Add the time later.
 
-• Track hours by property and activity category
-• Use AI-assisted entry to turn plain-English notes into structured time logs
-• Monitor REPS 750-hour progress and the 50% rule
-• Track 100-hour and 500-hour material participation goals
-• Add spouse participation when it applies to your filing situation
-• Import calendar events to speed up time logging
-• Attach records and notes to time entries
-• Export PDF reports for your CPA or tax records
-• Back up records with iCloud sync when available
+A CARE PLAN FOR EACH RENTAL
+• A seasonal upkeep list for each rental, like clearing the gutters in fall.
+• Tap an item to log it. You set the hours. Dormer shows your own past times, and never fills in a number for you.
 
-LandlordHours is built for organized recordkeeping. It does not provide tax, legal, or financial advice. Review your reports with a qualified tax professional.
+SHORT LESSONS
+• Short cards on what counts toward your hours. Each one ends with what to ask your CPA.
+• When you reach a milestone, a card on Today points you to the next lesson.
+
+FIND RENTAL WORK IN YOUR CALENDAR
+• The Inbox looks for plumber visits, showings and inspections. It suggests events that look like rental work.
+• Events it can’t tell about go in a Not sure row. You pick which calendars it checks.
+• Nothing counts until you confirm it. Calendar titles are read on your device.
+
+REMINDERS, ONLY IF YOU WANT THEM
+• A weekly check on your pace, and a heads-up when a care item comes due.
+• They stay off until you turn them on. Set quiet hours, and get a few a month at most.
+
+SEE WHERE YOU STAND
+• Every hour you log builds your house, so you see your progress at a glance.
+• Each rental keeps its own count, short-term and long-term.
+• The home screen opens on the rental you just changed.
+
+ICLOUD, WITH NO ACCOUNT
+• No sign-in. There is nothing to sign up for.
+• Your records sync across your devices through your own iCloud. We never see them.
+
+A PDF FOR YOUR CPA
+• Every hour you log has a date, a rental, the kind of work and who did it.
+• Export the year as a PDF or a spreadsheet and send it to your CPA.
+
+FREE AND PRO
+• Free: log at one rental, with no time limit. You can switch which rental once a month. Your other rentals stay in view, and their hours still count.
+• Dormer Pro adds every rental, the PDF and spreadsheet, the care plan and all the lessons.
+• Pro is a yearly subscription. New subscribers start with a 14-day free trial. The app shows the price for your country before you subscribe.
+• Already bought Pro for life? You keep it. There is nothing to do.
+
+ABOUT THE SUBSCRIPTION
+• You pay through your Apple Account when you confirm the purchase. With the trial, the first charge comes when the trial ends.
+• Pro renews each year. To stop it, turn off auto-renew at least 24 hours before your year ends. The renewal is charged within those last 24 hours.
+• Manage or cancel in your Apple Account settings. Cancel at least 24 hours before the trial ends, and you pay nothing.
+• Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+• Privacy Policy: https://altaiventures.co/products/dormer/privacy/
+
+Dormer keeps records. It doesn’t give tax or legal advice. It can’t tell you if you meet a tax test. Your CPA decides what the numbers mean.

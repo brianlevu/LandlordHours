@@ -6,7 +6,7 @@ product
 
 ## Users
 
-LandlordHours is for rental-property owners and couples who need a reliable, low-friction record of real estate activity hours for tax qualification planning. They are often logging work between property visits, repairs, bookkeeping, tenant communication, and calendar events, so the app must be fast, understandable, and trustworthy on a phone.
+Dormer (internal code name LandlordHours) is for rental-property owners and couples who need a reliable, low-friction record of real estate activity hours for tax qualification planning. They are often logging work between property visits, repairs, bookkeeping, tenant communication, and calendar events, so the app must be fast, understandable, and trustworthy on a phone.
 
 ## Product Purpose
 

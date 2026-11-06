@@ -1,4 +1,6 @@
-# LandlordHours
+# Dormer (code name LandlordHours)
+
+The App Store listing is named "Dormer". LandlordHours is the internal code name for targets and source.
 
 A mobile-first time tracking app for landlords to track hours spent on rental properties for IRS Real Estate Professional Status (REPS) tax qualification.
 
