@@ -12,8 +12,8 @@ enum PropertyType: String, Codable, CaseIterable {
     
     var fullName: String {
         switch self {
-        case .ltr: return "Long-Term Rental"
-        case .str: return "Short-Term Rental"
+        case .ltr: return "Long-term rental"
+        case .str: return "Short-term rental"
         }
     }
     
@@ -32,14 +32,23 @@ struct RentalProperty: Identifiable, Codable, Hashable {
     var propertyType: PropertyType
     var createdAt: Date
     var modifiedAt: Date
+    /// Other names for this property (2.0, additive): listing titles on rental platforms,
+    /// nicknames, and contractor or vendor names tied to it. The classifier matches each as a
+    /// full phrase. Older data decodes as empty.
+    var aliases: [String] = []
+    /// "I live here" (2.0, additive): an address match on a home the owner lives in is weak
+    /// evidence and needs a work keyword. Older data decodes as false.
+    var isOwnerOccupied: Bool = false
 
-    init(id: UUID = UUID(), name: String, address: String, propertyType: PropertyType) {
+    init(id: UUID = UUID(), name: String, address: String, propertyType: PropertyType, aliases: [String] = [], isOwnerOccupied: Bool = false) {
         self.id = id
         self.name = name
         self.address = address
         self.propertyType = propertyType
         self.createdAt = Date()
         self.modifiedAt = Date()
+        self.aliases = aliases
+        self.isOwnerOccupied = isOwnerOccupied
     }
 
     init(from decoder: Decoder) throws {
@@ -50,6 +59,29 @@ struct RentalProperty: Identifiable, Codable, Hashable {
         propertyType = try c.decode(PropertyType.self, forKey: .propertyType)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
+        aliases = try c.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        isOwnerOccupied = try c.decodeIfPresent(Bool.self, forKey: .isOwnerOccupied) ?? false
+    }
+
+    static let aliasMinLength = 3
+    static let aliasMaxLength = 80
+    static let maxAliases = 10
+
+    /// Trimmed, case-insensitively unique aliases (order kept): at least 3 characters (the
+    /// matcher ignores shorter ones), each cut to 80 characters, at most 10.
+    static func cleanedAliases(_ raw: [String]) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for alias in raw {
+            var trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.count > aliasMaxLength {
+                trimmed = String(trimmed.prefix(aliasMaxLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard trimmed.count >= aliasMinLength, seen.insert(trimmed.lowercased()).inserted else { continue }
+            out.append(trimmed)
+            if out.count == maxAliases { break }
+        }
+        return out
     }
     
     var shortAddress: String {
@@ -89,14 +121,14 @@ enum ActivityCategory: String, Codable, CaseIterable {
         case .repairs: return "Fixing leaks, HVAC, plumbing, electrical"
         case .management: return "Collecting rent, communications, scheduling"
         case .leasing: return "Showing units, screening tenants, signing leases"
-        case .bookkeeping: return "Accounting, tax prep, financial records"
+        case .bookkeeping: return "Bookkeeping, tax prep, financial records"
         case .legal: return "Evictions, compliance, permits"
         case .insurance: return "Claims, policy reviews"
         case .travel: return "Driving to property for activities"
         case .renovations: return "Major improvements, remodeling"
-        case .investing: return "NOT countable - Investment decisions"
-        case .financing: return "NOT countable - Loan decisions"
-        case .contractNegotiation: return "NOT countable - Purchase/sale negotiations"
+        case .investing: return "Investor work, not counted: investment decisions"
+        case .financing: return "Investor work, not counted: loan decisions"
+        case .contractNegotiation: return "Investor work, not counted: buying and selling talks"
         }
     }
     
@@ -316,6 +348,19 @@ struct TimeEntry: Identifiable, Codable {
     var importSource: String? // nil = manual, "calendar" = calendar import
     var importExternalId: String?
     var importCalendarId: String?
+    // 2.0 auto-capture provenance. Additive and optional: 1.1 builds ignore these keys when
+    // decoding, never write them, and CloudKit `.changedKeys` pushes from 1.1 leave them alone.
+    /// When the app first noticed the activity (for calendar: max(firstSeen, eventEnd)).
+    var detectedAt: Date?
+    /// When the user confirmed the suggestion. Non-nil marks a confirm-first record.
+    var confirmedAt: Date?
+    /// Short machine detail about the source (e.g. "backfill"). Never an event title.
+    var sourceDetail: String?
+    /// The suggestion's dedupe key. The entry's `id` is derived from it (see `CaptureIdentity`).
+    var sourceKey: String?
+    /// 2.0 Log time: the short, fact-checked description for the record (from Apple's model,
+    /// edited or confirmed by the user). `notes` stays the user's own words. Additive/optional.
+    var recordDescription: String?
 
     init(
         id: UUID = UUID(),
@@ -328,7 +373,12 @@ struct TimeEntry: Identifiable, Codable {
         attachments: [TimeAttachment] = [],
         importSource: String? = nil,
         importExternalId: String? = nil,
-        importCalendarId: String? = nil
+        importCalendarId: String? = nil,
+        detectedAt: Date? = nil,
+        confirmedAt: Date? = nil,
+        sourceDetail: String? = nil,
+        sourceKey: String? = nil,
+        recordDescription: String? = nil
     ) {
         self.id = id
         self.propertyId = propertyId
@@ -341,6 +391,11 @@ struct TimeEntry: Identifiable, Codable {
         self.importSource = importSource
         self.importExternalId = importExternalId
         self.importCalendarId = importCalendarId
+        self.detectedAt = detectedAt
+        self.confirmedAt = confirmedAt
+        self.sourceDetail = sourceDetail
+        self.sourceKey = sourceKey
+        self.recordDescription = recordDescription
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -360,6 +415,11 @@ struct TimeEntry: Identifiable, Codable {
         importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
         importExternalId = try c.decodeIfPresent(String.self, forKey: .importExternalId)
         importCalendarId = try c.decodeIfPresent(String.self, forKey: .importCalendarId)
+        detectedAt = try c.decodeIfPresent(Date.self, forKey: .detectedAt)
+        confirmedAt = try c.decodeIfPresent(Date.self, forKey: .confirmedAt)
+        sourceDetail = try c.decodeIfPresent(String.self, forKey: .sourceDetail)
+        sourceKey = try c.decodeIfPresent(String.self, forKey: .sourceKey)
+        recordDescription = try c.decodeIfPresent(String.self, forKey: .recordDescription)
     }
     
     // Helper to get property name - call this when needed
@@ -535,7 +595,9 @@ struct TaxQualificationEngine {
 
     /// Single source of truth for the material participation figure shown on
     /// Dashboard, Reports, widget and Siri. With a grouping election all properties
-    /// count as one activity; without it, the best single property counts.
+    /// count as one activity; without it, the best single property counts. Owners with BOTH
+    /// kinds of rental get their short-term rental's own count: the 100 and 500 hour tests
+    /// are counted per rental, and a long-term rental's hours never stand in for it.
     static func materialParticipationOverview(
         entries: [TimeEntry],
         properties: [RentalProperty],
@@ -553,10 +615,34 @@ struct TaxQualificationEngine {
             )
         }
         if groupingElection { return status(nil) }
-        return properties
+        return countedProperties(properties)
             .map { status($0.id) }
             .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
             ?? status(nil)
+    }
+
+    /// The rentals the 100 or 500 hour count looks at: the short-stay rentals when stays are
+    /// mixed (a long-term rental's hours never stand in for one), otherwise every rental.
+    /// Today's hero and the Properties rows both read this, so they never disagree.
+    static func countedProperties(_ properties: [RentalProperty]) -> [RentalProperty] {
+        let shortStays = properties.filter { $0.propertyType == .str }
+        return (!shortStays.isEmpty && shortStays.count < properties.count) ? shortStays : properties
+    }
+
+    /// The one rental Today names (eyebrow, house flag, subtitle): the counted rental with the
+    /// most hours. nil when the count covers every rental (grouping election, 750 goal, record).
+    static func todayFocusProperty(
+        entries: [TimeEntry],
+        properties: [RentalProperty],
+        year: Int,
+        groupingElection: Bool,
+        countsPerRental: Bool
+    ) -> RentalProperty? {
+        guard countsPerRental, !groupingElection, !properties.isEmpty else { return nil }
+        let overview = materialParticipationOverview(
+            entries: entries, properties: properties, year: year, groupingElection: false
+        )
+        return properties.first { $0.id == overview.propertyId }
     }
 
     private static func entriesForYear(_ entries: [TimeEntry], year: Int) -> [TimeEntry] {

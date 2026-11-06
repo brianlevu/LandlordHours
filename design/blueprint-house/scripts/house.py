@@ -24,6 +24,22 @@ PL = 0.08                        # plate thickness
 
 random.seed(41100)
 
+# Sculpt knobs (craft5.py sets these before build_all). Defaults reproduce pass 1-4 geometry exactly.
+KN = dict(
+    fw=0.09,            # window / door casing width
+    frame_d=0.10,       # casing depth proud of the wall
+    sill=(0.16, 0.17, 0.08),   # sill overhang each side, depth, height
+    sash=0.045,         # sash border
+    mull=0.05,          # mullion width
+    tile_th=0.05,       # roof tile thickness
+    tile_bevel=0.008,
+    barge=(0.06, 0.3),  # barge board width, height
+    barge_off=-0.06,    # barge centre offset along the slope normal
+    fascia=(0.05, 0.26),
+    post=0.16,          # porch post section
+    beam=0.18,          # porch beam height
+)
+
 # ---------------------------------------------------------------- colour/materials
 
 def lin(h):
@@ -55,13 +71,40 @@ def mat(name, hexa, rough=0.8, hexb=None, metal=0.0, spec=0.35, coat=0.0):
     MATS[name] = m
     return m
 
+def foliage(name, a, b, c):
+    """Clay foliage: two greens mixed by a soft noise, a per-object tint and a gentle bump."""
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    nt = m.node_tree; p = nt.nodes['Principled BSDF']
+    p.inputs['Roughness'].default_value = 0.82; p.inputs['Specular IOR Level'].default_value = 0.3
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    nz = nt.nodes.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 3.2; nz.inputs['Detail'].default_value = 2.0
+    nt.links.new(tc.outputs['Object'], nz.inputs['Vector'])
+    ramp = nt.nodes.new('ShaderNodeMix'); ramp.data_type = 'RGBA'
+    ramp.inputs['A'].default_value = lin(b); ramp.inputs['B'].default_value = lin(a)
+    nt.links.new(nz.outputs['Fac'], ramp.inputs['Factor'])
+    oi = nt.nodes.new('ShaderNodeObjectInfo')
+    mr = nt.nodes.new('ShaderNodeMath'); mr.operation = 'MULTIPLY'; mr.inputs[1].default_value = 0.45
+    nt.links.new(oi.outputs['Random'], mr.inputs[0])
+    tint = nt.nodes.new('ShaderNodeMix'); tint.data_type = 'RGBA'
+    tint.inputs['B'].default_value = lin(c)
+    nt.links.new(ramp.outputs['Result'], tint.inputs['A']); nt.links.new(mr.outputs[0], tint.inputs['Factor'])
+    nt.links.new(tint.outputs['Result'], p.inputs['Base Color'])
+    bn = nt.nodes.new('ShaderNodeBump'); bn.inputs['Strength'].default_value = 0.25; bn.inputs['Distance'].default_value = 0.05
+    nz2 = nt.nodes.new('ShaderNodeTexNoise'); nz2.inputs['Scale'].default_value = 14.0
+    nt.links.new(tc.outputs['Object'], nz2.inputs['Vector'])
+    nt.links.new(nz2.outputs['Fac'], bn.inputs['Height']); nt.links.new(bn.outputs['Normal'], p.inputs['Normal'])
+    m['base_hex'] = a
+    MATS[name] = m
+    return m
+
 def make_materials():
     mat('stone', '#E6E0D6', 0.85)
     mat('paver', '#EDE7DC', 0.8, '#E2DACB')
     mat('lawn', '#B3CB98', 0.9)
     mat('shrub', '#84AE68', 0.75, '#6A9A58')
     mat('trunk', '#9A6B45', 0.8)
-    mat('concrete', '#D3CEC6', 0.9, '#CBC5BB')
+    foliage('foliage', '#86B26A', '#5E9150', '#A6C982')
+    mat('concrete', '#97938B', 0.92, '#908C84')   # r4: mid stone grey so the poured slab reads against the lawn
     mat('timber', '#E8B474', 0.72, '#DDA35E')       # framing
     mat('ply', '#EBC994', 0.8, '#E2BC80')           # sheathing
     mat('tile', '#D46A4A', 0.62, '#C95E40')         # terracotta roof
@@ -83,9 +126,9 @@ def make_materials():
     MATS['glass'] = g
     lit = bpy.data.materials.new('glass_lit'); lit.use_nodes = True
     p = lit.node_tree.nodes['Principled BSDF']
-    p.inputs['Base Color'].default_value = lin('#FFD27A')
+    p.inputs['Base Color'].default_value = lin('#FFD98C')
     p.inputs['Emission Color'].default_value = lin('#FFC864')
-    p.inputs['Emission Strength'].default_value = 3.2
+    p.inputs['Emission Strength'].default_value = 9.0      # WP-A: windows read as lit; bloom is baked in post (post.py)
     p.inputs['Roughness'].default_value = 0.3
     MATS['glass_lit'] = lit
     # linework wash: 8% drafting cyan over transparent
@@ -98,11 +141,22 @@ def make_materials():
     nt.links.new(tr.outputs[0], mx.inputs[1]); nt.links.new(em.outputs[0], mx.inputs[2])
     nt.links.new(mx.outputs[0], out.inputs['Surface'])
     MATS['wash'] = w
+    cl = bpy.data.materials.new('clear'); cl.use_nodes = True
+    nt = cl.node_tree; nt.nodes.clear()
+    o4 = nt.nodes.new('ShaderNodeOutputMaterial'); tn = nt.nodes.new('ShaderNodeBsdfTransparent')
+    nt.links.new(tn.outputs[0], o4.inputs['Surface'])
+    MATS['clear'] = cl
     ho = bpy.data.materials.new('holdout'); ho.use_nodes = True
     nt = ho.node_tree; nt.nodes.clear()
     o2 = nt.nodes.new('ShaderNodeOutputMaterial'); hn = nt.nodes.new('ShaderNodeHoldout')
     nt.links.new(hn.outputs[0], o2.inputs['Surface'])
     MATS['holdout'] = ho
+    gm = bpy.data.materials.new('glowmask'); gm.use_nodes = True
+    nt = gm.node_tree; nt.nodes.clear()
+    o3 = nt.nodes.new('ShaderNodeOutputMaterial'); en = nt.nodes.new('ShaderNodeEmission')
+    en.inputs['Color'].default_value = (1, 1, 1, 1); en.inputs['Strength'].default_value = 1.0
+    nt.links.new(en.outputs[0], o3.inputs['Surface'])
+    MATS['glowmask'] = gm
 
 # ---------------------------------------------------------------- geometry helpers
 
@@ -427,7 +481,7 @@ def build_roof():
             items.append((1, k, 'sheath_%s_%d' % (key, k), [('ply', [M], [])], ''))
     # tiles: rows bottom-up
     phi = math.radians(6)
-    rowh, tl, tw, gap, th = 0.33, 0.42, 0.44, 0.016, 0.05
+    rowh, tl, tw, gap, th = 0.33, 0.42, 0.44, 0.016, KN['tile_th']
     for key, sl in SL.items():
         nrows = int(math.ceil((sl.S - 0.05) / rowh))
         for i in range(nrows):
@@ -458,16 +512,16 @@ def build_roof():
     for key in ('mainL', 'mainR'):
         sl = SL[key]
         for yb in (-2.4 - OH - 0.03, 3.0 + OH + 0.03):
-            a = sl.P(-0.03, yb, -0.06); b = sl.P(sl.S, yb, -0.06)
-            trimb.append(M_line(a, b, 0.06, 0.3, sl.n))
+            a = sl.P(-0.03, yb, KN['barge_off']); b = sl.P(sl.S, yb, KN['barge_off'])
+            trimb.append(M_line(a, b, KN['barge'][0], KN['barge'][1], sl.n))
         xf = sl.P(0, 0, 0)
-        trimb.append(M_box((xf.x + (-0.03 if key == 'mainL' else 0.03), 0.3, xf.z - 0.1), (0.05, 5.4 + 2 * OH + 0.12, 0.26)))
+        trimb.append(M_box((xf.x + (-0.03 if key == 'mainL' else 0.03), 0.3, xf.z - 0.1), (KN['fascia'][0], 5.4 + 2 * OH + 0.12, KN['fascia'][1])))
     for key in ('wingF', 'wingB'):
         sl = SL[key]
-        a = sl.P(-0.03, 4.4 + OH + 0.03, -0.06); b = sl.P(sl.S, 4.4 + OH + 0.03, -0.06)
-        trimb.append(M_line(a, b, 0.06, 0.3, sl.n))
+        a = sl.P(-0.03, 4.4 + OH + 0.03, KN['barge_off']); b = sl.P(sl.S, 4.4 + OH + 0.03, KN['barge_off'])
+        trimb.append(M_line(a, b, KN['barge'][0], KN['barge'][1], sl.n))
         xf = sl.P(0, 0, 0)
-        trimb.append(M_box((3.0 + OH / 2 + 0.2, xf.y + (-0.03 if key == 'wingF' else 0.03), xf.z - 0.1), (2.9 + OH, 0.05, 0.26)))
+        trimb.append(M_box((3.0 + OH / 2 + 0.2, xf.y + (-0.03 if key == 'wingF' else 0.03), xf.z - 0.1), (2.9 + OH, KN['fascia'][0], KN['fascia'][1])))
     # decorative gable truss (front)
     yt = -2.4 - OH + 0.12
     cz = E + 1.25
@@ -492,7 +546,7 @@ def build_roof():
         a, b = phase_span[ph]
         for j, it in enumerate(grp):
             t = a + (b - a) * (j + 1) / len(grp)
-            new_obj(it[2], it[3], 3, t, it[4], 'roof', bevel=0.01 if ph != 2 else 0.008)
+            new_obj(it[2], it[3], 3, t, it[4], 'roof', bevel=0.01 if ph != 2 else KN['tile_bevel'])
 
 # ---------------------------------------------------------------- siding (stage 4)
 
@@ -562,23 +616,24 @@ def build_units(walls):
             def B(ua, ub, za, zb, off0, off1, lst=tb):
                 c = w.P((ua + ub) / 2, (off0 + off1) / 2, (za + zb) / 2)
                 lst.append(M_box(c, (ub - ua, off1 - off0, zb - za), w.ang))
-            fw = 0.09
+            fw = KN['fw']; fd = KN['frame_d']
             if o['type'] == 'win':
-                B(u0 - fw, u0, z0 - fw, z1 + fw, 0.0, 0.1)
-                B(u1, u1 + fw, z0 - fw, z1 + fw, 0.0, 0.1)
-                B(u0, u1, z1, z1 + fw, 0.0, 0.1)
-                B(u0, u1, z0 - fw, z0, 0.0, 0.1)
-                B(u0 - 0.16, u1 + 0.16, z0 - fw - 0.07, z0 - fw + 0.01, 0.0, 0.17)   # sill
+                B(u0 - fw, u0, z0 - fw, z1 + fw, 0.0, fd)
+                B(u1, u1 + fw, z0 - fw, z1 + fw, 0.0, fd)
+                B(u0, u1, z1, z1 + fw, 0.0, fd)
+                B(u0, u1, z0 - fw, z0, 0.0, fd)
+                so, sd, sh = KN['sill']
+                B(u0 - so, u1 + so, z0 - fw - sh + 0.01, z0 - fw + 0.01, 0.0, sd)   # sill
                 # sash border + mullions (recessed)
-                sb = 0.045
+                sb = KN['sash']; mw = KN['mull'] / 2
                 B(u0, u0 + sb, z0, z1, -0.06, 0.0); B(u1 - sb, u1, z0, z1, -0.06, 0.0)
                 B(u0 + sb, u1 - sb, z1 - sb, z1, -0.06, 0.0); B(u0 + sb, u1 - sb, z0, z0 + sb, -0.06, 0.0)
                 cols = o.get('cols', 2)
                 for c in range(1, cols):
                     uc = u0 + (u1 - u0) * c / cols
-                    B(uc - 0.025, uc + 0.025, z0 + sb, z1 - sb, -0.055, -0.005)
+                    B(uc - mw, uc + mw, z0 + sb, z1 - sb, -0.055, -0.005)
                 zm = z0 + (z1 - z0) * 0.55
-                B(u0 + sb, u1 - sb, zm - 0.025, zm + 0.025, -0.055, -0.005)
+                B(u0 + sb, u1 - sb, zm - mw, zm + mw, -0.055, -0.005)
                 B(u0, u1, z0, z1, -0.09, -0.07, gl)
                 extra = []
                 if o.get('lintel'):
@@ -597,9 +652,9 @@ def build_units(walls):
                 ob = new_obj('unit_%s_%d' % (w.name, k), [('trim', tb, [])] + extra + [('glass', gl, [])], 4, 0.0, 'major', 'unit', bevel=0.008)
                 ob['glass_slot'] = len(extra) + 1
             else:   # door
-                B(u0 - fw, u0, z0, z1 + fw, 0.0, 0.11)
-                B(u1, u1 + fw, z0, z1 + fw, 0.0, 0.11)
-                B(u0 - fw, u1 + fw, z1 + fw, z1 + fw + 0.05, 0.0, 0.13)
+                B(u0 - fw, u0, z0, z1 + fw, 0.0, fd + 0.01)
+                B(u1, u1 + fw, z0, z1 + fw, 0.0, fd + 0.01)
+                B(u0 - fw, u1 + fw, z1 + fw, z1 + fw + 0.05, 0.0, fd + 0.03)
                 db = []
                 B(u0, u1, z0, z1, -0.07, -0.02, db)
                 # raised panels
@@ -636,14 +691,14 @@ def build_porch():
     posts = [(-0.45, -3.85), (2.8, -3.85)]
     ztop = F + 2.62
     for (x, y) in posts:
-        pb.append(M_box((x, y, (F - 0.05 + ztop) / 2), (0.16, 0.16, ztop - F + 0.05)))
+        pb.append(M_box((x, y, (F - 0.05 + ztop) / 2), (KN['post'], KN['post'], ztop - F + 0.05)))
         pb.append(M_box((x, y, F - 0.05 + 0.06), (0.24, 0.24, 0.12)))    # plinth block
         for sx in (-1, 1):
             if (x < 0 and sx < 0) or (x > 2 and sx > 0):
                 continue
             a = Vector((x, y, ztop - 0.6)); b = Vector((x + sx * 0.55, y, ztop - 0.05))
             pb.append(M_line(a, b, 0.09, 0.09, (0, -1, 0)))
-    pb.append(M_box((1.175, -3.85, ztop + 0.09), (3.55, 0.16, 0.18)))   # beam
+    pb.append(M_box((1.175, -3.85, ztop + 0.09), (3.55, KN['post'], KN['beam'])))   # beam
     # shed roof
     y0, z0 = -2.4 - 0.06, F + 3.08
     y1, z1 = -4.12, ztop + 0.2
@@ -699,24 +754,59 @@ def build_lot():
             pv.append(M_box(((xa + xb) / 2, y + 0.21, 0.015), (xb - xa, 0.42, 0.09)))
         y += 0.48; k += 1
     new_obj('lot_path', [('paver', pv, [])], -1, 0, '', 'lot', bevel=0.015)
-    # shrubs + tree
+    # shrubs + tree (WP-A: lumpy clay clusters, tree kept inside the lot so no shadow falls off it)
     rnd = random.Random(7)
-    shrubs = [(-3.3, -1.9, 0.38), (-3.35, -1.35, 0.3), (-3.3, 0.6, 0.34), (-3.35, 2.4, 0.4), (-3.25, 1.2, 0.26),
-              (-1.9, -3.4, 0.34), (-2.5, -3.6, 0.26), (3.6, -3.3, 0.36), (4.2, -2.9, 0.28), (5.1, -0.4, 0.34), (5.2, 0.4, 0.26)]
+    shrubs = [(-3.3, -1.9, 0.36), (-3.35, -1.3, 0.28), (-3.3, 0.6, 0.33), (-3.32, 2.35, 0.36), (-3.25, 1.2, 0.26),
+              (-1.9, -3.4, 0.33), (-2.5, -3.62, 0.25), (3.6, -3.3, 0.35), (4.2, -2.9, 0.27), (5.1, -0.4, 0.33), (5.2, 0.4, 0.25)]
     for j, (x, y, r) in enumerate(shrubs):
-        fns = [sphere_fn((x, y, r * 0.7), r, 3, 0.85)]
-        for _ in range(3):
-            a = rnd.uniform(0, 6.28)
-            fns.append(sphere_fn((x + math.cos(a) * r * 0.6, y + math.sin(a) * r * 0.6, r * 0.5), r * rnd.uniform(0.55, 0.75), 3, 0.85))
-        new_obj('shrub_%02d' % j, [('shrub', [], fns)], -1, 0, '', 'lot', bevel=0, smooth=True)
-    tx, ty = -3.1, 3.55
-    trunk = Matrix.Translation((tx, ty, 1.0))
-    canopy = [sphere_fn((tx, ty, 2.75), 0.95, 3, 1.05), sphere_fn((tx + 0.35, ty - 0.3, 2.3), 0.62, 3), sphere_fn((tx - 0.4, ty + 0.2, 2.25), 0.6, 3)]
-    new_obj('tree', [('trunk', [], [cyl_fn(trunk, 0.15, 2.0, 16)]), ('shrub', [], canopy)], -1, 0, '', 'lot', bevel=0, smooth=True)
+        fns = [sphere_fn((x, y, r * 0.62), r * 0.82, 4, 0.9)]
+        n = 7
+        for k in range(n):
+            a_ = 2 * math.pi * k / n + rnd.uniform(-0.3, 0.3)
+            rr = r * rnd.uniform(0.5, 0.62)
+            d = r * rnd.uniform(0.5, 0.62)
+            fns.append(sphere_fn((x + math.cos(a_) * d, y + math.sin(a_) * d, rr * 0.75 + rnd.uniform(0, r * 0.25)), rr, 3, 0.92))
+        fns.append(sphere_fn((x + rnd.uniform(-0.08, 0.08), y + rnd.uniform(-0.08, 0.08), r * 1.0), r * 0.5, 3, 0.95))
+        ob = new_obj('shrub_%02d' % j, [('foliage', [], fns)], -1, 0, '', 'lot', bevel=0, smooth=True)
+        lumpy(ob, 0.045 * (r / 0.33), 0.35 + 0.1 * (j % 3))
+    tx, ty = -3.18, 3.68
+    trunk = []
+    def taper(bm):
+        bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.17, radius2=0.08, depth=1.8,
+                              matrix=Matrix.Translation((tx, ty, 0.9)))
+    trunk.append(taper)
+    for (dx, dy, dz, ang) in ((0.22, -0.1, 1.35, 0.7), (-0.18, 0.12, 1.5, -0.8)):
+        M = Matrix.Translation((tx + dx * 0.5, ty + dy * 0.5, dz)) @ Matrix.Rotation(ang, 4, 'Y' if abs(dx) > abs(dy) else 'X')
+        trunk.append(cyl_fn(M, 0.045, 0.55, 10))
+    crown = [(0.0, 0.0, 2.55, 0.6), (0.3, -0.22, 2.25, 0.42), (-0.32, 0.18, 2.2, 0.42), (0.22, 0.3, 2.45, 0.4),
+             (-0.25, -0.28, 2.5, 0.4), (0.05, -0.05, 3.0, 0.42), (0.35, 0.05, 2.7, 0.34), (-0.3, -0.02, 2.85, 0.34)]
+    canopy = [sphere_fn((tx + cx * 1.05, ty + cy * 1.1, cz - 0.28), r * 1.18, 4 if r > 0.5 else 3, 0.95) for (cx, cy, cz, r) in crown]
+    ob = new_obj('tree', [('trunk', [], trunk), ('foliage', [], canopy)], -1, 0, '', 'lot', bevel=0, smooth=True)
+    lumpy(ob, 0.06, 0.4, vgroup_mat=1)
 
-def build_slab():
+def lumpy(ob, strength, size, vgroup_mat=None):
+    """Organic displacement for foliage (optionally only the faces of one material slot)."""
+    tex = bpy.data.textures.new(ob.name + '_lump', 'CLOUDS'); tex.noise_scale = size; tex.noise_depth = 1
+    dm = ob.modifiers.new('lump', 'DISPLACE'); dm.texture = tex; dm.strength = strength; dm.mid_level = 0.5
+    dm.texture_coords = 'GLOBAL'
+    if vgroup_mat is not None:
+        vg = ob.vertex_groups.new(name='foliage')
+        idx = sorted({v for p in ob.data.polygons if p.material_index == vgroup_mat for v in p.vertices})
+        vg.add(idx, 1.0, 'REPLACE')
+        dm.vertex_group = 'foliage'
+
+def build_slab(walls):
     new_obj('slab', [('concrete', [], [prism_fn(FOOT, -0.06, F)])], 1, 0, 'major', 'slab', bevel=0.02)
     new_obj('porch_deck', [('concrete', [M_box((1.175, -3.275, (F - 0.06 - 0.06) / 2), (3.55, 1.45, F - 0.06 + 0.06))], [])], 1, 0, 'major', 'slab', bevel=0.02)
+    # r4: timber sill plates bolted to the slab along every wall line (real builds lay them before framing).
+    # They read as "foundation poured" at hero size and sit just proud of the framing bottom plates.
+    SH = 0.05
+    sills = []
+    for w in walls:
+        L0, L1 = w.trim, w.L - w.trim
+        c = w.P((L0 + L1) / 2, -SD / 2, F + SH / 2)
+        sills.append(M_box(c, (L1 - L0, SD + 0.05, SH), w.ang))
+    new_obj('sill_plates', [('timber', sills, [])], 1, 0, '', 'slab', bevel=0.006)
 
 def build_stake():
     sb = []
@@ -742,7 +832,7 @@ def build_all():
     reset()
     make_materials()
     walls = build_walls()
-    build_lot(); build_stake(); build_slab()
+    build_lot(); build_stake(); build_slab(walls)
     build_frame(walls); build_roof()
     rows = build_siding(walls)
     build_units(walls); build_porch()

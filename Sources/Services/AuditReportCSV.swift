@@ -15,6 +15,10 @@ enum AuditReportCSV {
         "logged_at",
         "last_edited_at",
         "source",
+        "detected_at",
+        "confirmed_at",
+        "confirmation_lag",
+        "source_detail",
         "attachments",
     ]
 
@@ -44,7 +48,11 @@ enum AuditReportCSV {
                 row.description,
                 timestampFormatter.string(from: row.loggedAt),
                 row.lastEditedAt.map { timestampFormatter.string(from: $0) } ?? "",
-                row.source.displayName,
+                row.sourceLabel,
+                row.detectedAt.map { timestampFormatter.string(from: $0) } ?? "",
+                row.confirmedAt.map { timestampFormatter.string(from: $0) } ?? "",
+                row.confirmationLagText ?? "",
+                row.sourceDetail ?? "",
                 attachments,
             ]
             // Numeric columns skip the formula guard so they stay numbers in spreadsheets.

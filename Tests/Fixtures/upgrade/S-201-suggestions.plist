@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>LandlordHours.capture.notificationLog</key>
+	<dict/>
+	<key>LandlordHours.rating.installDate</key>
+	<date>2026-10-25T08:46:49Z</date>
+	<key>SKTransactionUpdatesLastChecked</key>
+	<real>814610809.684604</real>
+	<key>localProfileId</key>
+	<string>local-6F1E2D3C-0000-4000-8000-0000000C0533</string>
+	<key>localProfileName</key>
+	<string>New Owner</string>
+	<key>loginType</key>
+	<string>local</string>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.capture.backfillCompleted</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.capture.calendarSuggestionsEnabled</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.capture.eventPromptsEnabled</key>
+	<false/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.capture.whatsNew20Seen</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.entries</key>
+	<data>
+	W3siZGF0ZSI6ODEzNTE3MjAwLCJpZCI6IjgxNjYxMDgwLTkxM0QtNDFERS05RUE3LTcx
+	N0NEMTY0NDZCRSIsInByb3BlcnR5SWQiOiI5RkVDQkFEQS1CNDVDLTRBRjAtQTlDNy03
+	NjBFODdFNjFFRkYiLCJjcmVhdGVkQXQiOjgxNDYxMDgxMC4wNTU3OCwibW9kaWZpZWRB
+	dCI6ODE0NjEwODEwLjA1NTc4LCJhdHRhY2htZW50cyI6W10sIm5vdGVzIjoiUGlja2Vk
+	IHVwIHN1cHBsaWVzIiwicGFydGljaXBhbnQiOiJTZWxmIiwiaG91cnMiOjEsImNhdGVn
+	b3J5IjoiVHJhdmVsIHRvIFByb3BlcnR5In1d
+	</data>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.properties</key>
+	<data>
+	W3sicHJvcGVydHlUeXBlIjoiU1RSIiwiYWxpYXNlcyI6W10sIm5hbWUiOiJQaW5lIENh
+	YmluIiwiYWRkcmVzcyI6IjE0IFBpbmUgUmlkZ2UgUmQiLCJpZCI6IjlGRUNCQURBLUI0
+	NUMtNEFGMC1BOUM3LTc2MEU4N0U2MUVGRiIsImlzT3duZXJPY2N1cGllZCI6ZmFsc2Us
+	Im1vZGlmaWVkQXQiOjgxNDYxMDgxMC4wNTAxOTQsImNyZWF0ZWRBdCI6ODE0NjEwODEw
+	LjA1MDE5NH0seyJwcm9wZXJ0eVR5cGUiOiJMVFIiLCJhbGlhc2VzIjpbXSwibmFtZSI6
+	Ik9hayBTdHJlZXQgRHVwbGV4IiwiYWRkcmVzcyI6IjIyMCBPYWsgU3QiLCJpZCI6IjFD
+	MjRGNTVDLUUxNDktNEJEQy05N0UxLTVFQzdGREVGNTRDNSIsImlzT3duZXJPY2N1cGll
+	ZCI6ZmFsc2UsIm1vZGlmaWVkQXQiOjgxNDYxMDgxMC4wNTIxOSwiY3JlYXRlZEF0Ijo4
+	MTQ2MTA4MTAuMDUyMTl9XQ==
+	</data>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.taxProfile.filingStatus</key>
+	<string>Married, Joint</string>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.taxProfile.groupingElection</key>
+	<false/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.taxProfile.noOneParticipatedMore</key>
+	<data>
+	e30=
+	</data>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.taxProfile.nonREWorkHours</key>
+	<real>0.0</real>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.taxProfile.spouseTracking</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.taxProfile.taxYear</key>
+	<integer>2026</integer>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.LandlordHours.today.swipeHintSeen</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.globalGoalType</key>
+	<string>REPS</string>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.hasCompletedOnboarding</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.hasSkippedGuidedOnboarding</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.legacyDataMigrated</key>
+	<true/>
+	<key>u.local-6F1E2D3C-0000-4000-8000-0000000C0533.propertyGoals</key>
+	<data>
+	W10=
+	</data>
+</dict>
+</plist>

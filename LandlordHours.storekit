@@ -11,12 +11,12 @@
       "localizations" : [
         {
           "description" : "Unlock all pro features forever — unlimited properties, PDF export, AI smart entry, iCloud backup.",
-          "displayName" : "LandlordHours Pro",
+          "displayName" : "Dormer Pro",
           "locale" : "en_US"
         }
       ],
       "productID" : "com.openclaw.landlordhours.pro",
-      "referenceName" : "LandlordHours Pro (Lifetime)",
+      "referenceName" : "Dormer Pro (Lifetime)",
       "type" : "NonConsumable"
     }
   ],

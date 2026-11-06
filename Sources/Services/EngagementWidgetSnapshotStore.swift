@@ -58,8 +58,8 @@ struct EngagementWidgetSnapshot: Codable, Equatable {
         recommendationSurface: .homeNudge,
         recommendationReason: .setupProperty,
         recommendationDestination: .addProperty,
-        recommendationTitle: "Set up LandlordHours",
-        recommendationMessage: "Add your first property to start tracking evidence."
+        recommendationTitle: "Set up Dormer",
+        recommendationMessage: "Add your first property to start your record."
     )
 
     init(

@@ -1,53 +1,16 @@
 import Foundation
 
-// MARK: - Entry Source
-//
-// How a time entry was captured. Persisted in `TimeEntry.importSource` so it rides the
-// existing CloudKit field (no schema change): nil = manual entry, "timer", "voice",
-// "calendar". Entries logged before 1.1 by timer or voice carry nil and read as manual.
-enum EntrySource: String, CaseIterable {
-    case manual
-    case timer
-    case voice
-    case calendar
-
-    init(importSource: String?) {
-        switch importSource {
-        case EntrySource.calendar.rawValue: self = .calendar
-        case EntrySource.timer.rawValue: self = .timer
-        case EntrySource.voice.rawValue: self = .voice
-        default: self = .manual
-        }
-    }
-
-    /// Value stored in `TimeEntry.importSource`. Manual entries store nil.
-    var storedValue: String? {
-        self == .manual ? nil : rawValue
-    }
-
-    var displayName: String {
-        switch self {
-        case .manual: return "Manual"
-        case .timer: return "Timer"
-        case .voice: return "Voice"
-        case .calendar: return "Calendar import"
-        }
-    }
-}
-
-extension TimeEntry {
-    var source: EntrySource { EntrySource(importSource: importSource) }
-
-    /// True only for entries imported from the calendar (timer/voice entries are not imports).
-    var isCalendarImport: Bool { source == .calendar }
-}
-
 // MARK: - Audit Report Model
 
 struct AuditReport {
     struct Summary: Equatable {
         let totalHours: Double
-        let repsCountableHours: Double
+        /// Hours that are not investor-level work, everyone together. Never a 750 figure: the 750 is
+        /// each person's own (`selfRepsHours`, `spouseRepsHours`).
+        let nonInvestorHours: Double
+        /// Each person's own hours toward the 750. Spouse hours never combine with yours (IRC 469(c)(7)(B)).
+        let selfRepsHours: Double
+        let spouseRepsHours: Double
         let nonCountableHours: Double
         let entryCount: Int
         let propertyCount: Int
@@ -65,14 +28,20 @@ struct AuditReport {
         let selfHours: Double
         let spouseHours: Double
         let totalHours: Double
-        let repsCountableHours: Double
+        /// Each person's own hours toward the 750 at this rental, never summed.
+        let selfRepsHours: Double
+        let spouseRepsHours: Double
     }
 
     struct CategoryTotal: Equatable {
         let category: ActivityCategory
         let countsForREPS: Bool
         let entryCount: Int
+        /// Everyone's hours in this category together (a plain total, not a 750 figure).
         let hours: Double
+        /// Each person's own hours in this category.
+        let selfHours: Double
+        let spouseHours: Double
     }
 
     struct ParticipantTotal: Equatable {
@@ -105,29 +74,29 @@ struct AuditReport {
         var moreThanHalfText: String {
             if let met = meetsMoreThanHalfTest { return met ? "Met" : "Not met" }
             return participant == .spouse
-                ? "Not evaluated — spouse work hours aren't tracked in the app yet"
-                : "Not evaluated — add your other work hours"
+                ? "Not checked. Spouse work hours aren’t tracked in the app yet"
+                : "Not checked. Add your other work hours"
         }
 
         /// One calm, factual line for the cover page.
         var coverLine: String {
             let hours = AuditReportFormat.hours(realEstateHours)
             guard meets750HourTest else {
-                return "\(displayName): \(hours) hours. The 750-hour test needs more than 750 hours."
+                return "\(displayName): \(hours) hours. That is not yet over 750."
             }
             switch meetsMoreThanHalfTest {
-            case .some(true): return "\(displayName): \(hours) hours. Meets the 750-hour and more-than-half tests."
-            case .some(false): return "\(displayName): \(hours) hours. Meets the 750-hour test; does not meet the more-than-half test."
-            case .none: return "\(displayName): \(hours) hours. Meets the 750-hour test; more-than-half test not evaluated."
+            case .some(true): return "\(displayName): \(hours) hours. Over 750, and over half of work hours."
+            case .some(false): return "\(displayName): \(hours) hours. Over 750, but not over half of work hours."
+            case .none: return "\(displayName): \(hours) hours. Over 750. Half of work hours not checked."
             }
         }
 
         var statusText: String {
             switch isQualified {
-            case .some(true): return "Meets both REPS hour tests"
+            case .some(true): return "Over 750 hours and over half of work hours"
             case .some(false):
-                return meets750HourTest ? "Does not meet the more-than-half test" : "Does not meet the 750-hour test"
-            case .none: return "750-hour test met; more-than-half test not evaluated"
+                return meets750HourTest ? "Not over half of work hours" : "Not over 750 hours"
+            case .none: return "Over 750 hours. Half of work hours not checked"
             }
         }
     }
@@ -140,10 +109,10 @@ struct AuditReport {
         let pendingConfirmation: Bool
 
         var statusText: String {
-            if meets500HourTest { return "Meets 500-hour test" }
-            if meets100HourTest { return "Meets 100-hour test" }
-            if pendingConfirmation { return "Over 100 hours; confirm no one participated more" }
-            return "Below material participation thresholds"
+            if meets500HourTest { return "Over 500 hours" }
+            if meets100HourTest { return "Over 100 hours, and no one else did more" }
+            if pendingConfirmation { return "Over 100 hours. Confirm no one else did more" }
+            return "Under 100 hours"
         }
     }
 
@@ -160,10 +129,31 @@ struct AuditReport {
         /// nil when the entry was never edited after it was logged.
         let lastEditedAt: Date?
         let source: EntrySource
+        /// When the app first proposed the entry. nil for manual, timer, voice and pre-2.0 rows.
+        let detectedAt: Date?
+        /// When the user confirmed a suggestion. nil for entries that were never suggestions.
+        let confirmedAt: Date?
+        /// Free-text detail the source recorded (for example a calendar event title).
+        let sourceDetail: String?
+        /// Whole days between detection and confirmation, only when more than 7. Otherwise nil.
+        let confirmedDaysLater: Int?
         let attachmentRefs: [String]
         let attachmentFilenames: [String]
 
         var reference: String { "E\(number)" }
+
+        /// Plain source label: "Calendar suggestion" for a confirmed calendar suggestion.
+        var sourceLabel: String { AuditReportFormat.sourceLabel(source: source, confirmedAt: confirmedAt) }
+
+        /// "confirmed N days later", shown only when the gap is more than 7 days.
+        var confirmationLagText: String? {
+            confirmedDaysLater.map { "confirmed \($0) days later" }
+        }
+    }
+
+    struct SourceTotal: Equatable {
+        let label: String
+        let entryCount: Int
     }
 
     struct AttachmentRef {
@@ -183,13 +173,22 @@ struct AuditReport {
     let qualifications: [ParticipantQualification]
     let materialParticipation: [MaterialParticipationLine]
     let groupingElection: Bool
+    /// Whose own hours the 750 follows.
+    let repsParticipant: Participant
     let propertyTotals: [PropertyTotal]
     let categoryTotals: [CategoryTotal]
     let participantTotals: [ParticipantTotal]
     let entries: [EntryRow]
+    /// Entry counts per source, in a fixed order, only sources that appear.
+    let sourceTotals: [SourceTotal]
     let attachments: [AttachmentRef]
 
     var isEmpty: Bool { entries.isEmpty }
+
+    /// One person's own hours toward the 750 (never the two added together).
+    func repsHours(for participant: Participant) -> Double {
+        participant == .spouse ? summary.spouseRepsHours : summary.selfRepsHours
+    }
 }
 
 // MARK: - Builder
@@ -208,6 +207,9 @@ enum AuditReportBuilder {
         var nonRealEstateHours: [Participant: Double] = [:]
         var groupingElection: Bool = false
         var noOneParticipatedMore: Bool? = nil
+        /// The one person whose own hours the 750 follows (the spouse when the spouse is the real estate
+        /// professional). The preview page shows this person's hours; nobody's are added to another's.
+        var repsParticipant: Participant = .selfParticipant
         var generatedAt: Date = Date()
         var calendar: Calendar = .current
     }
@@ -224,6 +226,7 @@ enum AuditReportBuilder {
         nonREWorkHours: Double,
         groupingElection: Bool,
         noOneParticipatedMore: Bool?,
+        repsParticipant: Participant = .selfParticipant,
         generatedAt: Date = Date()
     ) -> Input {
         var participants: [Participant] = [.selfParticipant]
@@ -238,6 +241,7 @@ enum AuditReportBuilder {
             nonRealEstateHours: nonRE,
             groupingElection: groupingElection,
             noOneParticipatedMore: noOneParticipatedMore,
+            repsParticipant: repsParticipant,
             generatedAt: generatedAt
         )
     }
@@ -283,13 +287,23 @@ enum AuditReportBuilder {
                 category: entry.category,
                 participant: entry.participant,
                 hours: entry.hours,
-                description: entry.notes,
+                description: entry.recordDescription ?? entry.notes,
                 loggedAt: entry.createdAt,
                 lastEditedAt: edited ? entry.modifiedAt : nil,
                 source: entry.source,
+                detectedAt: entry.detectedAt,
+                confirmedAt: entry.confirmedAt,
+                sourceDetail: entry.sourceDetail,
+                confirmedDaysLater: confirmedDaysLater(entry, calendar: calendar),
                 attachmentRefs: refs,
                 attachmentFilenames: entry.attachments.map(\.filename)
             ))
+        }
+
+        // Counts per source label, in a stable order.
+        let sourceCounts = Dictionary(grouping: rows, by: \.sourceLabel).mapValues(\.count)
+        let sourceTotals = AuditReportFormat.sourceLabelOrder.compactMap { label in
+            sourceCounts[label].map { AuditReport.SourceTotal(label: label, entryCount: $0) }
         }
 
         // Per-property totals: only properties with entries this year, in first-seen-by-name order.
@@ -305,7 +319,8 @@ enum AuditReportBuilder {
                 selfHours: sum(entries.filter { $0.participant == .selfParticipant }),
                 spouseHours: sum(entries.filter { $0.participant == .spouse }),
                 totalHours: sum(entries),
-                repsCountableHours: sum(entries.filter(\.countsForREPS))
+                selfRepsHours: sum(entries.filter { $0.countsForREPS && $0.participant == .selfParticipant }),
+                spouseRepsHours: sum(entries.filter { $0.countsForREPS && $0.participant == .spouse })
             )
         }
         .sorted { lhs, rhs in
@@ -321,7 +336,9 @@ enum AuditReportBuilder {
                 category: category,
                 countsForREPS: category.countsForREPS,
                 entryCount: entries.count,
-                hours: sum(entries)
+                hours: sum(entries),
+                selfHours: sum(entries.filter { $0.participant == .selfParticipant }),
+                spouseHours: sum(entries.filter { $0.participant == .spouse })
             )
         }
 
@@ -378,7 +395,9 @@ enum AuditReportBuilder {
 
         let summary = AuditReport.Summary(
             totalHours: sum(yearEntries),
-            repsCountableHours: sum(yearEntries.filter(\.countsForREPS)),
+            nonInvestorHours: sum(yearEntries.filter(\.countsForREPS)),
+            selfRepsHours: sum(yearEntries.filter { $0.countsForREPS && $0.participant == .selfParticipant }),
+            spouseRepsHours: sum(yearEntries.filter { $0.countsForREPS && $0.participant == .spouse }),
             nonCountableHours: sum(yearEntries.filter { !$0.countsForREPS }),
             entryCount: yearEntries.count,
             propertyCount: propertyTotals.count,
@@ -395,12 +414,23 @@ enum AuditReportBuilder {
             qualifications: qualifications,
             materialParticipation: mpLines,
             groupingElection: input.groupingElection,
+            repsParticipant: input.repsParticipant,
             propertyTotals: propertyTotals,
             categoryTotals: categoryTotals,
             participantTotals: participantTotals,
             entries: rows,
+            sourceTotals: sourceTotals,
             attachments: attachmentRefs
         )
+    }
+
+    /// Days from detection to confirmation (calendar days in the report's zone) when more than 7.
+    static let lagThresholdDays = 7
+
+    private static func confirmedDaysLater(_ entry: TimeEntry, calendar: Calendar) -> Int? {
+        guard let detected = entry.detectedAt, let confirmed = entry.confirmedAt else { return nil }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: detected), to: calendar.startOfDay(for: confirmed)).day ?? 0
+        return days > lagThresholdDays ? days : nil
     }
 
     private static func sum(_ entries: [TimeEntry]) -> Double {
@@ -424,7 +454,22 @@ enum AuditReportBuilder {
 // MARK: - Shared formatting
 
 enum AuditReportFormat {
-    static let disclaimer = "LandlordHours is a record-keeping tool, not tax advice. Review your qualification with a tax professional."
+    static let disclaimer = "Dormer is a record-keeping tool, not tax advice. Ask a tax professional what your hours mean for you."
+
+    static let suggestionExplanation = "Suggested entries were proposed by the app (for example, from your calendar or a receipt) and added to your record only when you confirmed them."
+
+    static let calendarSuggestionLabel = "Calendar suggestion"
+
+    /// Labels in report order. Sources added after 2.0 ship use their own display name.
+    static let sourceLabelOrder: [String] = [
+        "Manual", "Timer", "Voice", "Calendar import", calendarSuggestionLabel,
+        "Receipt", "Location", "Shortcut", "Gmail", "Other",
+    ]
+
+    static func sourceLabel(source: EntrySource, confirmedAt: Date?) -> String {
+        if source == .calendar, confirmedAt != nil { return calendarSuggestionLabel }
+        return source.displayName
+    }
 
     static func hours(_ value: Double) -> String {
         String(format: "%.2f", value)
@@ -437,5 +482,14 @@ enum AuditReportFormat {
         formatter.timeZone = timeZone
         formatter.dateFormat = format
         return formatter
+    }
+}
+
+// MARK: - The export screen's one 750 figure
+
+enum ExportPDFSummary {
+    /// The export screen's "toward 750" row: one person's own hours for `year`.
+    static func repsHours(entries: [TimeEntry], year: Int, participant: Participant) -> Double {
+        TaxQualificationEngine.qualifyingRealEstateHours(entries: entries, participant: participant, year: year)
     }
 }

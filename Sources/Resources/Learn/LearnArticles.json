@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "articles": [
+    {
+      "id": "goal-750",
+      "group": "start",
+      "paragraphs": 6
+    },
+    {
+      "id": "good-entry",
+      "group": "start",
+      "paragraphs": 5
+    },
+    {
+      "id": "stays",
+      "group": "start",
+      "paragraphs": 5
+    },
+    {
+      "id": "fifty-percent",
+      "group": "all",
+      "paragraphs": 5
+    },
+    {
+      "id": "spouse-hours",
+      "group": "all",
+      "paragraphs": 4
+    },
+    {
+      "id": "material-participation",
+      "group": "all",
+      "paragraphs": 4
+    },
+    {
+      "id": "grouping",
+      "group": "all",
+      "paragraphs": 4
+    },
+    {
+      "id": "receipts",
+      "group": "all",
+      "paragraphs": 4
+    },
+    {
+      "id": "driving",
+      "group": "all",
+      "paragraphs": 4
+    },
+    {
+      "id": "tax-pro",
+      "group": "all",
+      "paragraphs": 4
+    }
+  ]
+}

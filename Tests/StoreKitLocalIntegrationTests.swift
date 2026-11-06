@@ -13,7 +13,7 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        session = try SKTestSession(configurationFileNamed: "LandlordHours")
+        session = try SharedStoreKitTestSession.session()
         session.disableDialogs = true
         session.clearTransactions()
         resetScopedStoreKitState()
@@ -22,7 +22,6 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
     override func tearDownWithError() throws {
         session.clearTransactions()
         resetScopedStoreKitState()
-        session = nil
         try super.tearDownWithError()
     }
 
@@ -30,12 +29,12 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
         let products = try await Product.products(for: [proProductID])
 
         let proProduct = try XCTUnwrap(products.first(where: { $0.id == proProductID }))
-        XCTAssertEqual(proProduct.displayName, "LandlordHours Pro")
+        XCTAssertEqual(proProduct.displayName, "Dormer Pro")
         XCTAssertEqual(proProduct.type, .nonConsumable)
     }
 
     private func resetScopedStoreKitState() {
-        UserDefaults.standard.set(testUserID, forKey: "emailUserId")
+        IdentityScope.debugOverride = testUserID
         UserDefaults.standard.set("storekit-local-test@example.com", forKey: "emailUserEmail")
         UserDefaults.standard.set("StoreKit Test", forKey: "emailUserName")
         UserDefaults.standard.set(LoginType.email.rawValue, forKey: "loginType")

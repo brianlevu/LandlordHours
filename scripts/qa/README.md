@@ -42,3 +42,11 @@ Heuristics: tiny preview text, gradients and translucent bars can false-flag, an
 
 - Builder: run both before handoff, fix every flag you agree with, and state in the handoff which you reject and why.
 - Visual gate: read the flagged lists first, open only those frames or crops, confirm or dismiss each by eye, then do the normal full read. A clean tool run is not a pass.
+
+## v2 tools (standard H, NOTES-standard-v2.md)
+
+- `frame_check.py density` now handles the dusk/night page: hero art is auto-detected (`--hero-rect x0,y0,x1,y1` in pt overrides, `--hero-glob` adds hero names) and excluded from D6/D2/D4; a card with a 1pt `pageCardEdge` ring is a card, not an input field; a card's foot row is not the pinned bar. A card enclosing the art fails "H hero not in a card". H1/H2 print as advisory (the frame square is not visible in a screenshot).
+- `frame_check.py DIR` on hero frames: canvas is matched against the page gradient path (dE 6), the card sample skips gradient pixels, the art is masked from the action sample, light-page text must be an allowed page ink, and every card needs its `pageCardEdge` ring (>= 1.8:1 light, 1.5:1 dark, because #2A3560 on the night page measures 1.62).
+- `frame_check.py hero A.png ... --pairs lit=dark [--windows craft_windows.json] [--strict]`: p99 art contrast, window delta, saturation, hue bins, ground line. Saturation is REVIEW unless `--strict` (screenshot masks include shadow and ground).
+- `asset_check.py`, `motion_check.py`: new, with `test_asset_check.py`, `test_motion_check.py`.
+- `standard_lint.py`: clamp quota 3, CraftHouseView `DragGesture`, `craft-image`, `hero-card`, `blueprint-retired`, `tab-shell`, `page-ink`, `timeline-view`, `section-header-mono`. New rules are baselined; `swatch_matrix.py` and `ambient_check.py` (items 7 and 8) wait for features F.1 and F.2.

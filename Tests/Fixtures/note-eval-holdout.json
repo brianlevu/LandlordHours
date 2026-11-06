@@ -1,0 +1,650 @@
+{
+ "now": "2026-10-20T15:00:00-07:00",
+ "timeZone": "America/Los_Angeles",
+ "note": "Blind held-out set written without seeing the parser. null = the field must stay empty. Edited after writing: h06 participant set to null (the app can't know Dina is the spouse).",
+ "properties": [
+  {
+   "ref": "pine",
+   "name": "Pine Cabin",
+   "address": "88 Ridge Rd, Big Bear",
+   "type": "str",
+   "aliases": [
+    "Cabin",
+    "Big Bear"
+   ]
+  },
+  {
+   "ref": "oak",
+   "name": "Oak Street Duplex",
+   "address": "214 Oak St, Pasadena",
+   "type": "ltr",
+   "aliases": [
+    "Oak St",
+    "The duplex"
+   ]
+  },
+  {
+   "ref": "lofts",
+   "name": "Arroyo Lofts Unit 4B",
+   "address": "1 Arroyo Blvd 4B, Pasadena",
+   "type": "ltr",
+   "aliases": [
+    "the lofts"
+   ]
+  },
+  {
+   "ref": "maple",
+   "name": "Maple Court",
+   "address": "12 Maple Ct, Glendale",
+   "type": "ltr",
+   "aliases": [
+    "Maple Ct"
+   ]
+  },
+  {
+   "ref": "harbor",
+   "name": "Harbor View",
+   "address": "40 Harbor Dr, Long Beach",
+   "type": "str",
+   "aliases": [
+    "the beach condo"
+   ]
+  }
+ ],
+ "cases": [
+  {
+   "id": "h01",
+   "note": "Fixed the leaky faucet at the duplex yesterday, took about 2h",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 2,
+   "date": "2026-10-19",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h02",
+   "note": "called lender about refi rates on the lofts for 45 mins",
+   "spouseTracking": false,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "financing"
+   ],
+   "hours": 0.75,
+   "date": null,
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h03",
+   "note": "um so I went out to the cabin and uh replaced the smoke detectors and then checked the hot tub, couple hours",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 2,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h04",
+   "note": "Showed unit to 3 prospective tenants at Maple Ct saturday, 1.5 hrs",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "leasing"
+   ],
+   "hours": 1.5,
+   "date": "2026-10-17",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h05",
+   "note": "Bookkeeping, entered receipts for all the rentals, a few hours",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "bookkeeping"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h06",
+   "note": "Dina met the plumber at Oak St for 2 hours yesterday",
+   "spouseTracking": true,
+   "property": "oak",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 2,
+   "date": "2026-10-19",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h07",
+   "note": "Me and my wife painted the bedroom at the lofts all day Sat",
+   "spouseTracking": true,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "renovations"
+   ],
+   "hours": null,
+   "date": "2026-10-17",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h08",
+   "note": "my wife did the bookkeeping for the beach condo, 1h",
+   "spouseTracking": false,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "bookkeeping"
+   ],
+   "hours": 1,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h09",
+   "note": "researched comps for a duplex in Burbank I might buy, 2 hrs",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "investing"
+   ],
+   "hours": 2,
+   "date": null,
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h10",
+   "note": "Negotiated w/ seller on price for the new place in Alhambra, 1 hr",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "contractNegotiation",
+    "investing"
+   ],
+   "hours": 1,
+   "date": null,
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h11",
+   "note": "HELOC appt at the bank this morning 1 hour",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "financing"
+   ],
+   "hours": 1,
+   "date": "2026-10-20",
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h12",
+   "note": "Refinance paperwork for harbor view, signed docs from 1 to 3:30",
+   "spouseTracking": false,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "financing"
+   ],
+   "hours": 2.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h13",
+   "note": "Reviewed lease renewal for unit 2 at Oak Street, $450 rent increase, 30 min",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "leasing",
+    "management"
+   ],
+   "hours": 0.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h14",
+   "note": "filed 1099s for contractors, 3 hrs, 10/9",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "bookkeeping"
+   ],
+   "hours": 3,
+   "date": "2026-10-09",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h15",
+   "note": "Drove to Big Bear to check on the cabin after the storm, 4 hours round trip",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "travel",
+    "management"
+   ],
+   "hours": 4,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h16",
+   "note": "Talked w/ attorney about evicting tenant at Maple Ct, 20 min last Thursday",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "legal"
+   ],
+   "hours": 0.3333,
+   "date": "2026-10-15",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h17",
+   "note": "Did some landlord stuff",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": null,
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h18",
+   "note": "Roof leak at the duplex!! got a guy out, 3 days ago, about 1 hr",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 1,
+   "date": "2026-10-17",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h19",
+   "note": "renewed the insurance policy on the cabin, 40 minutes on the phone w/ agent",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "insurance"
+   ],
+   "hours": 0.6667,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h20",
+   "note": "Interviewed 2 property managers for the lofts, an hour and a half",
+   "spouseTracking": false,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 1.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h21",
+   "note": "Wife handled all the tenant calls for Maple Court last week",
+   "spouseTracking": true,
+   "property": "maple",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": "spouse",
+   "nonCountable": false
+  },
+  {
+   "id": "h22",
+   "note": "Spouse cleaned the beach condo turnover on Oct 12th, 3h",
+   "spouseTracking": true,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 3,
+   "date": "2026-10-12",
+   "participant": "spouse",
+   "nonCountable": false
+  },
+  {
+   "id": "h23",
+   "note": "Me and hubby installed new blinds at the lofts, 2h",
+   "spouseTracking": true,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "renovations",
+    "repairs"
+   ],
+   "hours": 2,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h24",
+   "note": "Partner and I toured a fourplex we want to buy, 2 hours Sat",
+   "spouseTracking": true,
+   "property": null,
+   "categoryAnyOf": [
+    "investing"
+   ],
+   "hours": 2,
+   "date": "2026-10-17",
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h25",
+   "note": "from 9 to 11:30 am mowed and trimmed hedges at Maple Ct",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "management",
+    "repairs"
+   ],
+   "hours": 2.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h26",
+   "note": "all morning on the pine cabin cleaning gutters",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "repairs",
+    "management"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h27",
+   "note": "Posted listing for the duplex on Zillow, 25 min b/c vacancy",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "leasing"
+   ],
+   "hours": 0.4167,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h28",
+   "note": "Pasadena inspection",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": null,
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h29",
+   "note": "Paid property tax and mortgage for everything, 1.5h yesterday",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "bookkeeping",
+    "financing"
+   ],
+   "hours": 1.5,
+   "date": "2026-10-19",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h30",
+   "note": "met w/ contractor re: kitchen remodel at oak st, couple hours last Tuesday",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "renovations"
+   ],
+   "hours": 2,
+   "date": "2026-10-13",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h31",
+   "note": "Tuesday: fixed garage door at the lofts, 1h",
+   "spouseTracking": false,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 1,
+   "date": "2026-10-20",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h32",
+   "note": "2.5 hrs on tax prep w/ CPA for my rentals",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "bookkeeping"
+   ],
+   "hours": 2.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h33",
+   "note": "Researching 1031 exchange options and listings in Palm Springs, spent the afternoon",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "investing"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h34",
+   "note": "Sold my Fresno property: signed counteroffer with buyers agent, 45 mins",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "contractNegotiation",
+    "investing"
+   ],
+   "hours": 0.75,
+   "date": null,
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h35",
+   "note": "plumber came to harbor view b/c toilet running, I waited around ~1 hr thursday",
+   "spouseTracking": false,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 1,
+   "date": "2026-10-15",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h36",
+   "note": "Beach condo guest checked in late, handled messages and key issue, 15 mins",
+   "spouseTracking": false,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 0.25,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h37",
+   "note": "Big Bear cabin: stained deck 4h Sunday",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "renovations",
+    "repairs"
+   ],
+   "hours": 4,
+   "date": "2026-10-18",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h38",
+   "note": "so um I was at the Oak Street place and then I talked to the tenants about the late rent and then I think it was like an hour yeah",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 1,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h39",
+   "note": "Maple court tenant moved out, did walkthrough and photos 50 mins monday",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "management",
+    "leasing"
+   ],
+   "hours": 0.8333,
+   "date": "2026-10-19",
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h40",
+   "note": "Arroyo lofs unit 4B - changed locks, 30min",
+   "spouseTracking": false,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 0.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h41",
+   "note": "Harbour View: ordered new mattresses online $1,200, 1 hr",
+   "spouseTracking": false,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "management",
+    "renovations"
+   ],
+   "hours": 1,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h42",
+   "note": "Spent the afternoon on all the rentals reviewing rents",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "h43",
+   "note": "Wife drove up to the cabin to drop off supplies",
+   "spouseTracking": true,
+   "property": "pine",
+   "categoryAnyOf": [
+    "travel",
+    "management"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": "spouse",
+   "nonCountable": false
+  },
+  {
+   "id": "h44",
+   "note": "Mortgage broker meeting about buying a condo in Santa Monica, 1h, 3 days ago",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "financing",
+    "investing"
+   ],
+   "hours": 1,
+   "date": "2026-10-17",
+   "participant": null,
+   "nonCountable": true
+  },
+  {
+   "id": "h45",
+   "note": "Called the HVAC guy re: furnace at 12 Maple Ct, 10 mins yesterday",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 0.1667,
+   "date": "2026-10-19",
+   "participant": null,
+   "nonCountable": false
+  }
+ ]
+}

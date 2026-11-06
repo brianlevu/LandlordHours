@@ -230,7 +230,7 @@ BANNED = [
     (r"\bTrack Time\b", "Track Time"),
 ]
 SMALL = {"a", "an", "the", "of", "to", "and", "or", "for", "in", "on", "with", "at", "by", "from", "as", "is", "vs"}
-PROPER = {"landlordhours", "pro", "apple", "icloud", "irs", "siri", "face", "touch", "id", "app", "store",
+PROPER = {"landlordhours", "dormer", "pro", "apple", "icloud", "irs", "siri", "face", "touch", "id", "app", "store",
           "calendar", "photos", "files", "pdf", "csv", "ai", "reps", "mp", "ltr", "str", "cpa", "ios",
           "ipad", "iphone", "testflight", "wi-fi", "sign", "in", "google", "mail", "messages", "maps",
           "notes", "reminders", "siri", "shortcuts", "spotlight", "healthkit", "q1", "q2", "q3", "q4",

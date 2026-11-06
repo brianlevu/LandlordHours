@@ -14,7 +14,7 @@ final class InitialSyncGateTests: XCTestCase {
         authSnapshot = AuthStateSnapshot.capture()
         AuthStateSnapshot.clearAll()
         profileId = "local-gate-\(UUID().uuidString.prefix(8))"
-        UserDefaults.standard.set(profileId, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = profileId
     }
 
     override func tearDown() {
@@ -172,25 +172,31 @@ final class TimerDraftFlowTests: XCTestCase {
         super.tearDown()
     }
 
-    func testSecondSwitchKeepsEarlierDraftAndSaveUsesExactTime() throws {
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+    /// 2.2 has no profile switch. Paused drafts still arrive (2.0 left them on the device, and
+    /// the merge turns a combined set's running timer into one, R15); the list rules are the same.
+    private func seedPausedDrafts(_ categories: [ActivityCategory], propertyId: UUID, ran: Double = 1.0 / 120.0) {
+        let now = Date()
+        let drafts = categories.enumerated().map { index, category in
+            StaleTimerRecovery(startTime: now.addingTimeInterval(-Double(categories.count - index) * 600), propertyId: propertyId,
+                               category: category, elapsedHours: ran, reason: .pausedAtSwitch, pausedAt: now)
+        }
+        UserDefaults.standard.set(try? JSONEncoder().encode(drafts), forKey: UserScope.key("LandlordHours.staleTimerRecoveries"))
+    }
+
+    private func viewModelWithRentals(_ names: [String]) -> AppViewModel {
+        IdentityScope.debugOverride = id
+        let first = AppViewModel()
+        first.suppressCelebrations = true
+        for name in names { first.addProperty(name: name, address: "1 \(name)", type: .ltr) }
+        return first
+    }
+
+    func testTwoDraftsKeepEarlierDraftAndSaveUsesExactTime() throws {
+        let setup = viewModelWithRentals(["Oak"])
+        let propertyId = setup.properties[0].id
+        seedPausedDrafts([.repairs, .management], propertyId: propertyId)
         let viewModel = AppViewModel()
         viewModel.suppressCelebrations = true
-        viewModel.addProperty(name: "Oak", address: "1 Oak", type: .ltr)
-        let propertyId = viewModel.properties[0].id
-
-        // First switch with a running timer → draft 1.
-        viewModel.startTimer(propertyId: propertyId, category: .repairs)
-        viewModel.signOut()
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
-        viewModel.signIn()
-        XCTAssertEqual(viewModel.staleTimerRecoveries.count, 1)
-
-        // Second switch before reviewing draft 1 → draft 2 is added, draft 1 kept.
-        viewModel.startTimer(propertyId: propertyId, category: .management)
-        viewModel.signOut()
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
-        viewModel.signIn()
         XCTAssertEqual(viewModel.staleTimerRecoveries.count, 2, "Earlier draft must not be overwritten")
         XCTAssertEqual(viewModel.staleTimerRecoveries.map(\.category), [.repairs, .management])
         XCTAssertTrue(viewModel.staleTimerRecoveries.allSatisfy { $0.reason == .pausedAtSwitch })
@@ -208,23 +214,10 @@ final class TimerDraftFlowTests: XCTestCase {
         XCTAssertNil(UserDefaults.standard.data(forKey: "u.\(id).LandlordHours.staleTimerRecoveries"))
     }
 
-    private func makeTwoDrafts(_ viewModel: AppViewModel) -> UUID {
-        viewModel.suppressCelebrations = true
-        viewModel.addProperty(name: "Oak", address: "1 Oak", type: .ltr)
-        let propertyId = viewModel.properties[0].id
-        for category in [ActivityCategory.repairs, .management] {
-            viewModel.startTimer(propertyId: propertyId, category: category)
-            viewModel.signOut()
-            UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
-            viewModel.signIn()
-        }
-        return propertyId
-    }
-
     func testPausedDraftSavesWithTruthfulNote() throws {
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        let setup = viewModelWithRentals(["Oak"])
+        seedPausedDrafts([.repairs, .management], propertyId: setup.properties[0].id)
         let viewModel = AppViewModel()
-        _ = makeTwoDrafts(viewModel)
         let first = try XCTUnwrap(viewModel.staleTimerRecovery)
         XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: first.id))
         let saved = try XCTUnwrap(viewModel.timeEntries.first)
@@ -234,9 +227,9 @@ final class TimerDraftFlowTests: XCTestCase {
     }
 
     func testDoubleTapSaveSavesOnlyTheDisplayedDraft() throws {
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        let setup = viewModelWithRentals(["Oak"])
+        seedPausedDrafts([.repairs, .management], propertyId: setup.properties[0].id)
         let viewModel = AppViewModel()
-        _ = makeTwoDrafts(viewModel)
         let shown = try XCTUnwrap(viewModel.staleTimerRecovery)
         let before = viewModel.timeEntries.count
 
@@ -249,28 +242,20 @@ final class TimerDraftFlowTests: XCTestCase {
     }
 
     func testDraftForDeletedPropertyIsKeptAndCanBeSavedElsewhere() throws {
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        let setup = viewModelWithRentals(["Oak", "Pine"])
+        let oak = setup.properties[0], pine = setup.properties[1]
+        seedPausedDrafts([.repairs], propertyId: oak.id, ran: 0.75)
         let viewModel = AppViewModel()
-        viewModel.suppressCelebrations = true
-        viewModel.addProperty(name: "Oak", address: "1 Oak", type: .ltr)
-        viewModel.addProperty(name: "Pine", address: "2 Pine", type: .ltr)
-        let oak = viewModel.properties[0], pine = viewModel.properties[1]
-        viewModel.startTimer(propertyId: oak.id, category: .repairs)
-        viewModel.signOut()
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
-        viewModel.signIn()
         viewModel.deleteProperty(viewModel.properties.first { $0.id == oak.id }!)
 
         // Reload: the draft is kept, not dropped.
-        viewModel.signOut()
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
-        viewModel.signIn()
-        let draft = try XCTUnwrap(viewModel.staleTimerRecovery)
-        XCTAssertTrue(viewModel.staleTimerRecoveryNeedsProperty(draft))
-        XCTAssertFalse(viewModel.saveRecoveredStaleTimer(id: draft.id), "Can't save to a deleted property")
-        XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: draft.id, propertyId: pine.id))
-        XCTAssertEqual(viewModel.timeEntries.filter { $0.propertyId == pine.id }.count, 1)
-        XCTAssertTrue(viewModel.staleTimerRecoveries.isEmpty)
+        let reloaded = AppViewModel()
+        let draft = try XCTUnwrap(reloaded.staleTimerRecovery)
+        XCTAssertTrue(reloaded.staleTimerRecoveryNeedsProperty(draft))
+        XCTAssertFalse(reloaded.saveRecoveredStaleTimer(id: draft.id), "Can't save to a deleted property")
+        XCTAssertTrue(reloaded.saveRecoveredStaleTimer(id: draft.id, propertyId: pine.id))
+        XCTAssertEqual(reloaded.timeEntries.filter { $0.propertyId == pine.id }.count, 1)
+        XCTAssertTrue(reloaded.staleTimerRecoveries.isEmpty)
     }
 
     func testCappedDraftCannotBeSavedWithOneTap() throws {
@@ -323,7 +308,7 @@ final class SyncStatusTests: XCTestCase {
         authSnapshot = AuthStateSnapshot.capture()
         AuthStateSnapshot.clearAll()
         profileId = "local-status-\(UUID().uuidString.prefix(8))"
-        UserDefaults.standard.set(profileId, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = profileId
     }
 
     override func tearDown() {

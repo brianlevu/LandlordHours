@@ -14,6 +14,8 @@ struct EngagementNotificationPlan: Equatable {
 
 final class EngagementNotificationScheduler {
     static let shared = EngagementNotificationScheduler()
+    /// Reasons that never become a notification any more.
+    static let retiredReasons: Set<EngagementReason> = [.calendarDraftsReady]
 
     private let center: UNUserNotificationCenter
     private let service: EngagementIntelligenceService
@@ -34,6 +36,9 @@ final class EngagementNotificationScheduler {
 
         let recommendation = service.recommendation(for: context)
         guard recommendation.surface == .notification else { return nil }
+        // Retired in 2.0: calendar items are announced one by one at event end
+        // (EndOfEventScheduler); a "N calendar items" digest on top would double-notify.
+        guard !Self.retiredReasons.contains(recommendation.reason) else { return nil }
         guard recommendation.destination != .none else { return nil }
 
         let plan = EngagementNotificationPlan(
@@ -63,10 +68,15 @@ final class EngagementNotificationScheduler {
         content.sound = plan.playsSound ? .default : nil
         content.threadIdentifier = "landlordhours.engagement"
         content.categoryIdentifier = categoryIdentifier(for: plan.destination)
-        content.userInfo = [
+        var userInfo: [String: Any] = [
             "reason": plan.reason.rawValue,
-            "destination": plan.destination.rawValue
+            NotificationPayload.destinationKey: plan.destination.rawValue
         ]
+        // Every notification carries the profile it was made for (see NotificationPayload).
+        if let profileId = UserScope.userId {
+            userInfo[NotificationPayload.profileIdKey] = profileId
+        }
+        content.userInfo = userInfo
 
         if #available(iOS 15.0, *) {
             content.interruptionLevel = interruptionLevel(for: plan.reason)

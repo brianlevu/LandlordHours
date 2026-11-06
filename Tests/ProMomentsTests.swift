@@ -187,7 +187,8 @@ final class FunnelAnalyticsTests: XCTestCase {
             Analytics.entryLogged(source: source)
             XCTAssertEqual(only("entry_logged")?["source"] as? String, source.rawValue)
         }
-        XCTAssertEqual(EntrySource.allCases.map(\.rawValue).sorted(), ["calendar", "manual", "timer", "voice"])
+        XCTAssertEqual(EntrySource.allCases.map(\.rawValue).sorted(),
+                       ["calendar", "gmail", "location", "manual", "other", "receipt", "shortcut", "timer", "voice"])
     }
 
     func testExportSharedCarriesFormat() {
@@ -210,17 +211,46 @@ final class FunnelAnalyticsTests: XCTestCase {
 
     func testPropertyFreeEvents() {
         Analytics.purchaseRestored()
-        Analytics.onboardingCompleted()
         XCTAssertEqual(only("purchase_restored")?.isEmpty, true)
-        XCTAssertEqual(only("onboarding_completed")?.isEmpty, true)
     }
 
-    func testProfileCreatedKind() {
-        Analytics.profileCreated(kind: .apple)
-        XCTAssertEqual(only("profile_created")?["kind"] as? String, "apple")
+    /// 2.0 onboarding keeps `onboarding_completed` and adds a step funnel; every value is fixed.
+    func testOnboardingEventsCarryFixedValuesOnly() {
+        Analytics.onboardingCompleted(skippedProperty: true, calendar: OnbCalendar.notNow.analyticsKey)
+        XCTAssertEqual(only("onboarding_completed")?["skipped_property"] as? Bool, true)
+        XCTAssertEqual(only("onboarding_completed")?["calendar"] as? String, "not_now")
         events = []
-        Analytics.profileCreated(kind: .local)
-        XCTAssertEqual(only("profile_created")?["kind"] as? String, "local")
+        Analytics.onboarding(.stepViewed(.property, .new))
+        XCTAssertEqual(only("onboarding_step_viewed")?["step"] as? String, "property")
+        XCTAssertEqual(only("onboarding_step_viewed")?["cohort"] as? String, "new")
+        events = []
+        Analytics.onboarding(.goalSelected(.mp500))
+        XCTAssertEqual(only("onboarding_goal_selected")?["goal"] as? String, "mp500")
+        events = []
+        Analytics.onboarding(.calendarResult(.allowed))
+        XCTAssertEqual(only("calendar_permission_result")?["result"] as? String, "full")
+        events = []
+        Analytics.onboarding(.whoSelected(.both))
+        XCTAssertEqual(only("onboarding_who_selected")?["who"] as? String, "both")
+        events = []
+        Analytics.onboarding(.propertyAdded(hasAddress: false, skipped: true))
+        XCTAssertEqual(only("onboarding_property_added")?["skipped"] as? Bool, true)
+        events = []
+        Analytics.onboarding(.notifyResult("declined_in_app"))
+        XCTAssertEqual(only("notify_permission_result")?["result"] as? String, "declined_in_app")
+    }
+
+    /// 2.2: no profiles. The identity events carry fixed values and counts only.
+    func testIdentityEventsCarryOnlyFixedValues() {
+        Analytics.mergeQuestionAnswered("spouse")
+        XCTAssertEqual(only("merge_question_answered")?["answer"] as? String, "spouse")
+        events = []
+        Analytics.syncPushFailed(recordType: "CustomCategory", code: 12)
+        XCTAssertEqual(only("sync_push_failed")?["record_type"] as? String, "CustomCategory")
+        XCTAssertEqual(only("sync_push_failed")?["ck_error"] as? Int, 12)
+        events = []
+        Analytics.icloudState(.restricted, quotaExceeded: false)
+        XCTAssertEqual(only("icloud_state")?["state"] as? String, "restricted")
     }
 
     func testRatingPromptRequestedTrigger() {
@@ -233,12 +263,20 @@ final class FunnelAnalyticsTests: XCTestCase {
         EntrySource.allCases.forEach { Analytics.entryLogged(source: $0) }
         Analytics.exportShared(format: .pdf)
         PaywallContext.allCases.forEach { Analytics.paywallViewed(context: $0) }
-        Analytics.profileCreated(kind: .local)
         Analytics.ratingPromptRequested(trigger: .entriesMilestone)
-        let allowedKeys: Set<String> = ["source", "format", "context", "kind", "trigger"]
+        LockEntry.allCases.forEach { Analytics.lockPreviewShown(entry: $0) }
+        PaywallContext.allCases.forEach {
+            Analytics.paywallShown(context: $0, entry: .exportPage)
+            Analytics.paywallCtaTapped(context: $0)
+            Analytics.purchaseSucceeded(context: $0)
+            Analytics.purchaseFailed(context: $0, outcome: "pending")
+        }
+        let allowedKeys: Set<String> = ["source", "format", "context", "kind", "trigger", "entry", "outcome"]
         let allowedValues: Set<String> = Set(EntrySource.allCases.map(\.rawValue))
             .union(["pdf", "csv", "apple", "local", "export_shared", "entries_milestone"])
             .union(PaywallContext.allCases.map(\.rawValue))
+            .union(LockEntry.allCases.map(\.rawValue))
+            .union(["failed", "pending", "cancelled"])
         for event in events {
             for (key, value) in event.props {
                 XCTAssertTrue(allowedKeys.contains(key), "\(event.name) has unexpected key \(key)")
@@ -258,13 +296,13 @@ final class FunnelAnalyticsIntegrationTests: XCTestCase {
         super.setUp()
         events = []
         Analytics.testSpy = { [weak self] name, props in self?.events.append((name, props)) }
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = id
     }
 
     override func tearDown() {
         Analytics.testSpy = nil
         AppViewModel.clearScopedAccountData(for: id)
-        UserDefaults.standard.removeObject(forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = nil
         super.tearDown()
     }
 
@@ -296,24 +334,22 @@ final class FunnelAnalyticsIntegrationTests: XCTestCase {
 
 final class PaywallContextTests: XCTestCase {
     func testHeadlineSpeaksToTheThingTapped() {
-        XCTAssertEqual(PaywallContext.export.title(year: 2026), "Export your 2026 record")
-        XCTAssertTrue(PaywallContext.secondProperty.title(year: 2026).contains("rental"))
-        XCTAssertEqual(PaywallContext.export.benefits.first, .exports)
-        XCTAssertEqual(PaywallContext.secondProperty.benefits.first, .properties)
-        XCTAssertTrue(PaywallContext.secondProperty.body.contains("one property"))
-        XCTAssertNotEqual(PaywallContext.dashboardUnlock.title(year: 2026), PaywallContext.settingsUpgrade.title(year: 2026),
-                          "Home's Unlock card gets its own headline")
-        XCTAssertNotEqual(PaywallContext.dashboardUnlock.body, PaywallContext.settingsUpgrade.body)
+        XCTAssertEqual(PaywallCopy.make(.export, year: 2026).headline, "The record your accountant gets")
+        XCTAssertTrue(PaywallCopy.make(.secondProperty, year: 2026).headline.contains("rental"))
+        XCTAssertNotEqual(PaywallCopy.make(.todayUnlock, year: 2026).headline, PaywallCopy.make(.settings, year: 2026).headline,
+                          "Today's record card gets its own headline")
     }
 
     func testCopyNeverOverclaimsTaxOutcomes() {
-        let banned = ["audit-proof", "audit proof", "guarantee", "irs-approved", "irs approved", "qualify you", "ensures"]
+        let banned = ["audit-proof", "audit proof", "guarantee", "irs-approved", "irs approved", "qualify you", "ensures",
+                      "qualified", "audit-ready", "evidence", "defensible", "tax-ready"]
         var copy: [String] = []
         for context in PaywallContext.allCases {
-            copy += [context.title(year: 2026), context.body, context.continueLabel]
+            let c = PaywallCopy.make(context, year: 2026, propertyName: "Oak", confirmedHours: 212)
+            copy += [c.headline, c.planLine, c.nextStep]
         }
-        copy += PaywallBenefit.allCases.flatMap { [$0.title, $0.detail] }
-        copy.append(NotTaxAdviceNote.text)
+        copy += PaywallCopy.benefits.flatMap { [$0.title, $0.line] }
+        for entry in LockEntry.allCases { copy += [ProGate.lockLine(entry), ProGate.keepsLine(entry)] }
         for line in copy {
             for word in banned {
                 XCTAssertFalse(line.lowercased().contains(word), "Overclaim '\(word)' in: \(line)")
@@ -321,15 +357,10 @@ final class PaywallContextTests: XCTestCase {
         }
     }
 
-    func testNotTaxAdviceWording() {
-        XCTAssertEqual(NotTaxAdviceNote.text,
-                       "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional.")
-    }
-
     func testOnboardingHasNoPaywallStep() {
-        XCTAssertEqual(OnboardingStep.allCases, [.goalSelection, .addProperty, .notifications, .calendar])
-        XCTAssertEqual(OnboardingStep.totalSegments, 4)
-        XCTAssertNil(OnboardingStep.fromLaunchArgument("paywall"))
+        XCTAssertEqual(OnbRouting.newUserSequence, [.welcome, .goal, .calendar, .who, .property, .notify, .staked])
+        XCTAssertEqual(OnbRouting.upgradeSequence, [.wnHouse, .calendar, .notify])
+        XCTAssertNil(OnbStep(launchValue: "paywall"))
     }
 }
 
@@ -420,29 +451,6 @@ final class MoreThanHalfDisplayTests: XCTestCase {
     }
 }
 
-// MARK: - Home goal card surface
-
-final class GoalCardToneTests: XCTestCase {
-    func testStateResolution() {
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: true, isOnTrack: false, needsOtherWorkHours: false), .met)
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: false, needsOtherWorkHours: false), .needsAttention)
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: true, needsOtherWorkHours: true), .needsAttention)
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: true, needsOtherWorkHours: false), .onTrack)
-    }
-
-    /// Sage (positive) only when the goal is met; behind is caution; on track is violet wash.
-    func testToneMapsToIntentTokens() {
-        for scheme in [ColorScheme.light, .dark] {
-            let colors = AdaptiveColors(colorScheme: scheme)
-            XCTAssertEqual(GoalCardTone.met.surface(colors), colors.positiveSurface)
-            XCTAssertEqual(GoalCardTone.needsAttention.surface(colors), colors.cautionSurface)
-            XCTAssertEqual(GoalCardTone.onTrack.surface(colors), colors.actionSurface)
-            XCTAssertNotEqual(GoalCardTone.needsAttention.surface(colors), colors.positiveSurface)
-            XCTAssertNotEqual(GoalCardTone.onTrack.surface(colors), colors.positiveSurface)
-        }
-    }
-}
-
 // MARK: - Timer draft card
 
 final class TimerDraftReviewTests: XCTestCase {
@@ -459,7 +467,8 @@ final class TimerDraftReviewTests: XCTestCase {
 
     func testCappedMessageDoesNotRepeatTheCap() {
         let message = draft(30).cardMessage(propertyName: "Oak", hasAnyProperty: true)
-        XCTAssertFalse(message.contains("24"), message)
+        XCTAssertFalse(message.contains("24h"), message)
+        XCTAssertFalse(message.localizedCaseInsensitiveContains("24 hours"), message)
         XCTAssertFalse(message.contains("30.0h"), message)
     }
 
@@ -510,10 +519,9 @@ final class LaneCContrastTests: XCTestCase {
             ("tab active dark", dark.actionText, dark.actionSurface, .dark),
         ]
         for (scheme, colors, style) in [(ColorScheme.light, light, UIUserInterfaceStyle.light), (.dark, dark, .dark)] {
-            for tone in [GoalCardTone.onTrack, .needsAttention, .met] {
-                pairs.append(("goal card \(tone) text \(scheme)", colors.textPrimary, tone.surface(colors), style))
-                pairs.append(("goal card \(tone) secondary \(scheme)", colors.textSecondary, tone.surface(colors), style))
-            }
+            // Today's metric tiles under the house hero (50% rule, pace) sit on the card fill.
+            pairs.append(("today metric text \(scheme)", colors.textPrimary, colors.backgroundSecondary, style))
+            pairs.append(("today metric secondary \(scheme)", colors.textSecondary, colors.backgroundSecondary, style))
         }
         for (name, fg, bg, style) in pairs {
             let ratio = contrast(fg, bg, style)

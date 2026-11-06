@@ -1,31 +1,34 @@
 import Foundation
 import SwiftUI
-import AuthenticationServices
+import Combine
 import WidgetKit
 import ActivityKit
 import UIKit
 import os.log
 
-// MARK: - Per-User Key Scoping
+// MARK: - Record-set key scoping
 
-/// Scopes UserDefaults keys to the current signed-in user.
-/// Auth keys (appleUserId, localProfileId, legacy emailUserId, etc.) remain unscoped.
+/// Scopes UserDefaults keys to the record set. 2.2 (package K): one record set per iCloud
+/// account under the fixed `v2.` prefix once the device merge has run (`IdentityScope`); the
+/// `u.<id>.` keys of 1.x / 2.0 profiles stay untouched (2.3 removes them).
 enum UserScope {
-    /// Current userId: `appleUserId ?? localProfileId ?? emailUserId` (legacy fallback).
+    /// The scope id: the frozen storage id (`v2.storageId`), used for folder names, capture ids
+    /// and notification ids. Nil only before the first 2.2 launch finished its device merge.
     static var userId: String? {
-        ProfileKeys.resolveUserId(.standard)
+        IdentityScope.resolve(.standard).scopeId
     }
 
-    /// Returns a user-scoped key. Falls back to unscoped if no user signed in.
+    /// A key in the live record set (`v2.<base>`).
     static func key(_ base: String) -> String {
-        guard let id = userId else { return base }
-        return "u.\(id).\(base)"
+        IdentityScope.resolve(.standard).prefix + base
     }
 
-    /// Returns the scoped key for a known userId. Used during account deletion
-    /// after capturing the account id but before clearing auth keys.
+    /// The key for a known scope id: the live prefix for the active scope id, otherwise the
+    /// legacy `u.<id>.` key (the inventory, DEBUG fixtures, tests).
     static func key(_ base: String, userId: String?) -> String {
         guard let userId else { return base }
+        let resolved = IdentityScope.resolve(.standard)
+        if userId == resolved.scopeId { return resolved.prefix + base }
         return "u.\(userId).\(base)"
     }
 }
@@ -33,9 +36,29 @@ enum UserScope {
 @MainActor
 class AppViewModel: ObservableObject {
     @Published var properties: [RentalProperty] = []
-    @Published var timeEntries: [TimeEntry] = []
+    @Published var timeEntries: [TimeEntry] = [] {
+        didSet { lastEntriesChangeOrigin = isApplyingRemoteChanges ? .remote : .local }
+    }
+    /// Where the latest change to `timeEntries` came from. Today mutes the house build (no
+    /// "+Nh" beam, no haptic) only for iCloud merges, never for the user's own saves.
+    enum EntriesChangeOrigin: Equatable { case local, remote }
+    @Published private(set) var lastEntriesChangeOrigin: EntriesChangeOrigin = .local
+    private var isApplyingRemoteChanges = false
     @Published var selectedYear: Int = Calendar.current.component(.year, from: Date())
-    @Published var isInitializing = true
+    /// WP-L: the active profile's first iCloud pull of this launch is still running, so the hours
+    /// on Today may not be final. Today shows the drafting loader in the house slot and a
+    /// placeholder for the number; everything else is usable. Never blocks: it ends when the
+    /// initial sync ends (any outcome) or after `initialPullPlaceholderTimeout`.
+    @Published private(set) var isAwaitingInitialPull = false
+    /// The initial sync is still running (true past the placeholder cap). Export waits on it:
+    /// a report made now could miss hours from other devices. False once it lands or fails.
+    @Published private(set) var isInitialPullRunning = false
+    /// The last initial sync reached iCloud's account but its pull failed. Export still works,
+    /// with a note that the report may miss hours from other devices.
+    @Published private(set) var initialPullFailed = false
+    private var initialSyncsInFlight = 0
+    static let initialPullPlaceholderTimeout: TimeInterval = 6
+    private var initialPullWaitToken = UUID()
     @Published var isSignedIn = false
     @Published var userName: String = ""
 
@@ -47,6 +70,10 @@ class AppViewModel: ObservableObject {
     // Celebration state
     @Published var activeCelebration: CelebrationType?
     var suppressCelebrations = false
+    /// True while no scene is on screen (a notification action or intent running in the
+    /// background). Milestones crossed then are queued, not lost; `AppModelHost` turns this
+    /// off and presents the queue when a scene becomes active.
+    var queuesCelebrations = false
 
     // Timer state
     @Published var isTimerRunning = false
@@ -69,291 +96,365 @@ class AppViewModel: ObservableObject {
     private var staleTimerRecoveryKey: String { UserScope.key("LandlordHours.staleTimerRecovery") }
     private var staleTimerRecoveriesKey: String { UserScope.key("LandlordHours.staleTimerRecoveries") }
 
+    /// Package K: the identity surfaces (iCloud status, Earlier records, the two-sets question,
+    /// the Welcome footer, the Today notice) and the record-set engine behind them.
+    let identity = IdentityCoordinator()
+    private var identityObservation: AnyCancellable?
+
     init() {
 #if DEBUG
+        // Captured upgrade fixtures and fresh-device resets are written before the merge reads them.
+        IdentityFixtures.applyLaunchArguments()
         seedLegacyEmailFixtureIfNeeded()
 #endif
-        // 1.1: turn a ≤1.0.6 email "account" into a local profile with the SAME ID.
-        // Must run before anything reads auth keys or migrates unscoped legacy data.
-        ProfileMigration.migrateEmailProfile(defaults: .standard)
+        // 2.2: every 1.x / 2.0 state becomes one record set under `v2.` (S1–S4, before the
+        // first frame). Nothing is deleted; `u.*` stays as it is.
+        // The managers re-read their keys only when this launch moved the record set.
+        if Self.runDeviceMerge() { reloadManagersForRecordSet() }
         checkSignInState()
 #if DEBUG
         applyLaunchMockScenarioIfNeeded()
 #endif
         if UserScope.userId != nil {
-            migrateUnscopedLegacyData()
             loadData()
             loadTimerState()
             refreshWidgetSnapshot()
         }
         syncService.delegate = self
+        var zoneSource: IdentityZoneSource = syncService
+#if DEBUG
+        if let fake = IdentityFixtures.fakeZoneIfRequested() { zoneSource = fake; Self.debugFakeZone = fake }
+#endif
+        identity.attach(source: zoneSource, live: self, sync: syncService)
+        identity.hasSavedEntry = !timeEntries.isEmpty
+        // Views that read `viewModel.identity` (Welcome, Today, Settings) re-render with it.
+        identityObservation = identity.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
+        // Any successful pull clears the export sheet's "Couldn't reach iCloud" note.
+        syncService.onInitialPullSucceeded = { [weak self] profileId in
+            guard let self, profileId == UserScope.userId else { return }
+            self.initialPullFailed = false
+        }
+        syncService.onIdentityChange = { [weak self] in
+            guard let self else { return }
+            self.reloadAfterIdentityChange()
+        }
 
-        // Trigger cloud sync when tax profile or goals change
+        // Settings edits made by a person are "dirty" until pushed (v4 §3.3); edits made while the
+        // record set is empty are "dirty while empty" and never beat the household's settings.
         TaxProfileManager.shared.onDidChange = { [weak self] in
-            self?.syncService.schedulePush()
+            guard let self else { return }
+            self.markSettingsDirty(tax: true)
+            self.refreshWidgetSnapshot()
+            self.syncService.schedulePush()
         }
         GoalManager.shared.onDidChange = { [weak self] in
-            self?.refreshWidgetSnapshot()
-            self?.syncService.schedulePush()
+            guard let self else { return }
+            self.markSettingsDirty(tax: false)
+            self.refreshWidgetSnapshot()
+            self.syncService.schedulePush()
         }
-        // Show branded splash screen for 1.5s, then animate into the app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeOut(duration: 0.4)) {
-                self.isInitializing = false
+        if Self.isUnitTestHost {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if self.isSignedIn { Task { await self.syncService.start() } }
             }
+        } else if isSignedIn {
+            #if DEBUG
+            if Self.simulatedPullState == nil { startInitialSync(showsPlaceholder: !Self.isMockLaunch) }
+            #else
+            startInitialSync(showsPlaceholder: !Self.isMockLaunch)
+            #endif
         }
-        // Start CloudKit sync after splash if signed in
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            if self.isSignedIn {
-                Task { await self.syncService.start() }
-            }
-        }
+#if DEBUG
+        applySimulatedPendingPullIfNeeded()
+#endif
     }
-    
-    func checkSignInState() {
-        let defaults = UserDefaults.standard
-        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
-            isSignedIn = true
-            userName = defaults.string(forKey: ProfileKeys.appleUserName) ?? "User"
-        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
-            isSignedIn = true
-            userName = defaults.string(forKey: ProfileKeys.localProfileName) ?? "User"
-        } else if defaults.string(forKey: ProfileKeys.emailUserId) != nil {
-            isSignedIn = true
-            userName = defaults.string(forKey: ProfileKeys.emailUserName) ?? "User"
+
+#if DEBUG
+    /// The in-memory zone a `-LHFakeZone` launch uses (UI tests drive "another device" through it).
+    static var debugFakeZone: FakeZoneSource?
+#endif
+
+    /// S1–S4 over the standard defaults and Application Support. True when this launch merged.
+    @discardableResult
+    static func runDeviceMerge() -> Bool {
+        var options = RecordSetMigration.DeviceOptions()
+#if DEBUG
+        options.crashAt = IdentityFixtures.crashAt
+        if ProcessInfo.processInfo.arguments.contains("-LHBackupFails") {
+            options.writeBackup = { _, _ in throw CocoaError(.fileWriteOutOfSpace) }
+        }
+#endif
+        do {
+            return try RecordSetMigration.runDevicePhase(defaults: .standard, root: MigrationFiles.defaultRoot, options: options) != .alreadyMerged
+        } catch {
+            Self.persistenceLogger.error("Device merge stopped: \(String(describing: error), privacy: .public)")
+            return true
         }
     }
 
-    /// Name shown for the active profile, from whichever identity is active.
-    static func resolvedProfileName(_ defaults: UserDefaults = .standard) -> String {
-        let candidate: String?
-        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
-            candidate = defaults.string(forKey: ProfileKeys.appleUserName)
-        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
-            candidate = defaults.string(forKey: ProfileKeys.localProfileName)
-        } else {
-            candidate = defaults.string(forKey: ProfileKeys.emailUserName)
-        }
-        guard let candidate, !candidate.isEmpty else { return "User" }
-        return candidate
-    }
-
-    func signIn() {
-        isSignedIn = true
-        // Clear in-memory state from any previous user before loading new user's data.
-        // This prevents stale data from leaking if a CloudKit sync fires during the transition.
-        properties = []
-        timeEntries = []
-        // Migrate legacy unscoped data to this user's scoped keys (one-time)
-        migrateUnscopedLegacyData()
-        // Load user-scoped data (UserScope.userId is now set via auth keys)
-        loadData()
-        loadTimerState()
-        // Pro belongs to this device's App Store account, not to a profile: carry the
-        // cached flag from the previous profile, then reload() re-checks StoreKit
-        // (Transaction.currentEntitlements) for the new profile.
-        ProEntitlementCarryOver.carryFromPreviousProfile(defaults: .standard)
-        // Reload all singleton managers for this user
+    /// Every manager re-reads its keys from the record set's prefix.
+    func reloadManagersForRecordSet() {
         SubscriptionManager.shared.reload()
         GoalManager.shared.loadGoals()
         CategoryManager.shared.loadCategories()
         TaxProfileManager.shared.reload()
         MilestoneTracker.shared.reload()
+    }
 
+    /// Pulls, answers and archive moves change the live set: reload what Today shows.
+    func reloadAfterIdentityChange() {
+        identity.hasSavedEntry = !timeEntries.isEmpty
+        if rootState == .welcome { identity.noteLiveHours(timeEntries.reduce(0) { $0 + $1.hours }) }
+        identity.refresh(sync: syncService)
+        objectWillChange.send()
+    }
+
+    private var isApplyingRemoteSettings = false
+
+    /// New-user onboarding began: on an empty phone its answers count as made "while empty" to
+    /// the end, so a household another device wrote is never overwritten by them (package K).
+    func beginOnboardingAnswers() {
+        IdentityKeys.beginOnboarding(liveIsEmpty: properties.isEmpty && timeEntries.isEmpty, defaults: .standard)
+    }
+
+    /// Onboarding finished or was left: settle its answers against the household.
+    func endOnboardingAnswers() {
+        identity.engine?.finishOnboarding()
+        identity.refresh(sync: syncService)
+    }
+
+    private func markSettingsDirty(tax: Bool) {
+        guard !isApplyingRemoteSettings else { return }
+        IdentityKeys.markSettingsDirty(tax: tax, liveIsEmpty: properties.isEmpty && timeEntries.isEmpty, defaults: .standard)
+    }
+
+    /// Starts the profile's initial iCloud sync. With `showsPlaceholder`, Today treats the hours
+    /// as not final until the first pull ends (any outcome) or the timeout passes.
+    @discardableResult
+    func startInitialSync(showsPlaceholder: Bool = true) -> Task<Void, Never> {
+        let token = showsPlaceholder && syncService.isCloudKitAvailable ? beginAwaitingInitialPull() : nil
+        initialSyncsInFlight += 1
+        isInitialPullRunning = true
+        return Task { [weak self] in
+            guard let self else { return }
+            // Returns only after a pull for the profile active now has run (a call made while
+            // another profile's pull is in flight waits for the re-run).
+            await self.syncService.start()
+            self.initialSyncsInFlight -= 1
+            if self.initialSyncsInFlight == 0 {
+                self.isInitialPullRunning = false
+                self.initialPullFailed = Self.initialPullFailed(
+                    accountAvailable: self.syncService.accountAvailable,
+                    completedFor: self.syncService.initialSyncCompletedFor,
+                    activeProfile: UserScope.userId
+                )
+            }
+            // Ends only the wait this sync began (a newer wait belongs to a newer start).
+            if let token { self.endAwaitingInitialPull(token: token) }
+        }
+    }
+
+    /// Failed = iCloud was reachable as an account but this profile's pull didn't complete.
+    /// No account (or no CloudKit) is not a failure: export works normally without a note.
+    static func initialPullFailed(accountAvailable: Bool, completedFor: String?, activeProfile: String?) -> Bool {
+        guard accountAvailable, let activeProfile else { return false }
+        return completedFor != activeProfile
+    }
+
+    @discardableResult
+    func beginAwaitingInitialPull(timeout: TimeInterval = AppViewModel.initialPullPlaceholderTimeout) -> UUID {
+        let token = UUID()
+        initialPullWaitToken = token
+        isAwaitingInitialPull = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            self?.endAwaitingInitialPull(token: token)
+        }
+        return token
+    }
+
+    /// Ends the wait `token` started; nil ends any wait (sign-out).
+    func endAwaitingInitialPull(token: UUID? = nil) {
+        if let token, token != initialPullWaitToken { return }
+        initialPullWaitToken = UUID()
+        isAwaitingInitialPull = false
+    }
+
+    /// Running inside the unit-test host (XCTest injects this variable).
+    static var isUnitTestHost: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// UI tests, captures and screenshot runs drive the app from DEBUG fixtures, not iCloud.
+    static var isMockLaunch: Bool {
+        ProcessInfo.processInfo.arguments.contains("-LHMockScenario")
+    }
+
+#if DEBUG
+    /// `-LHSimulatePendingPull <seconds>`: Today shows the first-pull loading state for that long,
+    /// then settles (captures and the "Today stays usable while loading" UI test).
+    /// `-LHSimulatePullState waiting|syncing|failed`: holds the export gate in that state
+    /// (captures of the export sheet). waiting = hours placeholder showing; syncing = past the
+    /// cap with the pull still running; failed = the pull failed (gate open with the note).
+    static var simulatedPullState: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSimulatePullState"), args.indices.contains(index + 1) else { return nil }
+        return args[index + 1]
+    }
+
+    private func applySimulatedPullStateIfNeeded() {
+        switch Self.simulatedPullState {
+        case "waiting":
+            isInitialPullRunning = true
+            beginAwaitingInitialPull(timeout: 3600)
+        case "syncing":
+            isInitialPullRunning = true
+        case "failed":
+            isInitialPullRunning = false
+            initialPullFailed = true
+        default:
+            break
+        }
+    }
+
+    private func applySimulatedPendingPullIfNeeded() {
+        applySimulatedPullStateIfNeeded()
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSimulatePendingPull"),
+              args.indices.contains(index + 1),
+              let seconds = Double(args[index + 1]) else { return }
+        beginAwaitingInitialPull(timeout: seconds)
+    }
+#endif
+    
+    /// There is no sign-in in 2.2: the record set exists once the device merge has run. The
+    /// name kept for compatibility: true whenever there is a record set to show.
+    func checkSignInState() {
+        isSignedIn = UserScope.userId != nil
         userName = Self.resolvedProfileName(.standard)
-        AppleSignInManager.shared.checkExistingSignIn()
-
-        // Start CloudKit sync
-        Task { await syncService.start() }
     }
 
-    /// "Continue without an account": creates a `local-<UUID>` profile.
-    ///
-    /// Deliberately does NOT call `signUp()`, which would wipe unscoped legacy data.
-    /// Unscoped legacy data is migrated into the new profile instead.
-    func continueWithoutAccount() {
+    /// "Your name" (optional), shown as "Prepared for" on reports. Device copy of
+    /// `TaxProfile.displayName`, which syncs.
+    static func resolvedProfileName(_ defaults: UserDefaults = .standard) -> String {
+        #if DEBUG
+        if let scope = defaults.string(forKey: IdentityScope.debugScopeKey) ?? IdentityScope.debugOverride,
+           let name = defaults.string(forKey: "u.\(scope).profile.name"), !name.isEmpty { return name }
+        #endif
+        if let name = defaults.string(forKey: IdentityKeys.displayName), !name.isEmpty { return name }
+        return ""
+    }
+
+    /// Saves "Your name" (device copy + the synced TaxProfile field).
+    func setDisplayName(_ name: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let defaults = UserDefaults.standard
-        let id = ProfileKeys.newLocalProfileId()
-        defaults.set(id, forKey: ProfileKeys.localProfileId)
-        defaults.removeObject(forKey: ProfileKeys.localProfileName)
-        defaults.removeObject(forKey: ProfileKeys.localProfileEmail)
-        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
-        migrateUnscopedLegacyData()
-        defaults.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
-        signIn()
-        Analytics.profileCreated(kind: .local)
+        if clean.isEmpty { defaults.removeObject(forKey: IdentityKeys.displayName) } else { defaults.set(clean, forKey: IdentityKeys.displayName) }
+        userName = clean
+        markSettingsDirty(tax: true)
+        syncService.schedulePush()
     }
 
-    /// Restores an earlier profile found on this device or in iCloud and makes it active.
-    /// The currently active profile's data stays on this device.
-    func switchToProfile(_ profile: DiscoveredProfile) {
-        if isSignedIn || UserScope.userId != nil {
-            signOut()
+    /// Whether the record set has finished onboarding. False before the device merge.
+    var activeProfileCompletedOnboarding: Bool {
+        guard UserScope.userId != nil else { return false }
+        return UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding"))
+    }
+
+    /// What the root shows (ContentView): Welcome, the onboarding steps, or the app.
+    enum RootState: Equatable { case welcome, onboarding, app }
+
+    var rootState: RootState {
+        guard isSignedIn else { return .welcome }
+        return activeProfileCompletedOnboarding ? .app : .welcome
+    }
+
+    /// Welcome's primary button: "Continue" when earlier records are already here (P2).
+    var welcomePrimaryTitle: String {
+        if case .found = identity.welcome {
+            return String(localized: "Continue", table: "Identity")
         }
-        ProfileRestore.activate(profile, defaults: .standard)
-        signIn()
+        return String(localized: "Get started", table: "ConversionPath")
     }
 
-    /// Inactive earlier profiles found on this device and (when reachable) in iCloud.
-    func discoverRestorableProfiles(cloudSource: CloudProfileRecordSource? = nil) async -> [DiscoveredProfile] {
-        let activeId = UserScope.userId
-        let device = ProfileDiscovery.deviceProfiles(defaults: .standard, excluding: activeId)
-        let source: CloudProfileRecordSource = cloudSource ?? syncService
-        let cloud: [DiscoveredProfile]
-        do {
-            cloud = ProfileDiscovery.cloudProfiles(
-                from: try await source.fetchProfileRecordSummaries(),
-                excluding: activeId
-            )
-        } catch {
-            cloud = []
+    /// The one Today card K fills (C's slot under the hero).
+    var todayNotice: TodayIdentityNotice? { identity.todayNotice }
+
+    enum ProfileDeletionError: LocalizedError, Equatable {
+        /// iCloud is off/unreachable, so copies saved there can't be removed now.
+        case iCloudUnavailable
+        /// The phone is signed in to a different iCloud account: its zone is never deleted.
+        case otherICloudAccount
+
+        var errorDescription: String? {
+            switch self {
+            case .iCloudUnavailable:
+                return String(localized: "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?", table: "Identity")
+            case .otherICloudAccount:
+                return String(localized: "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?", table: "Identity")
+            }
         }
-        return ProfileDiscovery.merge(device: device, cloud: cloud)
     }
 
-    /// Call when a new account is created (not for returning sign-in).
-    func signUp() {
-        // New user — delete any stale unscoped data so it doesn't leak
-        Self.clearUnscopedLegacyData()
-        // Clear onboarding flag so new user sees onboarding flow
-        UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
-        signIn()
-        // signUp() is only called for a brand-new Sign in with Apple profile.
-        Analytics.profileCreated(kind: .apple)
-    }
-
-    /// Signs out / switches away from the active profile. Per-profile data stays on the
-    /// device under `u.<id>.*`.
+    /// Delete all data (§1.4): the whole iCloud zone (one operation), then every `v2.*` and
+    /// `u.*` key, the archive, the backup, attachments, notification keys and the widget
+    /// snapshot. Afterwards the app is a new install: Welcome.
     ///
-    /// - Parameter keepProfileState: false only when the profile's data was just deleted,
-    ///   so nothing is written back into the deleted scope.
-    func signOut(keepProfileState: Bool = true) {
-        // Stop CloudKit sync
+    /// - Parameter allowLocalOnly: with iCloud unavailable it throws `.iCloudUnavailable` BEFORE
+    ///   deleting anything, unless the person chose "Delete from this iPhone anyway".
+    func deleteAllData(allowLocalOnly: Bool = false) async throws {
         syncService.stop()
-        let defaults = UserDefaults.standard
-        let outgoingId = UserScope.userId
-
-        // Timer: stop the visible timer and save its state to THIS profile while its ID
-        // is still set. (Before 1.1 this ran after the ID was cleared and wrote unscoped
-        // `LandlordHours.timer*` keys.) A running timer resumes — or is offered for
-        // recovery if stale — when the profile comes back.
-        if keepProfileState, let outgoingId {
-            // Pause a running timer at switch time: record the elapsed time as a recovery
-            // draft for this profile (offered when the profile comes back) instead of
-            // leaving the timer counting while another profile is active.
-            if isTimerRunning, let start = timerStartTime, let propertyId = timerPropertyId {
-                saveStaleTimerRecovery(StaleTimerRecovery(
-                    startTime: start,
-                    propertyId: propertyId,
-                    category: timerCategory,
-                    elapsedHours: max(Date().timeIntervalSince(start), 0) / 3600.0,
-                    reason: .pausedAtSwitch,
-                    pausedAt: Date()
-                ))
-                endTimerLiveActivity(propertyId: propertyId, category: timerCategory, startDate: start, needsReview: true)
-                isTimerRunning = false
-                timerStartTime = nil
-                timerPropertyId = nil
+        if !syncService.accountAvailable { await syncService.checkAccountStatus() }
+        var deletedInICloud = false
+        if syncService.accountAvailable {
+            do {
+                try await syncService.deleteEverythingInICloud()
+                deletedInICloud = true
+            } catch is CloudKitSyncService.OtherICloudAccountError {
+                // Another account's iCloud is never touched; this iPhone's copy only when asked.
+                guard allowLocalOnly else { throw ProfileDeletionError.otherICloudAccount }
             }
-            saveTimerState()
-            if defaults.string(forKey: ProfileKeys.localProfileId) == outgoingId,
-               let name = defaults.string(forKey: ProfileKeys.localProfileName), !name.isEmpty {
-                defaults.set(name, forKey: UserScope.key(ProfileRestore.profileNameKey, userId: outgoingId))
-            }
-            defaults.set(outgoingId, forKey: ProfileKeys.previousProfileId)
+        } else if !allowLocalOnly {
+            throw ProfileDeletionError.iCloudUnavailable
         }
-        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
+        Analytics.deleteAllData(iCloud: deletedInICloud)
+        wipeEverythingLocal()
+    }
 
-        // Clear auth keys (unscoped — shared on device)
-        for key in ProfileKeys.signOutKeys {
+    /// The local half of Delete all data (also P31 "Delete here too").
+    func wipeEverythingLocal() {
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
+        deleteAttachmentFiles(for: timeEntries)
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys
+        where key.hasPrefix("u.") || key.hasPrefix(IdentityKeys.prefix) || ProfileKeys.signOutKeys.contains(key)
+            || key == ProfileKeys.previousProfileId || Self.unscopedLegacyKeys.contains(key) || key == CaptureActionQueue.key {
             defaults.removeObject(forKey: key)
         }
-        // Clear any stale unscoped legacy data to prevent leaking to next user
-        Self.clearUnscopedLegacyData()
-        // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
+        let root = MigrationFiles.defaultRoot
+        // Photos are not keyed by record set: the whole folder goes.
+        for folder in IdentityFolder.allCases {
+            try? FileManager.default.removeItem(at: root.appendingPathComponent(folder.rawValue, isDirectory: true))
+        }
+        identity.earlier.deleteEverything()
+        // A new install's record set.
+        RecordSetMigration.adoptIds(storage: IdentityZone.household, unified: IdentityZone.household, defaults: defaults)
+        RecordSetMigration.setStep(.deviceMerged, defaults)
 
-        // Reset in-memory timer state only; never persist it after the ID is gone.
+        properties = []
+        timeEntries = []
+        activeCelebration = nil
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
         timerCategory = .repairs
         staleTimerRecovery = nil
-
-        // Reset in-memory state
-        properties = []
-        timeEntries = []
-        activeCelebration = nil
-        isSignedIn = false
-        userName = ""
         EngagementWidgetSnapshotStore.save(.empty)
+        WidgetSurfaceStore.save(.empty)
         WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
-
-        // Reset singleton managers in memory
-        SubscriptionManager.shared.resetForSignOut()
-        GoalManager.shared.resetForSignOut()
-        CategoryManager.shared.resetForSignOut()
-        TaxProfileManager.shared.resetForSignOut()
-        MilestoneTracker.shared.reload()
-        AppleSignInManager.shared.signOut()
-    }
-
-    enum ProfileDeletionError: LocalizedError, Equatable {
-        /// iCloud is off/unreachable, so copies saved there can't be removed now.
-        case iCloudUnavailable
-
-        var errorDescription: String? {
-            switch self {
-            case .iCloudUnavailable:
-                return "iCloud is off, so copies saved there can't be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
-            }
-        }
-    }
-
-    /// Deletes the active profile's data (Apple: "Delete Account and Data"; local:
-    /// "Delete All Data"): iCloud records, scoped keys, attachment files and
-    /// notification keys, then signs out.
-    ///
-    /// - Parameter allowLocalOnly: when iCloud is unavailable the call throws
-    ///   `ProfileDeletionError.iCloudUnavailable` BEFORE deleting anything, unless the
-    ///   user explicitly chose "Delete from this iPhone anyway".
-    func deleteAccountAndData(allowLocalOnly: Bool = false) async throws {
-        guard let userId = UserScope.userId else {
-            signOut()
-            return
-        }
-
-        syncService.stop()
-        if !syncService.accountAvailable {
-            await syncService.checkAccountStatus()
-        }
-        if syncService.accountAvailable {
-            try await syncService.deleteCurrentUserRecords(
-                properties: properties,
-                entries: timeEntries,
-                categories: CategoryManager.shared.customCategories,
-                userId: userId
-            )
-        } else if !allowLocalOnly {
-            throw ProfileDeletionError.iCloudUnavailable
-        }
-
-        // Photo files are not keyed by user; delete the ones this profile references.
-        deleteAttachmentFiles(for: timeEntries)
-        Self.clearScopedAccountData(for: userId)
-
-        properties = []
-        timeEntries = []
-        activeCelebration = nil
-        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
-        isTimerRunning = false
-        timerStartTime = nil
-        timerPropertyId = nil
-
-        signOut(keepProfileState: false)
-        let defaults = UserDefaults.standard
-        if defaults.string(forKey: ProfileKeys.previousProfileId) == userId {
-            defaults.removeObject(forKey: ProfileKeys.previousProfileId)
-        }
+        reloadManagersForRecordSet()
+        checkSignInState()
+        identity.refresh(sync: syncService)
+        objectWillChange.send()
     }
 
     func resetCurrentUserLocalData() {
@@ -369,6 +470,7 @@ class AppViewModel: ObservableObject {
         timerCategory = .repairs
         staleTimerRecovery = nil
         EngagementWidgetSnapshotStore.save(.empty)
+        WidgetSurfaceStore.save(.empty)
         WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
 
         saveTimerState()
@@ -390,6 +492,7 @@ class AppViewModel: ObservableObject {
             GuidedOnboardingStore.completedKey,
             GuidedOnboardingStore.skippedKey,
             "globalGoalType",
+            "materialParticipationTarget",
             "propertyGoals",
             "customCategories",
             "selectedTaxYear",
@@ -408,7 +511,7 @@ class AppViewModel: ObservableObject {
             "LandlordHours.taxProfile.nonREWorkHours"
         ]
 
-        for key in Set(localDataKeys) {
+        for key in Set(localDataKeys + CaptureOptIn.allBaseKeys) {
             defaults.removeObject(forKey: UserScope.key(key))
         }
 
@@ -436,9 +539,13 @@ class AppViewModel: ObservableObject {
         "hasPurchasedPro",
         "trialStartDate",
         "globalGoalType",
+        "materialParticipationTarget",
         "propertyGoals",
         "iCloudBackupEnabled",
         "profileImageData",
+        "profile.name",
+        "profile.email",
+        "profile.userEdited",
         GuidedOnboardingStore.completedKey,
         GuidedOnboardingStore.skippedKey,
         "LandlordHours.taxProfile.filingStatus",
@@ -447,29 +554,6 @@ class AppViewModel: ObservableObject {
         "LandlordHours.taxProfile.groupingElection",
         "LandlordHours.taxProfile.nonREWorkHours",
     ]
-
-    /// One-time migration: copies unscoped data into the current user's scoped keys,
-    /// then deletes the unscoped keys so they can't leak to other users.
-    private func migrateUnscopedLegacyData() {
-        let migrationKey = UserScope.key("legacyDataMigrated")
-        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
-        guard UserScope.userId != nil else { return }
-
-        let defaults = UserDefaults.standard
-        for baseKey in Self.unscopedLegacyKeys {
-            let scopedKey = UserScope.key(baseKey)
-            // Only migrate if unscoped data exists AND scoped version doesn't
-            if defaults.object(forKey: baseKey) != nil && defaults.object(forKey: scopedKey) == nil {
-                defaults.set(defaults.object(forKey: baseKey), forKey: scopedKey)
-            }
-        }
-
-        // Mark migration as done for this user
-        defaults.set(true, forKey: migrationKey)
-
-        // Delete all unscoped legacy keys
-        Self.clearUnscopedLegacyData()
-    }
 
     /// Delete all unscoped legacy data keys. Safe to call multiple times.
     static func clearUnscopedLegacyData() {
@@ -509,8 +593,13 @@ class AppViewModel: ObservableObject {
             GuidedOnboardingStore.completedKey,
             GuidedOnboardingStore.skippedKey,
             "LandlordHours.timer",
-            ProfileRestore.profileNameKey
-        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
+            PendingCelebrationQueue.baseKey,
+            HouseCelebrationLedger.celebratedBaseKey,
+            HouseCelebrationLedger.pendingBaseKey,
+            HouseCelebrationLedger.backfillShownBaseKey,
+            "profile.displayName",
+            CapturePromptConsent.baseKey
+        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys
 
         for key in Set(baseKeys) {
             defaults.removeObject(forKey: UserScope.key(key, userId: userId))
@@ -523,8 +612,33 @@ class AppViewModel: ObservableObject {
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(notificationPrefix) {
             defaults.removeObject(forKey: key)
         }
+
+        // 2.0 capture inbox (local only): the profile's suggestions, dismissed keys, mute rules.
+        SuggestionStore.removeAll(forUserId: userId)
+        // Sync push baselines and delete tombstones (local-only and iCloud deletes alike).
+        SyncChangeTracker.removeAll(forUserId: userId)
     }
-    
+
+    // MARK: - Event-ended prompts (opt-in, per profile)
+
+    /// Whether this profile opted in to end-of-event notifications. Off by default, including
+    /// for profiles upgraded from 1.x. The inbox opt-in screens set it; changing it rebuilds
+    /// (or clears) the schedule right away.
+    var eventPromptsEnabled: Bool {
+        get {
+            guard let userId = UserScope.userId else { return false }
+            return CapturePromptConsent.isEnabled(profileId: userId)
+        }
+        set {
+            guard let userId = UserScope.userId else { return }
+            CapturePromptConsent.set(newValue, profileId: userId)
+            objectWillChange.send()
+            Task { @MainActor in
+                await CaptureNotificationRefresher.shared.refresh(reason: newValue ? "opt-in" : "opt-out")
+            }
+        }
+    }
+
     // MARK: - Sync Now (manual trigger for Settings)
     func syncNow() {
         Task { await syncService.syncNow() }
@@ -532,8 +646,7 @@ class AppViewModel: ObservableObject {
 
     // MARK: - Subscription Features
     func canAddProperty() -> Bool {
-        if SubscriptionManager.shared.isPro { return true }
-        return properties.count < 1
+        ProGate.canAddProperty(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
     }
     
     func canAddTimeEntry() -> Bool {
@@ -545,7 +658,7 @@ class AppViewModel: ObservableObject {
     }
     
     func canExportPDF() -> Bool {
-        return SubscriptionManager.shared.isPro
+        !ProGate.isExportLocked(isPro: SubscriptionManager.shared.isPro)
     }
 
     /// Called after the user actually shares an export (the share sheet reported completion).
@@ -573,7 +686,10 @@ class AppViewModel: ObservableObject {
         let property = RentalProperty(name: name, address: address, propertyType: type)
         properties.append(property)
         saveData()
-        triggerCelebration(.propertyAdded)
+        // 2.0: a toast, not the 1.x full-screen confetti (CelebrationType.propertyAdded is retired).
+        if !suppressCelebrations && persistenceError == nil {
+            LHToastCenter.shared.show(.success, "Added \(property.name)")
+        }
         Analytics.propertyAdded()
     }
     
@@ -596,7 +712,8 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: removedEntries)
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
-        Task { await syncService.deletePropertyFromCloud(property) }
+        // Tombstones the property AND its entries; the next push sends the deletes.
+        syncService.deletePropertyFromCloud(property, cascadedEntries: removedEntries)
     }
     
     // MARK: - Time Entry Management
@@ -610,6 +727,7 @@ class AppViewModel: ObservableObject {
         attachments: [TimeAttachment] = [],
         source: EntrySource = .manual
     ) {
+        let houseHoursBefore = houseCountableHours()
         let entry = TimeEntry(
             propertyId: propertyId,
             participant: participant,
@@ -622,12 +740,93 @@ class AppViewModel: ObservableObject {
         )
         timeEntries.append(entry)
         saveData()
-        checkHourMilestones()
+        reportHouseSave(previousHours: houseHoursBefore)
         Analytics.sessionLogged(category: category, participant: participant)
         Analytics.entryLogged(source: source)
         RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
     }
     
+    /// The Log time sheet's save. Unlike `addTimeEntry`, it reports a failed write: the entry is
+    /// taken back out (nothing half-saved), `persistenceError` is set, and the sheet stays open
+    /// with the reason. On success it runs the same house, analytics and iCloud path.
+    @discardableResult
+    func logTimeEntry(
+        propertyId: UUID,
+        participant: Participant,
+        category: ActivityCategory,
+        hours: Double,
+        date: Date,
+        notes: String,
+        attachments: [TimeAttachment] = [],
+        source: EntrySource = .manual,
+        recordDescription: String? = nil
+    ) -> LogSaveResult {
+        guard properties.contains(where: { $0.id == propertyId }) else {
+            return .failed(LogSaveResult.missingPropertyMessage)
+        }
+        guard hours > 0 else { return .failed(LogSaveResult.missingHoursMessage) }
+        let houseHoursBefore = houseCountableHours()
+        let entry = TimeEntry(
+            propertyId: propertyId,
+            participant: participant,
+            category: category,
+            hours: min(hours, 24),
+            date: date,
+            notes: notes,
+            attachments: attachments,
+            importSource: source.storedValue,
+            recordDescription: recordDescription
+        )
+        timeEntries.append(entry)
+        guard writePersistentStore() else {
+            timeEntries.removeAll { $0.id == entry.id }
+            return .failed(LogSaveResult.writeFailedMessage)
+        }
+        refreshWidgetSnapshot()
+        syncService.schedulePush()
+        reportHouseSave(previousHours: houseHoursBefore)
+        Analytics.sessionLogged(category: category, participant: participant)
+        Analytics.entryLogged(source: source)
+        RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
+        return .saved(entry.id)
+    }
+
+    /// The first-run Log sheet's save: the rental (name only, long-term, no address) and the entry
+    /// land together or not at all. A failed write takes both back out. The free plan's one-rental
+    /// limit is checked here too, so a second path can never slip a rental past it.
+    @discardableResult
+    func logFirstEntry(
+        propertyName: String,
+        participant: Participant,
+        category: ActivityCategory,
+        hours: Double,
+        date: Date,
+        notes: String,
+        attachments: [TimeAttachment] = [],
+        source: EntrySource = .manual,
+        recordDescription: String? = nil
+    ) -> LogSaveResult {
+        let draft = FirstPropertyDraft(name: propertyName)
+        guard draft.isValid else { return .failed(LogSaveResult.missingNameMessage) }
+        guard canAddProperty() else { return .failed(LogSaveResult.missingPropertyMessage) }
+        let property = draft.makeProperty()
+        properties.append(property)
+        let result = logTimeEntry(propertyId: property.id, participant: participant, category: category, hours: hours,
+                                  date: date, notes: notes, attachments: attachments, source: source,
+                                  recordDescription: recordDescription)
+        guard result.entryId != nil else {
+            properties.removeAll { $0.id == property.id }
+            return result
+        }
+        Analytics.propertyAdded()
+        return result
+    }
+
+#if DEBUG
+    /// DEBUG: the next persistent write fails (unit tests and the `-LHFailNextSave` capture).
+    static var debugFailNextWrite = false
+#endif
+
     func updateTimeEntry(_ entry: TimeEntry) {
         if let index = timeEntries.firstIndex(where: { $0.id == entry.id }) {
             timeEntries[index] = entry
@@ -639,7 +838,7 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: [entry])
         timeEntries.removeAll { $0.id == entry.id }
         saveData()
-        Task { await syncService.deleteEntryFromCloud(entry) }
+        syncService.deleteEntryFromCloud(entry)
     }
 
     /// Remove the on-disk attachment files backing the given entries. Safe to call
@@ -652,11 +851,16 @@ class AppViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Calendar Import
+    // MARK: - Calendar Import (1.x)
+    /// The 1.x bulk calendar import, unchanged. 2.0 has no UI that calls it (calendar work is
+    /// confirmed one suggestion at a time in the Inbox); it stays because 1.1 devices still run
+    /// this exact code, and the 1.1-compatibility tests (CaptureFlowTests, CalendarDetectorTests)
+    /// replay it to prove a 2.0 confirm is skipped by a 1.1 import.
     func importCalendarEntries(_ detectedEntries: [DetectedCalendarEntry]) -> Int {
         guard !properties.isEmpty else { return 0 }
         let validPropertyIds = Set(properties.map(\.id))
         let selected = detectedEntries.filter { $0.isSelected }
+        let houseHoursBefore = houseCountableHours()
         var importedCount = 0
         for detected in selected {
             guard let propertyId = detected.propertyId,
@@ -686,7 +890,7 @@ class AppViewModel: ObservableObject {
         }
         if importedCount > 0 {
             saveData()
-            checkHourMilestones()
+            reportHouseSave(previousHours: houseHoursBefore)
         }
         return importedCount
     }
@@ -769,6 +973,17 @@ class AppViewModel: ObservableObject {
         saveTimerState()
     }
 
+    /// Puts a discarded running timer back exactly as it was (the "Timer discarded · Undo" toast).
+    func restoreTimer(propertyId: UUID, category: ActivityCategory, startTime: Date) {
+        guard !isTimerRunning, properties.contains(where: { $0.id == propertyId }) else { return }
+        isTimerRunning = true
+        timerStartTime = startTime
+        timerPropertyId = propertyId
+        timerCategory = category
+        saveTimerState()
+        startOrUpdateTimerLiveActivity()
+    }
+
     /// Saves ONE timer draft as an entry. Pass the id of the draft the user is looking at:
     /// if it was already saved/discarded (a double tap), nothing happens — the next draft is
     /// never saved unseen.
@@ -838,38 +1053,25 @@ class AppViewModel: ObservableObject {
         let tracker = MilestoneTracker.shared
         guard tracker.shouldCelebrate(type, year: year) else { return }
         tracker.markCelebrated(type, year: year)
-        activeCelebration = type
-    }
-
-    private func checkHourMilestones() {
-        let year = Calendar.current.component(.year, from: Date())
-        let goalType = GoalManager.shared.globalGoalType
-        let status: (hours: Double, isMet: Bool)
-
-        switch goalType {
-        case .reps, .both:
-            let reps = repsStatus(participant: .selfParticipant, year: year)
-            status = (reps.realEstateHours, reps.isQualified)
-        case .str:
-            let material = materialParticipationOverview(year: year)
-            status = (material.ownerAndSpouseHours, material.isMateriallyParticipating)
-        }
-
-        // Check goal met first (highest priority)
-        if status.isMet {
-            triggerCelebration(.goalMet)
-            return
-        }
-
-        // Check hour milestones: 10, 50, 100, 250, 500
-        let milestones: [Int] = [500, 250, 100, 50, 10]
-        for milestone in milestones {
-            if status.hours >= Double(milestone) {
-                triggerCelebration(.hoursLogged(milestone: milestone))
-                return
-            }
+        if queuesCelebrations {
+            PendingCelebrationQueue.enqueue(type)
+        } else {
+            activeCelebration = type
         }
     }
+
+    /// Shows the oldest queued celebration (crossed while in the background), if nothing else
+    /// is showing. Called when a scene becomes active.
+    func presentPendingCelebrationIfAny() {
+        guard activeCelebration == nil, !suppressCelebrations else { return }
+        if let next = PendingCelebrationQueue.dequeue() {
+            activeCelebration = next
+        }
+    }
+
+    // 2.0: saving hours no longer triggers the 1.x confetti overlay (hoursLogged / goalMet).
+    // The Blueprint house is the only reward on a save: the confirm build on Today and, at
+    // 100 / 500 / 750 / the goal, MilestoneCelebrationView once (TodayHouseEvents).
 
     // MARK: - REPS Calculations
     func entriesForYear(_ year: Int) -> [TimeEntry] {
@@ -926,10 +1128,11 @@ class AppViewModel: ObservableObject {
 
     func materialParticipationStatus(
         year: Int,
-        propertyId: UUID? = nil
+        propertyId: UUID? = nil,
+        includeSpouse: Bool = true
     ) -> TaxQualificationEngine.MaterialParticipationResult {
         TaxQualificationEngine.materialParticipationStatus(
-            entries: timeEntries,
+            entries: includeSpouse ? timeEntries : timeEntries.filter { $0.participant == .selfParticipant },
             year: year,
             propertyId: propertyId,
             groupingElection: TaxProfileManager.shared.groupingElection,
@@ -937,9 +1140,11 @@ class AppViewModel: ObservableObject {
         )
     }
 
-    func materialParticipationOverview(year: Int) -> TaxQualificationEngine.MaterialParticipationResult {
+    /// `includeSpouse: false` leaves spouse entries out (the house when spouse hours are not
+    /// tracked jointly); every other caller keeps the owner + spouse total.
+    func materialParticipationOverview(year: Int, includeSpouse: Bool = true) -> TaxQualificationEngine.MaterialParticipationResult {
         TaxQualificationEngine.materialParticipationOverview(
-            entries: timeEntries,
+            entries: includeSpouse ? timeEntries : timeEntries.filter { $0.participant == .selfParticipant },
             properties: properties,
             year: year,
             groupingElection: TaxProfileManager.shared.groupingElection,
@@ -956,12 +1161,17 @@ class AppViewModel: ObservableObject {
 
     private static let persistenceLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Persistence")
 
-    private static let saveFailureMessage =
-        "Couldn't save your latest changes — free up space and try again."
-    private static let loadFailureMessage =
-        "Couldn't open your saved records. They're still on your device — reopen the app, and contact support if this keeps happening."
+    /// Shown in the one toast with "Retry" (copy sheet §6).
+    static let saveFailureMessage = "Couldn’t save your last change. Your iPhone may be out of space."
+    /// Shown in the one toast with "Help" (opens Get help).
+    static let loadFailureMessage = "Couldn’t open your records. They’re still safe on this iPhone."
 
-    private func saveData() {
+    /// The toast's "Retry": writes everything again (clears the error on success).
+    func retrySave() {
+        saveData()
+    }
+
+    func saveData() {
         writePersistentStore()
         refreshWidgetSnapshot()
         // Trigger debounced cloud push
@@ -974,6 +1184,12 @@ class AppViewModel: ObservableObject {
     @discardableResult
     private func writePersistentStore() -> Bool {
         do {
+#if DEBUG
+            if Self.debugFailNextWrite {
+                Self.debugFailNextWrite = false
+                throw CocoaError(.fileWriteOutOfSpace)
+            }
+#endif
             // Write attachment files first so the encoded blob never carries photo
             // bytes and files are verified before any inline copy is dropped.
             try persistPendingAttachments()
@@ -1063,25 +1279,41 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    /// The one engagement context the widget and Siri read. Same counting rules as Today's
+    /// house: REPS is your hours alone; material participation adds a spouse only when Tax
+    /// Profile "Spouse hours" is on.
+    func engagementContext(
+        now: Date = Date(),
+        taxYear: Int? = nil,
+        isTimerRunning timerRunning: Bool? = nil,
+        timerStartTime timerStart: Date? = nil
+    ) -> EngagementContext {
+        let goal = GoalManager.shared.globalGoalType
+        let choice = GoalManager.shared.goalChoice
+        return EngagementContext(
+            now: now,
+            taxYear: taxYear ?? Calendar.current.component(.year, from: now),
+            properties: properties,
+            timeEntries: timeEntries,
+            calendarDraftCount: 0,
+            isTimerRunning: timerRunning ?? isTimerRunning,
+            timerStartTime: timerRunning == nil ? timerStartTime : timerStart,
+            notificationPermission: .notDetermined,
+            recentDismissals: [],
+            isProUser: SubscriptionManager.shared.isPro,
+            // MP 500 measures against 500 (its HourGoalType stays `.str` for 1.x compatibility).
+            targetHours: choice.targetHours,
+            goalType: goal,
+            groupingElection: TaxProfileManager.shared.groupingElection,
+            includeSpouse: tracksSpouseJointly
+        )
+    }
+
     private func refreshWidgetSnapshot() {
         let now = Date()
         let taxYear = Calendar.current.component(.year, from: now)
         let widgetGoal = widgetGoalContext()
-        let context = EngagementContext(
-            now: now,
-            taxYear: taxYear,
-            properties: properties,
-            timeEntries: timeEntries,
-            calendarDraftCount: 0,
-            isTimerRunning: isTimerRunning,
-            timerStartTime: timerStartTime,
-            notificationPermission: .notDetermined,
-            recentDismissals: [],
-            isProUser: SubscriptionManager.shared.isPro,
-            targetHours: widgetGoal.targetHours,
-            goalType: GoalManager.shared.globalGoalType,
-            groupingElection: TaxProfileManager.shared.groupingElection
-        )
+        let context = engagementContext(now: now, taxYear: taxYear)
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
         EngagementWidgetSnapshotStore.save(
@@ -1105,18 +1337,14 @@ class AppViewModel: ObservableObject {
                 recommendationMessage: recommendation.message
             )
         )
-        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
+        // 2.0 surfaces: the widget draws WidgetSurfaceSnapshot (and reloads the same kind).
+        refreshWidgetSurface(now: now)
     }
 
     private func widgetGoalContext() -> (targetHours: Double, label: String, shortLabel: String) {
-        let goal = GoalManager.shared.globalGoalType
-        let hours = goal.hoursRequired
-        let short = "\(Int(hours))h"
-        switch goal {
-        case .reps: return (hours, "\(short) REPS", short)
-        case .str: return (hours, "\(short) STR", short)
-        case .both: return (hours, "\(short) REPS + STR", short)
-        }
+        let choice = GoalManager.shared.goalChoice
+        let labels = choice.widgetLabels
+        return (choice.targetHours, labels.0, labels.1)
     }
     
     private func saveTimerState() {
@@ -1450,6 +1678,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidReceiveEntries(_ remoteEntries: [TimeEntry]) {
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
         for remote in remoteEntries {
             if let idx = timeEntries.firstIndex(where: { $0.id == remote.id }) {
                 if remote.modifiedAt > timeEntries[idx].modifiedAt {
@@ -1469,6 +1699,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidDeleteEntryIds(_ ids: Set<UUID>) {
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
         timeEntries.removeAll { ids.contains($0.id) }
         saveDataLocal()
     }
@@ -1487,9 +1719,11 @@ extension AppViewModel: CloudKitSyncDelegate {
         mgr.saveCategories()
     }
 
-    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal]) {
+    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal], materialParticipationTarget: Int?) {
         let mgr = GoalManager.shared
         mgr.globalGoalType = globalGoalType
+        // nil: a record from a device before 2.0 says nothing about the target; keep ours.
+        if let materialParticipationTarget { mgr.applyMaterialParticipationTarget(materialParticipationTarget) }
         mgr.propertyGoals = propertyGoals
         mgr.saveGoals()
     }
@@ -1565,13 +1799,10 @@ extension AppViewModel: CloudKitSyncDelegate {
         Self.clearScopedAccountData(for: userId)
 
         let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: ProfileKeys.emailUserId)
-        defaults.removeObject(forKey: ProfileKeys.emailUserName)
-        defaults.removeObject(forKey: ProfileKeys.emailUserEmail)
-        defaults.set(userId, forKey: ProfileKeys.localProfileId)
-        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: ProfileKeys.localProfileEmail)
-        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: ProfileKeys.localProfileName)
-        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        // An isolated DEBUG scope (`u.debug-<scenario>.`), never the person's `v2.` record set.
+        defaults.set(userId, forKey: IdentityScope.debugScopeKey)
+        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: "u.\(userId).profile.name")
+        reloadManagersForRecordSet()
 
         isSignedIn = true
         userName = Self.launchMockName(defaultValue: scenario.userName)
@@ -1605,6 +1836,8 @@ extension AppViewModel: CloudKitSyncDelegate {
         let goalManager = GoalManager.shared
         goalManager.propertyGoals = []
         goalManager.globalGoalType = scenario == .occasional ? .str : .reps
+        goalManager.setGoalSetup(rental: nil, pro: nil)          // a mock launch starts with no onboarding answers
+        TaxProfileManager.shared.setNoOneParticipatedMore(nil, forYear: Calendar.current.component(.year, from: Date()))
 
         switch scenario {
         case .firstTime:
@@ -1648,6 +1881,11 @@ extension AppViewModel: CloudKitSyncDelegate {
         defaults.synchronize()
 
         suppressCelebrations = false
+        TodayHouseEvents.shared.resetInMemoryState()
+        #if DEBUG
+        applyTodayHoursSeedIfNeeded()
+        applyPropertiesSeedIfNeeded()
+        #endif
     }
 
     /// A small solid image used only by the `-LHSeedAttachment` journey hook.
@@ -1796,4 +2034,111 @@ extension AppViewModel: CloudKitSyncDelegate {
         return Calendar.current.date(byAdding: .day, value: -daysAgo, to: base) ?? Date()
     }
 #endif
+}
+
+// MARK: - The live record set (package K's engine reads and writes through here)
+
+extension AppViewModel: LiveRecordSet {
+    var liveEntries: [TimeEntry] { timeEntries }
+    var liveProperties: [RentalProperty] { properties }
+    var liveCategories: [CustomCategory] { CategoryManager.shared.customCategories }
+
+    func replaceLive(entries: [TimeEntry], properties newProperties: [RentalProperty], categories: [CustomCategory]) {
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
+        properties = newProperties
+        timeEntries = entries
+        writePersistentStore()
+        let manager = CategoryManager.shared
+        if manager.customCategories.map(\.id) != categories.map(\.id) || manager.customCategories.map(\.modifiedAt) != categories.map(\.modifiedAt) {
+            manager.customCategories = categories
+            manager.saveCategories()
+        }
+        refreshWidgetSnapshot()
+        identity.hasSavedEntry = !timeEntries.isEmpty
+    }
+
+    var goalSettings: GoalSettingsValues {
+        let gm = GoalManager.shared
+        let json = (try? JSONEncoder().encode(gm.propertyGoals)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let mp = gm.materialParticipationTarget
+        return GoalSettingsValues(globalGoalType: gm.globalGoalType.rawValue, materialParticipationTarget: mp == 0 ? nil : mp, propertyGoalsJSON: json)
+    }
+
+    var taxProfile: TaxProfileValues {
+        let tp = TaxProfileManager.shared
+        return TaxProfileValues(filingStatus: tp.filingStatus.rawValue, spouseTracking: tp.spouseTracking, taxYear: tp.taxYear,
+                                groupingElection: tp.groupingElection, nonREWorkHours: tp.nonREWorkHours,
+                                displayName: UserDefaults.standard.string(forKey: IdentityKeys.displayName))
+    }
+
+    func applyRemoteSettings(goal: GoalSettingsValues?, tax: TaxProfileValues?) {
+        isApplyingRemoteSettings = true
+        defer { isApplyingRemoteSettings = false }
+        if let goal {
+            let gm = GoalManager.shared
+            gm.globalGoalType = HourGoalType(rawValue: goal.globalGoalType) ?? .reps
+            if let mp = goal.materialParticipationTarget { gm.applyMaterialParticipationTarget(mp) }
+            gm.propertyGoals = goal.propertyGoals
+            gm.saveGoals()
+        }
+        if let tax {
+            let tp = TaxProfileManager.shared
+            if let status = FilingStatus(rawValue: tax.filingStatus) { tp.filingStatus = status }
+            tp.spouseTracking = tax.spouseTracking
+            tp.taxYear = tax.taxYear
+            tp.groupingElection = tax.groupingElection
+            tp.nonREWorkHours = tax.nonREWorkHours
+            if let name = tax.displayName, !name.isEmpty {
+                UserDefaults.standard.set(name, forKey: IdentityKeys.displayName)
+                userName = name
+            }
+        }
+    }
+}
+
+// MARK: - The person's answers (package K); each one pushes what changed
+
+extension AppViewModel {
+    func answerTwoSets(_ answer: TwoSetsAnswer, group id: String) {
+        identity.answer(answer, group: id)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func putBack(_ names: Set<String>) {
+        identity.putBack(names)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func answerBulk(_ answer: BulkAnswer) {
+        identity.answerBulk(answer)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func answerZoneGone(_ answer: ZoneGoneAnswer) async {
+        guard let engine = identity.engine else { return }
+        _ = await engine.answerZoneGone(answer)
+        if answer == .deleteHere { wipeEverythingLocal() }
+        reloadAfterIdentityChange()
+    }
+
+    func answerAccountChanged(_ answer: AccountChangedAnswer) async {
+        guard let engine = identity.engine else { return }
+        _ = await engine.answerAccountChanged(answer)
+        identity.accountChangedDeferred = false
+        reloadAfterIdentityChange()
+        if answer != .later { await syncService.start() }
+    }
+}
+
+extension AppViewModel {
+    /// Welcome's "Continue" (P2): the records arrived from an earlier version, so setup is done.
+    func completeOnboardingWithEarlierRecords() {
+        UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
+        CaptureOptIn.markWhatsNewSeen()
+        objectWillChange.send()
+    }
 }

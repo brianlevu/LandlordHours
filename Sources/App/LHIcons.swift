@@ -1010,37 +1010,6 @@ struct LHCircleBadge: View {
     }
 }
 
-// MARK: - Tab Bar Icon
-struct LHTabIcon: View {
-    let icon: LHIcon
-    let label: String
-    var isSelected: Bool = false
-
-    @Environment(\.colorScheme) var colorScheme
-
-    var body: some View {
-        VStack(spacing: 2) {
-            ZStack {
-                if isSelected {
-                    Circle()
-                        .fill(AppColors.primary.opacity(0.12))
-                        .frame(width: 36, height: 36)
-                }
-
-                LHIconView(
-                    icon: icon,
-                    size: 22,
-                    color: isSelected ? AppColors.primary : (colorScheme == .dark ? Color.gray : AppColors.textTertiary)
-                )
-            }
-
-            Text(label)
-                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? AppColors.primary : (colorScheme == .dark ? Color.gray : AppColors.textTertiary))
-        }
-    }
-}
-
 // MARK: - SF Symbol to LHIcon Mapping
 extension LHIcon {
     /// Map SF Symbol names to LHIcon cases for backward compatibility
@@ -1127,8 +1096,9 @@ extension LHIcon {
         return mapping[sfSymbol]
     }
 
-    /// Get the SF Symbol name this icon replaces (for use in tab items)
-    @available(iOS 16.0, *)
+
+    /// The icon rendered as a template image. Kept only for the HomeProto DEBUG mock (package C
+    /// deletes it with the mocks); the shell's tabs are SF Symbols (§1.25).
     @MainActor var tabItemImage: Image {
         let renderer = ImageRenderer(content:
             LHIconShape(icon: self)
@@ -1253,13 +1223,6 @@ extension LHIcon {
             LHIconBadge(icon: .renovations, bgColor: Color(hex: "EF4444"), size: 48)
         }
 
-        HStack(spacing: 24) {
-            LHTabIcon(icon: .home, label: "Home", isSelected: true)
-            LHTabIcon(icon: .properties, label: "Properties")
-            LHTabIcon(icon: .track, label: "Track")
-            LHTabIcon(icon: .reports, label: "Reports")
-            LHTabIcon(icon: .settings, label: "Settings")
-        }
     }
     .padding()
 }

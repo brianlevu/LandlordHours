@@ -9,6 +9,10 @@ final class VoiceEntryService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var transcript = ""
     @Published private(set) var errorMessage: String?
+    /// Speech or microphone access was refused. Log time dims the mic and offers Settings.
+    @Published private(set) var permissionDenied = false
+    /// 0...1, the input level while listening (drives the mic ring; 0 in silence).
+    @Published private(set) var inputLevel: Double = 0
 
     private let audioEngine = AVAudioEngine()
     private let speechRecognizer = SFSpeechRecognizer()
@@ -80,6 +84,7 @@ final class VoiceEntryService: NSObject, ObservableObject {
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         isRecording = false
+        inputLevel = 0
 
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
@@ -90,7 +95,35 @@ final class VoiceEntryService: NSObject, ObservableObject {
         isRecording = false
     }
 
+    /// True before the first ask: Log time shows its one-line voice intro first.
+    var needsPermissionPrompt: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHVoiceDenied") { return false }
+        if ProcessInfo.processInfo.arguments.contains("-LHVoiceFirstUse") { return true }
+        #endif
+        return SFSpeechRecognizer.authorizationStatus() == .notDetermined
+            || AVAudioApplication.shared.recordPermission == .undetermined
+    }
+
+    /// Reads the current permission state without asking (on sheet open).
+    func refreshPermissionState() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHVoiceDenied") { permissionDenied = true; return }
+        #endif
+        let speech = SFSpeechRecognizer.authorizationStatus()
+        let mic = AVAudioApplication.shared.recordPermission
+        permissionDenied = speech == .denied || speech == .restricted || mic == .denied
+    }
+
     private func requestPermissions() async -> Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHVoiceDenied") {
+            permissionDenied = true
+            errorMessage = "Allow microphone access to dictate time entries."
+            return false
+        }
+        #endif
+        defer { refreshPermissionState() }
         let speechAllowed = await requestSpeechAuthorization()
         guard speechAllowed else {
             errorMessage = "Allow speech recognition to dictate time entries."
@@ -133,12 +166,24 @@ final class VoiceEntryService: NSObject, ObservableObject {
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             request.append(buffer)
+            let level = Self.level(of: buffer)
+            Task { @MainActor in self?.inputLevel = level }
         }
 
         audioEngine.prepare()
         try audioEngine.start()
+    }
+
+    /// RMS of the buffer mapped to 0...1 (-50 dB → 0, -10 dB → 1).
+    nonisolated private static func level(of buffer: AVAudioPCMBuffer) -> Double {
+        guard let data = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return 0 }
+        var sum: Float = 0
+        for i in 0..<Int(buffer.frameLength) { sum += data[i] * data[i] }
+        let rms = sqrt(sum / Float(buffer.frameLength))
+        let db = 20 * log10(max(rms, 0.000_01))
+        return Double(min(max((db + 50) / 40, 0), 1))
     }
 
     private func resetRecognition(cancelTask: Bool) {

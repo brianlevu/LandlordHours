@@ -1,0 +1,220 @@
+import Foundation
+
+// MARK: - The person's answers: two sets, aside, put back, bulk, zone gone, account
+//
+// Every answer is recorded in groups.json before any merge write (§3.3), and every one can be
+// walked back: combine → the backup; aside → "Add to my records"; removed → Put back.
+// ("These are my spouse's hours" is held out of 2.2.)
+
+enum TwoSetsAnswer: String, Codable {
+    case combine
+    case aside
+}
+
+enum BulkAnswer: String { case keep, remove }
+enum ZoneGoneAnswer: String { case keepAndRestore, deleteHere }
+enum AccountChangedAnswer: String { case keepWithThisICloud, useThisICloud, later }
+
+extension RecordSetMigration {
+
+    private func updateGroup(_ id: String, _ change: (inout GroupRecord) -> Void) {
+        var file = GroupsFile.load(root: root) ?? GroupsFile(createdAt: now(), primaryId: storageId, groups: [])
+        var record = file.group(id) ?? GroupRecord(id: id, status: .pending, source: .device, entryCount: 0, propertyCount: 0, hours: 0, lastEntryDate: nil)
+        change(&record)
+        file.upsert(record)
+        try? file.save(root: root)
+    }
+
+    /// P4: the answer for one held group.
+    func answer(_ answer: TwoSetsAnswer, group id: String) {
+        earlier.reload()
+        guard let live, let group = earlier.group(id) else { return }
+        let at = now()
+        // The answer is written first; a crash after this re-applies the same merge.
+        updateGroup(id) { r in
+            r.answeredAt = at
+            switch answer {
+            case .combine: r.status = .combine
+            case .aside: r.status = .aside
+            }
+        }
+        Analytics.mergeQuestionAnswered(answer.rawValue)
+        if defaults.string(forKey: IdentityKeys.householdHeldFor) == id {
+            // The set that owns the household pair is answered: settings precedence first, then
+            // the held push can go.
+            releaseHousehold()
+            if answer == .combine {
+                // One set now: it takes the household's id, so every phone keeps one set.
+                defaults.set(id, forKey: IdentityKeys.unifiedId)
+                defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
+            }
+            // Aside: this phone's set keeps its own id and takes the household pair.
+        }
+        switch answer {
+        case .aside:
+            try? earlier.setStatus(.aside, for: id)
+        case .combine:
+            let e = MergeRules.unionReporting(live.liveEntries, group.entries)
+            let p = MergeRules.unionReporting(live.liveProperties, group.properties)
+            let c = MergeRules.unionReporting(live.liveCategories, group.categories)
+            let deduped = MergeRules.dedupeBySourceKey(e.merged)
+            writeLosers(e.losers.map(\.ledgerVersion) + p.losers.map(\.ledgerVersion) + c.losers.map(\.ledgerVersion)
+                        + deduped.losers.map(\.ledgerVersion), tag: "answer-\(id)")
+            live.replaceLive(entries: deduped.merged, properties: p.merged, categories: c.merged)
+            // The set's capture inbox, pending deletes and queued "Log it" taps join the live ones (U33/U34/U36).
+            Self.mergeCaptureFiles(from: [id], into: storageId, root: root)
+            if let contents = Self.trackerContents(id, root: root), let deletes = contents.pendingDeletes, !deletes.isEmpty {
+                tracker.addTombstones(deletes)
+            }
+            Self.rekeyQueuedActions(from: [id], to: storageId, defaults: defaults)
+            earlier.removeGroup(id)
+            // The combined records have no baseline under the unified id: the next push sends them.
+        }
+        onChange?()
+    }
+
+    /// "Add to my records" for an aside group: it goes back to the question (R10).
+    func reconsider(group id: String) {
+        try? earlier.setStatus(.pending, for: id)
+        updateGroup(id) { $0.status = .pending }
+        onChange?()
+    }
+
+    /// P19: delete one earlier group from iCloud and this iPhone. Can't be undone.
+    func deleteGroup(_ id: String) async {
+        guard let group = earlier.group(id) else { return }
+        let names = group.entries.map { $0.id.uuidString } + group.properties.map { $0.id.uuidString }
+            + group.categories.map { $0.id.uuidString } + group.unparsedRecords.map(\.recordName)
+        // The delete is queued like any other (tombstones + R11), so it reaches iCloud even when
+        // made offline, and a copy pulled meanwhile can't bring the group back as a new question.
+        var hashes: [String: String] = [:]
+        for e in group.entries { hashes[e.id.uuidString] = RecordLedger.version(e).hash }
+        for p in group.properties { hashes[p.id.uuidString] = RecordLedger.version(p).hash }
+        for c in group.categories { hashes[c.id.uuidString] = RecordLedger.version(c).hash }
+        tracker.addTombstones(names)
+        noteDeleted(Set(names), hashes: hashes)
+        if !names.isEmpty, await source.accountState() == .available, await confirmAccount() == .same {
+            let report = await source.push([], deletes: names)
+            tracker.clearTombstones(Array(report.deletedNames))
+        }
+        earlier.removeGroup(id)
+        updateGroup(id) { $0.status = .notNeeded; $0.entryCount = 0; $0.propertyCount = 0; $0.hours = 0 }
+        onChange?()
+    }
+
+    /// P18 "Put back": the records return to the live set and are pushed as new. Putting back is
+    /// an edit: each copy gets a new version (stamped, always later than the deleted one), so the
+    /// phones that saw the delete take it back (R11 ignores only the deleted version itself, with
+    /// no clock comparison between phones).
+    func putBack(_ names: Set<String>) {
+        guard let live else { return }
+        let taken = earlier.takeRemoved(names)
+        guard !taken.isEmpty else { return }
+        let at = now()
+        func stamped<T: IdentityRecord>(_ records: [T], _ stamp: (inout T) -> Void) -> [T] {
+            records.map { var r = $0; stamp(&r); return r }
+        }
+        let entries = stamped(taken.compactMap(\.entry)) { $0.modifiedAt = max($0.modifiedAt.addingTimeInterval(0.001), at) }
+        let properties = stamped(taken.compactMap(\.property)) { $0.modifiedAt = max($0.modifiedAt.addingTimeInterval(0.001), at) }
+        let categories = stamped(taken.compactMap(\.category)) { $0.modifiedAt = max($0.modifiedAt.addingTimeInterval(0.001), at) }
+        live.replaceLive(entries: MergeRules.union(live.liveEntries, entries),
+                         properties: MergeRules.union(live.liveProperties, properties),
+                         categories: MergeRules.union(live.liveCategories, categories))
+        forgetDeleted(names)
+        tracker.forget(recordNames: Array(names))
+        tracker.cancelTombstones(for: names)
+        onChange?()
+    }
+
+    /// P28: keep (push as new) or remove (Recently removed, kept until the person acts).
+    func answerBulk(_ answer: BulkAnswer) {
+        guard let live, let hold = earlier.bulkHold else { return }
+        switch answer {
+        case .keep:
+            tracker.forget(recordNames: Array(hold.names))
+            Analytics.bulkAnswered(kept: true, count: hold.names.count)
+        case .remove:
+            let at = now()
+            let entries = live.liveEntries, properties = live.liveProperties, categories = live.liveCategories
+            let removed = entries.filter { hold.names.contains($0.id.uuidString) }.map { RemovedRecord(name: $0.id.uuidString, reason: .bulkRemoved, removedAt: at, keepUntil: nil, entry: $0) }
+                + properties.filter { hold.names.contains($0.id.uuidString) }.map { RemovedRecord(name: $0.id.uuidString, reason: .bulkRemoved, removedAt: at, keepUntil: nil, property: $0) }
+                + categories.filter { hold.names.contains($0.id.uuidString) }.map { RemovedRecord(name: $0.id.uuidString, reason: .bulkRemoved, removedAt: at, keepUntil: nil, category: $0) }
+            earlier.remove(removed)
+            live.replaceLive(entries: entries.filter { !hold.names.contains($0.id.uuidString) },
+                             properties: properties.filter { !hold.names.contains($0.id.uuidString) },
+                             categories: categories.filter { !hold.names.contains($0.id.uuidString) })
+            if hold.fromPulledDeletes { noteDeleted(hold.names) }
+            tracker.forget(recordNames: Array(hold.names))
+            Analytics.bulkAnswered(kept: false, count: hold.names.count)
+        }
+        earlier.setBulkHold(nil)
+        onChange?()
+    }
+
+    /// P31: the zone was deleted on another device.
+    func answerZoneGone(_ answer: ZoneGoneAnswer) async -> Bool {
+        Analytics.zoneGoneAnswered(answer.rawValue)
+        switch answer {
+        case .keepAndRestore:
+            // Restore only into the account this phone's set came from.
+            guard await confirmAccount() == .same else { onChange?(); return false }
+            defaults.removeObject(forKey: IdentityKeys.zoneGone)
+            IdentityKeys.forgetZone(defaults)
+            // The person chose to put this iPhone’s copy back: the zone is created for that, here.
+            do { try await source.ensureZone() } catch { onChange?(); return false }
+            defaults.set(true, forKey: IdentityKeys.zoneSeen)
+            tracker.resetBaselines()
+            let report = await pushLive()
+            onChange?()
+            return !report.zoneGone && report.failedTypes.isEmpty
+        case .deleteHere:
+            defaults.removeObject(forKey: IdentityKeys.zoneGone)
+            onChange?()
+            return true
+        }
+    }
+
+    /// P13: this iPhone is signed in to a different iCloud account now.
+    func answerAccountChanged(_ answer: AccountChangedAnswer) async -> CloudOutcome {
+        guard answer != .later else { return .accountChanged }
+        let newUser = await source.userRecordName()
+        defaults.removeObject(forKey: IdentityKeys.accountChanged)
+        if let newUser { defaults.set(newUser, forKey: IdentityKeys.icloudUserRecordName) }
+        tracker.resetBaselines()
+        IdentityKeys.forgetZone(defaults)   // another account's zone: this device never saw it
+        defaults.removeObject(forKey: IdentityKeys.unifiedIdDecided)
+        defaults.removeObject(forKey: IdentityKeys.householdForeign)
+        accountMayHaveChanged()
+        if answer == .keepWithThisICloud {
+            // Whatever is already in this iCloud is asked about, never merged by its tag (§1.4).
+            defaults.set(true, forKey: IdentityKeys.accountSwitchKeep)
+        } else {
+            defaults.removeObject(forKey: IdentityKeys.accountSwitchKeep)
+        }
+        if answer == .useThisICloud, let live {
+            // This iPhone's set goes to Earlier records (nothing deleted); the new account's records come in.
+            let id = "this-iphone-" + ISO8601DateFormatter().string(from: now()).prefix(10)
+            try? earlier.save(ArchivedGroup(id: String(id), status: .aside, source: .device, entries: live.liveEntries,
+                                            properties: live.liveProperties, categories: live.liveCategories, createdAt: now()))
+            updateGroup(String(id)) { $0.status = .aside; $0.source = .device; $0.entryCount = live.liveEntries.count
+                $0.propertyCount = live.liveProperties.count; $0.hours = live.liveEntries.reduce(0) { $0 + $1.hours } }
+            live.replaceLive(entries: [], properties: [], categories: [])
+        }
+        try? FileManager.default.removeItem(at: ZoneSnapshot.url(root: root))
+        Self.setStep(.deviceMerged, defaults)
+        onChange?()
+        return await runCloudPhase()
+    }
+
+    static func trackerContents(_ id: String, root: URL) -> SyncChangeTracker.Contents? {
+        let url = SuggestionStore.directory(forUserId: id, baseDirectory: root.appendingPathComponent("Sync", isDirectory: true))
+            .appendingPathComponent("pushed-fingerprints.json")
+        return (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(SyncChangeTracker.Contents.self, from: $0) }
+    }
+
+    private func writeLosers(_ versions: [RecordVersion], tag: String) {
+        guard !versions.isEmpty else { return }
+        let url = MigrationFiles.migrationDirectory(root: root).appendingPathComponent("\(tag)-losers.json")
+        try? MigrationFiles.writeDurably(JSONEncoder.identity.encode(versions), to: url)
+    }
+}

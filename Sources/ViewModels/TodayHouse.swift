@@ -1,0 +1,590 @@
+import Foundation
+
+// MARK: - Today's house: what it counts, and the events that build it
+//
+// The Today hero is the Blueprint house (WP-H). This file holds the Today-only glue:
+//   - which hours the house counts (the goal's countable hours, from the existing tax engine),
+//   - the honest pace line ("Behind by 12h" / "On pace, 18h ahead"),
+//   - the event hub every save path reports to, so Today plays the confirm build on its next
+//     appear (or live), presents each milestone celebration once, and shows the Day-1 backfill
+//     reveal once.
+//
+// Countable hours (docs/2.0-auto-capture-plan.md, "the house counts the goal's countable hours"):
+//   - REPS: the real estate professional's own real-estate hours (yours, or your spouse's when
+//     they answered that their spouse is the pro), exactly `repsStatus(participant).realEstateHours`.
+//     Investor-only tasks never count. Spouse hours never count toward YOUR 750 (the IRS tests
+//     REPS for each spouse separately, as the audit export already says), so the REPS house
+//     never includes them, joint tracking or not.
+//   - Material participation: `materialParticipationOverview` (owner + spouse, best property or
+//     the grouped activity), with spouse hours only when the household tracks them jointly
+//     (Tax Profile "Spouse hours" on). Investor-only tasks never count.
+
+extension AppViewModel {
+    /// The goal the house measures against, from the 1.x goal setting.
+    var houseGoal: HouseGoal { GoalManager.shared.houseGoal }
+
+    /// Whether spouse hours are tracked jointly (Tax Profile "Spouse hours").
+    var tracksSpouseJointly: Bool { TaxProfileManager.shared.spouseTracking }
+
+    /// The goal's countable hours for `year`. Reuses the tax engine; never re-derives the rules.
+    func houseCountableHours(
+        goal: HouseGoal? = nil,
+        year: Int = Calendar.current.component(.year, from: Date()),
+        includeSpouse: Bool? = nil
+    ) -> Double {
+        switch goal ?? houseGoal {
+        case .reps750:
+            return repsStatus(participant: GoalManager.shared.repsParticipant, year: year).realEstateHours
+        case .mp500, .mp100:
+            return materialParticipationOverview(year: year, includeSpouse: includeSpouse ?? tracksSpouseJointly)
+                .ownerAndSpouseHours
+        }
+    }
+
+    /// Reports a save to Today's house. Call with the countable hours read BEFORE the save.
+    func reportHouseSave(previousHours: Double) {
+        guard !suppressCelebrations else { return }
+        let year = Calendar.current.component(.year, from: Date())
+        TodayHouseEvents.shared.entrySaved(
+            from: previousHours,
+            to: houseCountableHours(year: year),
+            goal: houseGoal,
+            year: year
+        )
+    }
+}
+
+// MARK: - Pace
+
+/// The honest status line on the hero. Linear pace: the share of the goal the calendar says
+/// you should have by today. Never rounds in the user's favour.
+struct TodayPace: Equatable {
+    enum Tone: Equatable { case positive, caution, neutral }
+
+    let text: String
+    let tone: Tone
+
+    static func resolve(hours: Double, goal: HouseGoal, date: Date = Date(), calendar: Calendar = .current) -> TodayPace {
+        if HouseProgress(hours: hours, goal: goal).isGoalMet {
+            return TodayPace(text: "Goal hours met", tone: .positive)
+        }
+        if hours <= 0 {
+            return TodayPace(text: "No hours logged yet", tone: .neutral)
+        }
+        let day = Double(calendar.ordinality(of: .day, in: .year, for: date) ?? 1)
+        let daysInYear = Double(calendar.range(of: .day, in: .year, for: date)?.count ?? 365)
+        let expected = goal.targetHours * day / daysInYear
+        if hours >= expected {
+            let ahead = Int((hours - expected).rounded(.down))
+            return TodayPace(text: ahead >= 1 ? "On pace, \(ahead)h ahead" : "On pace", tone: .positive)
+        }
+        let behind = max(1, Int((expected - hours).rounded(.up)))
+        return TodayPace(text: "Behind by \(behind)h", tone: .caution)
+    }
+}
+
+// MARK: - v2: the crafted hero's figures (standard §H.1 H10, §H.6; plan package 0a)
+
+/// What the crafted hero shows for one rental, or for "All rentals": hours, the goal they are
+/// measured against, and the stage from the one stage function.
+struct CraftHeroTotals: Equatable, Sendable {
+    let hours: Double
+    let goal: Double
+
+    var stage: CraftStage { CraftStage.stage(hours: hours, goal: goal) }
+
+    /// One rental: its confirmed hours against its goal.
+    init(hours: Double, goal: Double) {
+        self.hours = hours.isFinite ? max(0, hours) : 0
+        self.goal = goal.isFinite ? max(0, goal) : 0
+    }
+
+    /// "All rentals" (H10): the sum of confirmed hours across rentals against the largest goal any
+    /// rental uses (the 750 when one uses it), through the same stage function. No rentals: zero
+    /// hours against no goal (the first stage).
+    static func allRentals(_ rentals: [CraftHeroTotals]) -> CraftHeroTotals {
+        CraftHeroTotals(hours: rentals.reduce(0) { $0 + $1.hours },
+                        goal: rentals.map(\.goal).max() ?? 0)
+    }
+}
+
+/// The timber drop plays at most once per stage per rental (§H.6). Remembers, per profile and tax
+/// year, which rentals already played it, so a relaunch, a delete and re-log or another device's
+/// sync never replays it. "All rentals" is keyed as its own focus.
+struct CraftDropLedger {
+    static let baseKey = "LandlordHours.house.craftDropPlayed"
+    /// The key used for the aggregate "All rentals" focus.
+    static let allRentalsKey = "all"
+
+    var defaults: UserDefaults = .standard
+    /// The profile; nil = the active one.
+    var userId: String? = UserScope.userId
+
+    private var key: String { UserScope.key(Self.baseKey, userId: userId) }
+
+    static func token(focus: String, stage: CraftStage, year: Int) -> String { "\(year)_\(focus)_\(stage.rawValue)" }
+
+    static func focus(rentalID: UUID?) -> String { rentalID?.uuidString ?? allRentalsKey }
+
+    func hasPlayed(rentalID: UUID?, stage: CraftStage = .framing, year: Int) -> Bool {
+        (defaults.stringArray(forKey: key) ?? []).contains(Self.token(focus: Self.focus(rentalID: rentalID), stage: stage, year: year))
+    }
+
+    func markPlayed(rentalID: UUID?, stage: CraftStage = .framing, year: Int) {
+        var list = defaults.stringArray(forKey: key) ?? []
+        let token = Self.token(focus: Self.focus(rentalID: rentalID), stage: stage, year: year)
+        guard !list.contains(token) else { return }
+        list.append(token)
+        defaults.set(list, forKey: key)
+    }
+}
+
+// MARK: - Reveal on return (standard §B.3 `houseReveal`; Brian, 2026-10-26)
+//
+// The house moves when the user can see it move. Today remembers, per profile, tax year and page
+// (a rental, or "All rentals"), the last state the user SAW: the stage, the windows and the
+// number. When Today becomes visible (its tab is selected, the app is active, nothing covers it),
+// it plays ONE transition from that state to the live one and stores the live one as seen. Saves
+// made elsewhere (Records, the Log time sheet, the Inbox, another device) never play where the
+// user cannot see them, and several saves while away collapse into one transition.
+
+extension CraftStage: Codable {}
+
+/// What the hero showed for one page when the user last saw it.
+struct HouseSeenState: Codable, Equatable, Sendable {
+    var stage: CraftStage
+    var lit: Bool
+    var hours: Double
+
+    init(stage: CraftStage, lit: Bool, hours: Double) {
+        self.stage = stage
+        self.lit = lit
+        self.hours = hours.isFinite ? max(0, hours) : 0
+    }
+}
+
+/// The last state the user saw, per profile, tax year and page. Stored next to the drop ledger.
+/// Only the current year's pages are kept: a new year starts with nothing seen, so the first look
+/// at a page in a new year shows it as it is.
+struct HouseSeenLedger {
+    static let baseKey = "LandlordHours.house.seen"
+
+    var defaults: UserDefaults = .standard
+    /// The profile; nil = the active one.
+    var userId: String? = UserScope.userId
+
+    private var key: String { UserScope.key(Self.baseKey, userId: userId) }
+
+    static func token(focus: String, year: Int) -> String { "\(year)_\(focus)" }
+
+    private func load() -> [String: HouseSeenState] {
+        guard let data = defaults.data(forKey: key),
+              let map = try? JSONDecoder().decode([String: HouseSeenState].self, from: data) else { return [:] }
+        return map
+    }
+
+    func seen(focus: String, year: Int) -> HouseSeenState? {
+        load()[Self.token(focus: focus, year: year)]
+    }
+
+    /// Stores `state` as seen for `focus` in `year`, and drops every other year's pages.
+    func markSeen(_ state: HouseSeenState, focus: String, year: Int) {
+        let prefix = "\(year)_"
+        var map = load().filter { $0.key.hasPrefix(prefix) }
+        map[Self.token(focus: focus, year: year)] = state
+        if let data = try? JSONEncoder().encode(map) { defaults.set(data, forKey: key) }
+    }
+
+    func reset() { defaults.removeObject(forKey: key) }
+}
+
+/// The one transition Today plays from the last-seen state to the live one.
+struct HouseRevealPlan: Equatable, Sendable {
+    enum Direction: Equatable, Sendable { case up, down, same }
+
+    let from: HouseSeenState
+    let to: HouseSeenState
+    let direction: Direction
+    /// `timberDrop` going up into framing (once per stage per rental, never under Reduce Motion);
+    /// `stageFade` for any other stage change (a quiet fade going down); `none` within a stage.
+    let stageMotion: CraftStageMotion
+    /// The windows change (on after the stage lands; off with a plain fade).
+    let windowsChange: Bool
+    /// The number rolls from the seen hours to the live ones (never under Reduce Motion: it jumps).
+    let rollsNumber: Bool
+    /// The number waits on the seen hours until the last timber lands.
+    var holdsNumberUntilSettled: Bool { stageMotion == .timberDrop }
+    /// Going down never builds in reverse: the lower still fades in with no scale settle.
+    var isQuiet: Bool { direction == .down }
+
+    /// Seconds until the hero is still again (milestones wait this long).
+    var duration: Double {
+        let stageEnd: Double
+        switch stageMotion {
+        case .none: stageEnd = 0
+        case .timberDrop: stageEnd = CraftMotion.dropFadeIn + CraftMotion.dropClip + CraftMotion.dropCrossfade
+        case .stageFade: stageEnd = CraftMotion.stageFadeDuration
+        }
+        guard windowsChange else { return max(stageEnd, rollsNumber ? 0.6 : 0) }
+        let gap = stageMotion == .timberDrop ? 0 : CraftMotion.windowsAfterSettle
+        return stageEnd + gap + CraftMotion.windowsFade
+    }
+}
+
+enum HouseReveal {
+    /// The transition from what the user last saw to the live state. nil when there is nothing to
+    /// play: the page was never seen this year (it shows as it is), or nothing changed.
+    static func plan(seen: HouseSeenState?, current: HouseSeenState, dropAllowed: Bool, reduceMotion: Bool) -> HouseRevealPlan? {
+        guard let seen, seen != current else { return nil }
+        let direction: HouseRevealPlan.Direction
+        if current.hours > seen.hours || (current.hours == seen.hours && current.stage > seen.stage) {
+            direction = .up
+        } else if current.hours < seen.hours || current.stage < seen.stage {
+            direction = .down
+        } else {
+            direction = .same
+        }
+        var motion = CraftMotion.stageMotion(from: seen.stage, to: current.stage)
+        if motion == .timberDrop && (direction != .up || !dropAllowed || reduceMotion) { motion = .stageFade }
+        return HouseRevealPlan(from: seen, to: current, direction: direction, stageMotion: motion,
+                               windowsChange: seen.lit != current.lit,
+                               rollsNumber: !reduceMotion && Int(seen.hours.rounded(.down)) != Int(current.hours.rounded(.down)))
+    }
+}
+
+/// Today's side of the rule: called each time Today is visible with the live state of the shown
+/// page. Returns the one transition to play (nil = show the page as it is) and stores the live
+/// state as seen, so the same change never plays twice.
+struct HouseRevealCoordinator {
+    var ledger = HouseSeenLedger()
+
+    @discardableResult
+    func reveal(focus: String, current: HouseSeenState, year: Int, dropAllowed: Bool, reduceMotion: Bool) -> HouseRevealPlan? {
+        let plan = HouseReveal.plan(seen: ledger.seen(focus: focus, year: year), current: current,
+                                    dropAllowed: dropAllowed, reduceMotion: reduceMotion)
+        ledger.markSeen(current, focus: focus, year: year)
+        return plan
+    }
+
+    /// What the hero should draw first for `focus`: the last-seen state when there is one to play
+    /// from, else the live state.
+    func startState(focus: String, current: HouseSeenState, year: Int) -> HouseSeenState {
+        ledger.seen(focus: focus, year: year) ?? current
+    }
+}
+
+#if DEBUG
+/// `-LHRevealProbe`: an ordered log of reveal events for UI tests ("logSheetDismissed",
+/// "reveal:timberDrop:45->47"). Today shows it as a hidden `today.revealProbe` element.
+@MainActor
+final class HouseRevealDebugLog: ObservableObject {
+    static let shared = HouseRevealDebugLog()
+    static var isEnabled: Bool { ProcessInfo.processInfo.arguments.contains("-LHRevealProbe") }
+    @Published private(set) var events: [String] = []
+
+    func record(_ event: String) {
+        guard Self.isEnabled else { return }
+        events.append(event)
+    }
+}
+#endif
+
+// MARK: - Celebrate-once ledger
+
+/// Remembers which house celebrations a profile has seen, per tax year and milestone, so a
+/// celebration never repeats (deleting and re-adding hours, a relaunch, another device's sync).
+struct HouseCelebrationLedger {
+    static let celebratedBaseKey = "LandlordHours.house.celebrated"
+    static let pendingBaseKey = "LandlordHours.house.pendingCelebrations"
+    static let backfillShownBaseKey = "LandlordHours.house.backfillShown"
+
+    var defaults: UserDefaults = .standard
+    /// The profile; nil = the active one.
+    var userId: String? = UserScope.userId
+
+    private func key(_ base: String) -> String { UserScope.key(base, userId: userId) }
+
+    static func token(_ celebration: HouseCelebration, year: Int) -> String { "\(year)_\(celebration.id)" }
+
+    func isCelebrated(_ celebration: HouseCelebration, year: Int) -> Bool {
+        (defaults.stringArray(forKey: key(Self.celebratedBaseKey)) ?? []).contains(Self.token(celebration, year: year))
+    }
+
+    func markCelebrated(_ celebration: HouseCelebration, year: Int) {
+        var list = defaults.stringArray(forKey: key(Self.celebratedBaseKey)) ?? []
+        let token = Self.token(celebration, year: year)
+        guard !list.contains(token) else { return }
+        list.append(token)
+        defaults.set(list, forKey: key(Self.celebratedBaseKey))
+    }
+
+    /// Queued celebrations (crossed while Today was not on screen), as `year_id` tokens.
+    var pendingTokens: [String] {
+        get { defaults.stringArray(forKey: key(Self.pendingBaseKey)) ?? [] }
+        nonmutating set { defaults.set(newValue.isEmpty ? nil : newValue, forKey: key(Self.pendingBaseKey)) }
+    }
+
+    var backfillShown: Bool {
+        get { defaults.bool(forKey: key(Self.backfillShownBaseKey)) }
+        nonmutating set { defaults.set(newValue, forKey: key(Self.backfillShownBaseKey)) }
+    }
+
+    static func parse(token: String) -> (year: Int, celebration: HouseCelebration)? {
+        let parts = token.split(separator: "_", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let year = Int(parts[0]) else { return nil }
+        let id = parts[1]
+        if id.hasPrefix("stage-"), let raw = Int(id.dropFirst(6)), let m = HouseMilestone(rawValue: raw) {
+            return (year, .stage(m))
+        }
+        if id.hasPrefix("goal-"), let goal = HouseGoal(rawValue: String(id.dropFirst(5))) {
+            return (year, .goalMet(goal))
+        }
+        return nil
+    }
+}
+
+// MARK: - Milestone queue seam (WP4)
+
+/// Anything that can queue a house celebration. WP4's background milestone queue feeds Today
+/// through this (a "Log it" notification action crosses 500h with no scene on screen; Today
+/// presents it once on next appear). Queuing an already-celebrated milestone is a no-op.
+@MainActor
+protocol HouseMilestoneQueue: AnyObject {
+    func enqueue(_ celebration: HouseCelebration, year: Int)
+}
+
+/// The Day-1 backfill result Today reveals once.
+struct HouseBackfillReveal: Identifiable, Equatable {
+    let id = UUID()
+    let foundHours: Double
+    let suggestionCount: Int
+}
+
+// MARK: - Event hub
+
+/// Every save path reports here (manual log via "+", timer stop, inbox confirm). Today reads it
+/// on appear and while visible. Celebrations and the backfill flag persist per profile; the
+/// pending confirm build is in memory (a relaunch just shows the house at its new height).
+@MainActor
+final class TodayHouseEvents: ObservableObject, HouseMilestoneQueue {
+    static let shared = TodayHouseEvents()
+
+    /// The confirm build Today has not played yet (merged across saves: oldest from, newest to).
+    @Published private(set) var pendingConfirm: HouseConfirmEvent?
+    /// Bumped whenever a celebration is queued, so a visible Today can present it.
+    @Published private(set) var celebrationTick = 0
+    /// The Day-1 reveal, once, until Today shows it.
+    @Published private(set) var pendingBackfill: HouseBackfillReveal?
+
+    private let ledgerProvider: () -> HouseCelebrationLedger
+
+    init(ledger: @escaping () -> HouseCelebrationLedger = { HouseCelebrationLedger() }) {
+        self.ledgerProvider = ledger
+    }
+
+    private var ledger: HouseCelebrationLedger { ledgerProvider() }
+
+    // MARK: Saves
+
+    /// A save moved the goal's countable hours from `old` to `new`.
+    func entrySaved(from old: Double, to new: Double, goal: HouseGoal, year: Int) {
+        guard new > old else { return }
+        if let existing = pendingConfirm {
+            pendingConfirm = HouseConfirmEvent(oldHours: min(existing.oldHours, old), newHours: new)
+        } else {
+            pendingConfirm = HouseConfirmEvent(oldHours: old, newHours: new)
+        }
+        for celebration in HouseProgress.celebrations(from: old, to: new, goal: goal) {
+            enqueue(celebration, year: year)
+        }
+    }
+
+    /// Today takes the confirm it is about to play (or that it just played live).
+    @discardableResult
+    func takeConfirm() -> HouseConfirmEvent? {
+        defer { pendingConfirm = nil }
+        return pendingConfirm
+    }
+
+    // MARK: Celebrations
+
+    func enqueue(_ celebration: HouseCelebration, year: Int) {
+        let ledger = ledger
+        guard !ledger.isCelebrated(celebration, year: year) else { return }
+        let token = HouseCelebrationLedger.token(celebration, year: year)
+        var pending = ledger.pendingTokens
+        guard !pending.contains(token) else { return }
+        pending.append(token)
+        ledger.pendingTokens = pending
+        celebrationTick += 1
+    }
+
+    /// The celebration to present next: the highest one queued (the hero shows only the last of
+    /// a multi-threshold jump, as WP-H designed). nil when nothing is waiting.
+    var nextCelebration: (celebration: HouseCelebration, year: Int)? {
+        let ledger = ledger
+        return ledger.pendingTokens
+            .compactMap(HouseCelebrationLedger.parse(token:))
+            .filter { !ledger.isCelebrated($0.celebration, year: $0.year) }
+            .max { ($0.year, $0.celebration.thresholdHours) < ($1.year, $1.celebration.thresholdHours) }
+    }
+
+    /// Marks `celebration` and every lower queued one of that year as celebrated and clears
+    /// them, so none of them ever shows again. Call when the screen is presented.
+    func markPresented(_ celebration: HouseCelebration, year: Int) {
+        let ledger = ledger
+        ledger.markCelebrated(celebration, year: year)
+        var remaining: [String] = []
+        for token in ledger.pendingTokens {
+            guard let parsed = HouseCelebrationLedger.parse(token: token) else { continue }
+            if parsed.year == year && parsed.celebration.thresholdHours <= celebration.thresholdHours {
+                ledger.markCelebrated(parsed.celebration, year: parsed.year)
+            } else if !ledger.isCelebrated(parsed.celebration, year: parsed.year) {
+                remaining.append(token)
+            }
+        }
+        ledger.pendingTokens = remaining
+    }
+
+    // MARK: Day-1 backfill (WP3 calls this)
+
+    /// The Day-1 backfill finished: `foundHours` of suggestions (not records) in
+    /// `suggestionCount` items. Today shows the reveal once per profile.
+    func backfillFinished(foundHours: Double, suggestionCount: Int) {
+        guard suggestionCount > 0, foundHours > 0, !ledger.backfillShown else { return }
+        pendingBackfill = HouseBackfillReveal(foundHours: foundHours, suggestionCount: suggestionCount)
+    }
+
+    /// Today presented the reveal; it never shows again for this profile.
+    func markBackfillShown() {
+        ledger.backfillShown = true
+        pendingBackfill = nil
+    }
+
+    /// Profile switch / data reset: drop in-memory state (persisted state is per profile).
+    func resetInMemoryState() {
+        pendingConfirm = nil
+        pendingBackfill = nil
+    }
+}
+
+#if DEBUG
+// MARK: - DEBUG seeding for Today captures and UI tests
+//
+//   -LHTodayHours <h>          after -LHMockScenario: replace this year's entries with your own
+//                              countable hours totalling h (8h days, before today)
+//   -LHTodayConfirmHours <h>   then log h more hours through addTimeEntry (the real save path),
+//                              so Today plays the confirm build and any milestone on appear
+//   -LHTodayBackfill <h> <n>   then report a finished Day-1 backfill (h hours in n suggestions)
+//   -LHGoalChoice <reps750|mp500|mp100|record>   set the goal before Today draws
+//   -LHGoalPro <me|spouse|nobody>                who does real estate as a main job (750 follows them)
+//   -LHTodayStrHours <h>       add a short-term rental ("Tahoe cabin") with h hours of its own
+//   -LHTodayNoOneMore <yes|no|unanswered>   this year's "did anyone else do more?" answer
+//   -LHTodayStrName "<name>"   the short-term rental's name (a long one checks the eyebrow truncation)
+//   -LHTodaySpouseHours <h>    h spouse hours on the first rental (never joins your 750)
+// Compiled out of Release.
+extension AppViewModel {
+    func applyTodayHoursSeedIfNeeded(arguments: [String] = ProcessInfo.processInfo.arguments) {
+        func value(_ flag: String, offset: Int = 1) -> String? {
+            guard let i = arguments.firstIndex(of: flag), arguments.indices.contains(i + offset) else { return nil }
+            return arguments[i + offset]
+        }
+        // A mock scenario replaces the data: nothing on Today has been seen yet.
+        HouseSeenLedger().reset()
+        if let raw = value("-LHGoalChoice"), let choice = GoalChoice(rawValue: raw) {
+            GoalManager.shared.setGoalChoice(choice)
+        }
+        if let raw = value("-LHGoalPro"), let pro = RealEstatePro(rawValue: raw == "none" ? "nobody" : raw) {
+            GoalManager.shared.setGoalSetup(rental: GoalManager.shared.rentalMix, pro: pro)
+        }
+        if let raw = value("-LHTodayHours"), let total = Double(raw) {
+            seedTodayHours(total)
+        }
+        if let raw = value("-LHTodayStrHours"), let hours = Double(raw) { seedShortStayHours(hours) }
+        if let raw = value("-LHTodaySpouseHours"), let hours = Double(raw), let property = properties.first {
+            timeEntries.append(TimeEntry(propertyId: property.id, participant: .spouse, category: .management,
+                                         hours: hours, date: Date().addingTimeInterval(-86_400 * 2), notes: ""))
+            saveData()
+        }
+        if let raw = value("-LHTodayNoOneMore") {
+            let year = Calendar.current.component(.year, from: Date())
+            TaxProfileManager.shared.setNoOneParticipatedMore(raw == "yes" ? true : (raw == "no" ? false : nil), forYear: year)
+        }
+        if let raw = value("-LHTodayConfirmHours"), let hours = Double(raw), hours > 0,
+           let property = properties.first {
+            addTimeEntry(
+                propertyId: property.id,
+                participant: .selfParticipant,
+                category: .repairs,
+                hours: hours,
+                date: Date(),
+                notes: "Fixed the porch steps"
+            )
+        }
+        if let rawHours = value("-LHTodayBackfill"), let hours = Double(rawHours),
+           let rawCount = value("-LHTodayBackfill", offset: 2), let count = Int(rawCount) {
+            TodayHouseEvents.shared.backfillFinished(foundHours: hours, suggestionCount: count)
+        }
+    }
+
+    /// A short-term rental with `hours` of its own this year (8h days, before today).
+    private func seedShortStayHours(_ hours: Double) {
+        let wasSuppressed = suppressCelebrations
+        suppressCelebrations = true
+        defer { suppressCelebrations = wasSuppressed }
+        if !properties.contains(where: { $0.propertyType == .str }) {
+            let name = ProcessInfo.processInfo.arguments.firstIndex(of: "-LHTodayStrName")
+                .flatMap { i -> String? in let a = ProcessInfo.processInfo.arguments; return a.indices.contains(i + 1) ? a[i + 1] : nil } ?? "Tahoe cabin"
+            addProperty(name: name, address: "", type: .str)
+        }
+        guard let cabin = properties.first(where: { $0.propertyType == .str }) else { return }
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        var remaining = max(0, hours), daysBack = 3
+        while remaining > 0.0001 {
+            let h = min(8, remaining)
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: startOfToday),
+                  let date = calendar.date(byAdding: .hour, value: 10, to: day) else { break }
+            timeEntries.append(TimeEntry(propertyId: cabin.id, participant: .selfParticipant, category: .management,
+                                         hours: h, date: date, notes: ""))
+            remaining -= h
+            daysBack += 1
+        }
+        saveData()
+    }
+
+    private func seedTodayHours(_ total: Double) {
+        let wasSuppressed = suppressCelebrations
+        suppressCelebrations = true
+        defer { suppressCelebrations = wasSuppressed }
+        if properties.isEmpty {
+            addProperty(name: "Pine Cabin", address: "12 Pine Rd", type: .ltr)
+        }
+        guard let property = properties.first else { return }
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: Date())
+        let startOfToday = calendar.startOfDay(for: Date())
+        timeEntries.removeAll { calendar.component(.year, from: $0.date) == year }
+        var remaining = max(0, total)
+        var daysBack = 1
+        let categories: [ActivityCategory] = [.repairs, .management, .leasing, .bookkeeping]
+        while remaining > 0.0001 {
+            let hours = min(8, remaining)
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: startOfToday),
+                  calendar.component(.year, from: day) == year,
+                  let date = calendar.date(byAdding: .hour, value: 9, to: day) else { break }
+            timeEntries.append(TimeEntry(
+                propertyId: property.id,
+                participant: .selfParticipant,
+                category: categories[daysBack % categories.count],
+                hours: hours,
+                date: date,
+                notes: ""
+            ))
+            remaining -= hours
+            daysBack += 1
+        }
+        saveData()
+    }
+}
+#endif

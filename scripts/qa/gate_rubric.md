@@ -60,22 +60,59 @@ python3 scripts/qa/frame_check.py density <frames...> --json density.json
 | Rule | Limit |
 |---|---|
 | D1 list row height (default Dynamic Type) | 56-88pt, target 64 |
-| D2 one list item's share of the viewport | <= 12% default and XXL, <= 30% AX3 |
+| D2 one list item's share of the viewport | <= 12% default and XXL, **<= 45% AX3** (the standard's number; earlier gates misquoted 30%) |
 | D3 list tab with >= 5 items: complete rows above the fold | >= 5 default, >= 4 XXL |
 | D4 empty bands inside a non-hero card (x and y inset 16pt) | <= 35% of card height |
 | D6 non-hero card share of viewport / hero incl. header | <= 20% / <= 40% |
 
-A grouped list container is judged per row (D1, D2), not as one card (D6). Not covered by the script, so the gate reads them by eye with a pixel measurement: D3b/D3c (Today above the fold, AX compact hero), D7 text lines per row (title <= 2, meta 1), D9 gutter 20 / padding 16 / section gap 24 (the script reports gutter as info), contrast >= 4.5:1 on every text pair including placeholders, disabled and secondary text, and no two differently named state frames byte-identical.
+A grouped list container is judged per row (D1, D2), not as one card (D6). Not covered by the script, so the gate reads them by eye with a pixel measurement: D3b/D3c (Today above the fold, AX compact hero), D7 text lines per row (below AX: title <= 2, meta 1, a second meta line from XXL; **at AX no cap: titles and meta wrap as many lines as they need, never truncate**), D9 gutter 20 / padding 16 / section gap 24 (the script reports gutter as info, but **the 20pt list gutter is binding**: measure the grouped list's left edge on every iPhone frame, 19-21pt, anything else is a BLOCKER), contrast >= 4.5:1 on every text pair including placeholders, disabled and secondary text, and no two differently named state frames byte-identical.
 
-Any `FAIL` line from the script is a BLOCKER. Report the printed numbers, not a paraphrase.
+Any `FAIL` line from the script is a CANDIDATE blocker: **measure it by hand (PIL crop, pixel rows, a ruler on the frame) before citing it**, and cite your own measurement next to the script's number. A script FAIL you did not re-measure is not citable. Report the numbers, not a paraphrase.
+
+```bash
+python3 scripts/qa/frame_check.py breaks <frames...>   # mid-word line breaks ("Notifica-/tions"), Vision OCR; every hit is confirmed on the frame
+```
+
+**Re-gate discipline.** On a re-gate, a frame whose bytes are unchanged since the previous look gets **no new blocker** unless it is tagged **"missed earlier"** and says why the earlier look could not have seen it. A changed frame is judged fully.
+
+## 1a. Cross-tab consistency (measured, every gate, standard §S)
+
+The gate compares tabs, not a screen alone. On every gate, whatever the diff touches, capture one frame per tab
+root plus the sheets on the same seed and device, at default and XXL, in light and dark, and run:
+
+```bash
+python3 scripts/qa/frame_check.py consistency <inbox> <records> <rentals> <settings> <collection roots…> \
+    --hero <today> --detail <detail screens…> \
+    --sheet-task <logtime> --sheet-task <setup> --sheet-task <setup-denied> \
+    --sheet-item <confirm> --json consistency.json
+python3 scripts/qa/frame_check.py consistency <every onboarding step…> --json consistency-onboarding.json
+```
+
+- **S1** every frame has a title; **S2** title baselines within 1pt; **S3** first content within 2pt of the same
+  distance under the header's last baseline — **within each group**: tabs + collection roots, detail screens,
+  task sheets, item sheets, onboarding steps. Sheets are never compared across kinds (task vs item, §S).
+- Always pass every group, the sheets included; a run without `--sheet-task`/`--sheet-item` is incomplete.
+- FAIL is a BLOCKER, but measure it by hand on the frame first (the tool is a heuristic; the 2026-10-27 rule).
+- A screen the diff adds or moves joins its group: a collection root with the tabs, a detail screen with the details,
+  a sheet with its kind, an onboarding step with the steps. Empty-state frames are held to S1/S2 only (an empty state carries its own padding).
+- **iPad and other band-B frames (standard §1.27 IP1):** add `--column 672 --scale 2`. The tool's trailing slot
+  and gutters assume a phone-width frame; on a full iPad frame they misread the trailing action (13" Records read
+  147.5 for the header end instead of 139.0). A form sheet (Log time on iPad) is measured on a crop to the sheet's
+  own bounds, since its title sits on the sheet, not on the page's edge column.
+- The scroll-away header: one scrolled frame per touched tab must show the compact bar (title, back, the one
+  action) and no header remnant.
 
 ## 2. Component conformance (grep)
 
 ```bash
-python3 scripts/qa/standard_lint.py        # must print 0 NEW violations
+python3 scripts/qa/standard_lint.py        # must print 0 NEW violations; `hand-header` must stay at 0
 ```
 
-Then list, in the hand-off, every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff by its standard component name (`LHRow.Action`, `LHButton.primary`, and so on). A one-off view where a component exists is a finding. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, Lucide, emoji, `.dynamicTypeSize(` clamps outside the two allowed sites, or hand-built cards around rows. `CategoryToolTile(size:)` is 36 or 56 and never inside Today or Inbox decision rows. Radii are in {6, 12, 16, 20, capsule}. Frames at XXL and AX3 show no clipping, no mid-word break and no truncation at AX.
+Headers come only from the scaffolds (`.lhTabScreen`, `.lhDetailScreen`, `.lhSheetScreen`, standard §S). A screen
+that places its own title, top inset or hidden nav bar is a BLOCKER even when lint misses it (a private `Text`
+title in a `safeAreaInset`, for example).
+
+Then list, in the hand-off, every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff by its standard component name (`LHRow.Action`, `LHButton.primary`, and so on). A one-off view where a component exists is a finding. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, Lucide, emoji, `.dynamicTypeSize(` clamps outside the two allowed sites, or hand-built cards around rows. `CategoryToolTile(size:)` is 36 or 56 and never inside Today or Inbox decision rows. Radii are in {6, 12, 16, 20, capsule}. Frames at XXL and AX3 show no clipping, no mid-word break and no truncation at AX. **At AX a sheet pins only its primary button** (opaque footer, ~24pt fade); secondary and tertiary choices scroll with the body, so a second pinned button at AX is a finding. **Titles never truncate at AX**: an ellipsis on a title or subtitle at AX is a BLOCKER, and the 2-line title cap applies below AX only (owner rulings, Brian 2026-10-27). **Disclosure chevrons** are one ink (`textSecondary`, >= 3:1 as a UI glyph; a system-grey chevron at 1.72:1 is a BLOCKER) and are not drawn at AX in `LHRow.Browse` / `SettingRow`.
 
 ## 3. Motion conformance (grep + named motions)
 
@@ -106,3 +143,34 @@ Say which anchor, what matches (row rhythm, type scale, spacing, motion), and wh
 ## Verdict format
 
 `PASS`, `PASS_WITH_FIXES` or `FAIL`, then one line per section above with the evidence (script output, lint count, named motions, copy numbers, anchor paragraph). Fail closed: if the density script returns `NO_DATA` for a frame that should contain cards or rows, the frame is BLOCKED, not passed.
+
+---
+
+# Gate rubric addendum: design standard v2, the crafted object (2026-10-24, r2)
+
+Source of truth: `docs/design/DESIGN-STANDARD.md` §H and §F. Applies to every hero screen (Today, the rental page, Welcome, the Inbox empty state, the milestone) on top of the sections above. Tool changes are specified in `scripts/qa/NOTES-standard-v2.md`; until they land, the gate measures these by hand in PIL and prints the numbers.
+
+## 6. The hero (measured)
+
+- The house art bounding box is **36–46%** of the window height at default Dynamic Type, **24–32%** at AX, taken from the still's alpha at the known placement (stage scale and lift, §H.1), never from a count of non-page pixels (that count includes the night backlight and the spill pool). The frame is a square of side `min(W − 12, round(0.446 × H))` (390 on 402×874; 295 at AX; 297 on SE), derived on a frame as `lot_width / (0.96 × stage_scale)`. The ground line is an asset check, not a frame check. Art hidden at AX is a BLOCKER (D3c v2).
+- The art sits on the page: no closed card edge around it. A card around the hero is a BLOCKER.
+- Art p99 contrast vs the page (a highlight proxy) plus the mean-luma lift (house minus page, ≥ +5). Lit and framing with the lamp: p99 **≥ 3.0:1**. Unlit at night: **PASS ≥ 2.55, MARGINAL 2.40–2.55 (to Brian with the frame), BLOCKED < 2.40**. Today's half (2.51) and finished (2.48) unlit night frames are MARGINAL.
+- Lit and unlit frames of one state differ (hashes and window-box luma); the `-unlit` frame is darker in the windows. Equal = "state not captured", BLOCKED.
+- The number block overlaps the frame bottom by 44 ± 4pt at default (0 at AX); the chip, dots and number never intersect the art otherwise.
+- The page is the gradient (`#EAE3D7 → #D8CFC0 → #E8E0D3` light; `#0B1230 → #080C1D` dark), never flat, never a grid. The spill pool and (dark) backlight are present and fade with the windows.
+- Text on the light page is one of `textPrimary`, `textSecondary`, `action`, `behind #9A3624`, `positiveOnPage #0C5A30`, measured against the gradient step behind it. Any other ink on the page is a finding with its ratio (they all measure 3.5–3.9:1 on `#D8CFC0`); a `caution` state header on the page is a FAIL (§1.15).
+- Cards on the page carry a 1pt `pageCardEdge` (`#A3966F` / `#2A3560`).
+- Tab bar: native `TabView`, five items (Today, Inbox, Records, Rentals, Log time), "Log time" is the `plus` item with `role: .search`, the fifth item inside the bar as in the locked iOS 27 frame; frames on iOS 18, 26 and 27 compared to it; VoiceOver reads "Log time", not "Search"; selected-label contrast ≥ 4.5:1 in both appearances (a fixed light tint in dark measured 3.21:1 and is the known defect).
+- Today at default: chip + hero + number + pace + "To confirm · N" + 2 rows + "See all" foot above the tab bar; under 700pt of window height (SE, Duo closed), 1 row. At AX: chip + hero + number + pace above the bar; the AX chip never truncates mid-word.
+- Open finding to judge on the first AX3 Today frame: the 54pt numeral renders smaller than "of 100 hours" (the hierarchy inverts). Measure both glyph heights and report; do not pass it silently.
+- The hero toast sits in the chip's slot and the chip is hidden while it shows; a toast overlapping the chip or a roof is a FAIL.
+- The launch frame and its handoff are `pageTop`/night, never blueprint `#1E3FA6` (§H.5).
+- Light-mode tab-switch capture (Today → Inbox → Today): write one sentence on whether the warm-to-cool jump reads as a seam.
+
+## 7. Motion (measured on a 30 fps capture)
+
+The log flow shows the timber drop (≥ 24 consecutive changed frames in the lot region), no hard cuts outside the two crossfade windows, then the windows fading on over 0.30–0.47 s when it was the first hour of the day. Order: drop → windows → (milestone) one confetti beat → (later) scene. A milestone with a sign, words in the scene or linework is a FAIL. `rentalSlide` ≤ 0.30 s. A two-stage jump plays no in-between stage (§H.6). Nothing moves on appear, on a timer or on scroll. A static capture of a flow that should animate is BLOCKED ("no-animation capture").
+
+## 8. Anchor question for hero screens (judgment, written)
+
+Beside Opal, (Not Boring) Weather and Tolan: "Is this a lit object someone keeps, or a toy on a background?" Name what matches (one light source, a dark side, spill on the ground, a page with a time of day) and what does not. Kitsch from the §H.2 list (blooms, planters, lanterns, pets, smoke, weather, string lights) is a finding by name.

@@ -117,10 +117,10 @@ enum Analytics {
         UserDefaults.standard.bool(forKey: optOutKey)
     }
 
-    /// Captures an event. No-op when analytics never configured or opted out. Kept private — call
-    /// sites use the typed helpers below so the event taxonomy stays centralized and reviewable in
-    /// one place.
-    private static func capture(_ event: String, properties: [String: Any]? = nil) {
+    /// Captures an event. No-op when analytics never configured or opted out. Call sites use the
+    /// typed helpers (below, and package K's identity events in Analytics+Identity.swift) so the
+    /// event taxonomy stays centralized and reviewable.
+    static func capture(_ event: String, properties: [String: Any]? = nil) {
         #if DEBUG
         // Unit-test seam: a spy sees exactly what would be sent, and nothing reaches PostHog.
         if let spy = testSpy {
@@ -192,24 +192,72 @@ enum Analytics {
         capture("purchase_completed", properties: ["context": context.rawValue])
     }
 
+    // MARK: - Free-to-paid (WP-P). Fixed enums only: context, entry, outcome.
+
+    /// The redesigned paywall appeared. Fires alongside `paywall_viewed` (kept for 1.x funnels).
+    static func paywallShown(context: PaywallContext, entry: LockEntry) {
+        capture("paywall_shown", properties: ["context": context.rawValue, "entry": entry.rawValue])
+    }
+
+    /// The paywall's buy button was tapped.
+    static func paywallCtaTapped(context: PaywallContext) {
+        capture("paywall_cta_tapped", properties: ["context": context.rawValue])
+    }
+
+    /// A purchase went through (alongside the 1.x `purchase_completed`).
+    static func purchaseSucceeded(context: PaywallContext) {
+        capture("purchase_succeeded", properties: ["context": context.rawValue])
+    }
+
+    /// A purchase didn't complete. `outcome`: failed, pending (Ask to Buy) or cancelled.
+    static func purchaseFailed(context: PaywallContext, outcome: String) {
+        capture("purchase_failed", properties: ["context": context.rawValue, "outcome": outcome])
+    }
+
+    /// The App Store hadn't answered a purchase by the deadline. Its real outcome is logged later
+    /// as purchase_completed / purchase_failed if it ever arrives.
+    static func purchaseTimeout(context: PaywallContext) {
+        capture("purchase_timeout", properties: ["context": context.rawValue])
+    }
+
+    /// A free user saw a locked preview at an entry point. Once per appearance.
+    static func lockPreviewShown(entry: LockEntry) {
+        capture("lock_preview_shown", properties: ["entry": entry.rawValue])
+    }
+
     /// Restore found and re-applied an earlier Pro purchase.
     static func purchaseRestored() {
         capture("purchase_restored")
     }
 
-    /// The first-run onboarding flow finished.
-    static func onboardingCompleted() {
-        capture("onboarding_completed")
+    /// The first-run onboarding flow finished. `calendar`: full | denied | not_now | not_asked.
+    static func onboardingCompleted(skippedProperty: Bool = false, calendar: String = "not_asked") {
+        capture("onboarding_completed", properties: [
+            "skipped_property": skippedProperty,
+            "calendar": calendar
+        ])
     }
 
-    enum ProfileKind: String {
-        case apple
-        case local
-    }
+    // MARK: - 2.0 onboarding funnel
+    // Fixed enums only: never a property name, an address or an event title.
 
-    /// A new profile was created: with Sign in with Apple, or on this device only.
-    static func profileCreated(kind: ProfileKind) {
-        capture("profile_created", properties: ["kind": kind.rawValue])
+    static func onboarding(_ event: OnbEvent) {
+        switch event {
+        case .stepViewed(let step, let cohort):
+            capture("onboarding_step_viewed", properties: ["step": step.analyticsKey, "cohort": cohort.rawValue])
+        case .goalSelected(let goal):
+            capture("onboarding_goal_selected", properties: ["goal": goal.rawValue])
+        case .goalAnswered(let rental, let pro):
+            capture("onboarding_goal_answered", properties: ["rental": rental.rawValue, "pro": pro.rawValue])
+        case .calendarResult(let answer):
+            capture("calendar_permission_result", properties: ["result": answer.analyticsKey, "context": "onboarding"])
+        case .whoSelected(let who):
+            capture("onboarding_who_selected", properties: ["who": who == .both ? "both" : "self"])
+        case .propertyAdded(let hasAddress, let skipped):
+            capture("onboarding_property_added", properties: ["has_address": hasAddress, "skipped": skipped])
+        case .notifyResult(let result):
+            capture("notify_permission_result", properties: ["result": result, "context": "onboarding"])
+        }
     }
 
     /// We asked iOS to show its rating prompt. iOS decides whether it actually appears.

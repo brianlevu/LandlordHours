@@ -15,63 +15,62 @@ final class LandlordHoursUITests: XCTestCase {
         super.tearDown()
     }
 
-    func testFirstRunPropertySetupCTARequiresNameAndAddressForSaveCopy() {
+    /// 2.0: the first property needs only a name; the address is folded away.
+    func testFirstRunPropertyNeedsOnlyAName() {
         launch(scenario: "firstTime", tab: 0)
+        waitAndTap(app.buttons["onb-start"])
+        XCTAssertTrue(app.staticTexts["What do you rent out?"].waitForExistence(timeout: 8))
+        waitAndTap(app.buttons["rental-both"])
+        waitAndTap(app.buttons["pro-none"])
+        let goalCTA = app.buttons["onb-primary"]
+        XCTAssertTrue(goalCTA.waitForExistence(timeout: 5))
+        XCTAssertEqual(goalCTA.label, "Aim for 100 hours", "Both kinds, no real estate pro: 100 hours is suggested and selected")
+        waitAndTap(app.buttons["goal-500"])
+        XCTAssertEqual(goalCTA.label, "Aim for 500 hours")
+        waitAndTap(goalCTA)
+        waitAndTap(app.buttons["onb-link"])                    // Calendar: Not now
+        waitAndTap(app.buttons["who-both"])
+        XCTAssertTrue(app.descendants(matching: .any)["who-note"].waitForExistence(timeout: 3))
+        waitAndTap(app.buttons["onb-primary"])
 
-        let goalTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "main goal")).firstMatch
-        XCTAssertTrue(goalTitle.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.staticTexts["750h + 50% rule"].exists)
-        XCTAssertTrue(app.staticTexts["100h STR test"].exists)
-        XCTAssertTrue(app.staticTexts["Records first"].exists)
-        XCTAssertTrue(app.staticTexts["Guided setup"].exists)
-        waitAndTap(app.buttons["onboarding.goalPrimaryCTA"])
-
-        let propertyTitle = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Add your first")).firstMatch
-        XCTAssertTrue(propertyTitle.waitForExistence(timeout: 5))
-        let propertyCTA = app.buttons["onboarding.propertyPrimaryCTA"]
-        XCTAssertTrue(propertyCTA.waitForExistence(timeout: 3))
-        XCTAssertTrue(propertyCTA.label.contains("Continue without property"))
-
-        let nameField = app.textFields["onboarding.propertyName"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 3))
+        let save = app.buttons["onb-primary"]
+        XCTAssertTrue(app.staticTexts["Add your first rental."].waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled, "Save waits for a name")
+        XCTAssertFalse(app.textFields["property-address"].exists, "Address folded away")
+        let nameField = app.textFields["property-name"]
         nameField.tap()
         nameField.typeText("Oak Street Duplex")
-        XCTAssertTrue(propertyCTA.label.contains("Continue without property"))
-
-        let addressField = app.textFields["onboarding.streetAddress"]
-        XCTAssertTrue(addressField.waitForExistence(timeout: 3))
-        addressField.tap()
-        addressField.typeText("123 Main Street")
-        XCTAssertTrue(propertyCTA.label.contains("Save property"))
+        XCTAssertTrue(save.isEnabled)
+        waitAndTap(app.buttons["property-add-address"])
+        XCTAssertTrue(app.textFields["property-address"].waitForExistence(timeout: 3))
     }
 
+    /// 2.0: the old Track tab index opens the Log time sheet; every detail row is right there.
     func testTrackManualDetailsFlowIsReachable() {
         launch(scenario: "frequent", tab: 2)
 
-        XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 8))
-        let manualButton = app.buttons["Set details manually, Property, category, hours"]
-        XCTAssertTrue(manualButton.waitForExistence(timeout: 5))
-        manualButton.tap()
-
-        XCTAssertTrue(app.staticTexts["Set details"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Category"].exists)
-        XCTAssertTrue(app.staticTexts["Property"].exists)
-        XCTAssertTrue(app.staticTexts["Hours"].exists)
+        XCTAssertTrue(app.buttons["sheet.close"].waitForExistence(timeout: 8))
+        // The note comes first; "Enter details yourself" opens every row.
+        XCTAssertTrue(app.descendants(matching: .any)["log.note"].exists)
+        app.buttons["log.enterDetails"].tap()
+        XCTAssertTrue(app.buttons["log.property"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["log.category"].exists)
+        XCTAssertTrue(app.buttons["log.date"].exists)
+        XCTAssertTrue(app.buttons["log.hours"].exists)
     }
 
     func testTrackNoteTypingStaysInComposer() {
         launch(scenario: "occasional", tab: 2)
 
-        XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 8))
-        let noteEditor = app.textViews.firstMatch
-        XCTAssertTrue(noteEditor.waitForExistence(timeout: 5))
+        let noteEditor = app.descendants(matching: .any)["log.note"].firstMatch
+        XCTAssertTrue(noteEditor.waitForExistence(timeout: 8))
 
         noteEditor.tap()
         noteEditor.typeText("painted porch for 1 hour")
 
         XCTAssertFalse(app.staticTexts["Top Hit"].exists)
-        XCTAssertTrue(noteEditor.value as? String == "painted porch for 1 hour")
-        XCTAssertTrue(app.staticTexts["Evidence draft"].waitForExistence(timeout: 5))
+        XCTAssertEqual(noteEditor.value as? String, "painted porch for 1 hour")
+        XCTAssertTrue(app.descendants(matching: .any)["log.fill.caption"].waitForExistence(timeout: 5))
     }
 
     func testReportsExportGeneratesShareablePDFState() {
@@ -82,7 +81,7 @@ final class LandlordHoursUITests: XCTestCase {
         // tapping before the button is hittable lands on the splash overlay.
         // The accessibility tree reports the button hittable while the splash still
         // covers it, so retry the tap until the export sheet actually opens.
-        let exportTitle = app.staticTexts["Export report"]
+        let exportTitle = app.staticTexts["Export the record"]
         for _ in 0..<5 where !exportTitle.exists {
             let exportButton = app.buttons["Export report"]
             if exportButton.waitForExistence(timeout: 3), exportButton.isHittable {
@@ -92,7 +91,7 @@ final class LandlordHoursUITests: XCTestCase {
         }
 
         let generateButton = app.buttons["export.generatePDF"]
-        assertVisibleText("Export report", timeout: 5)
+        assertVisibleText("Export the record", timeout: 5)
         scrollToElement(generateButton)
         generateButton.tap()
 
@@ -113,7 +112,7 @@ final class LandlordHoursUITests: XCTestCase {
         // State 1: conditional prompt (hours over 100, confirmation unanswered).
         let confirmRow = app.buttons["reports.mp100.confirmRow"]
         XCTAssertTrue(confirmRow.waitForExistence(timeout: 5))
-        assertVisibleText("100-hour threshold reached", timeout: 5)
+        assertStanding(contains: "100 hours reached")
         attachScreenshot(named: "mp100-1-conditional-reports")
 
         // State 2: the confirmation question sheet.
@@ -125,21 +124,32 @@ final class LandlordHoursUITests: XCTestCase {
 
         // State 3: confirmed — the 100-hour test passes.
         answerYes.tap()
-        XCTAssertTrue(app.staticTexts["No one participated more"].waitForExistence(timeout: 5))
-        assertVisibleText("Goal met!", timeout: 5)
+        XCTAssertTrue(app.staticTexts["No one did more"].waitForExistence(timeout: 5))   // package G wording
+        assertStanding(contains: "Goal met")
         attachScreenshot(named: "mp100-3-confirmed-reports")
+    }
+
+    /// Reports' standing card speaks its status in its accessibility value.
+    private func assertStanding(contains text: String, timeout: TimeInterval = 5) {
+        let predicate = NSPredicate(format: "identifier BEGINSWITH %@ AND value CONTAINS %@", "reports.standing.", text)
+        let card = app.descendants(matching: .any).matching(predicate).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: timeout), "Expected a standing card saying: \(text)")
     }
 
     func testSettingsSecondaryFlowsOpenWithoutSwitchingTabs() {
         launch(scenario: "frequent", tab: 4)
 
         assertVisibleText("Settings", timeout: 12)
+        // Settings is a lazy List: rows below the fold exist only once scrolled to.
         let taxProfile = app.buttons["settings.taxProfile"]
-        XCTAssertTrue(taxProfile.waitForExistence(timeout: 5))
+        _ = app.buttons["settings.profile"].waitForExistence(timeout: 5)
+        scrollToElement(taxProfile)
+        let tabBar = app.buttons["tab.today"]
+        if tabBar.exists, taxProfile.frame.maxY > tabBar.frame.minY - 8 { app.swipeUp() }
         taxProfile.tap()
 
-        XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Track"].isHittable)
+        XCTAssertTrue(app.staticTexts["Filing and goal"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["tab.logTime"].isHittable)
     }
 
     func testAppearancePreferenceShowsSavedStateAndPersists() {
@@ -150,34 +160,34 @@ final class LandlordHoursUITests: XCTestCase {
         launch(scenario: "frequent", tab: 4)
 
         assertVisibleText("Settings", timeout: 12)
-        scrollToElement(app.buttons["Dark appearance"])
-        app.buttons["Dark appearance"].tap()
+        scrollToElement(app.buttons["Dark"])
+        app.buttons["Dark"].tap()
 
-        XCTAssertTrue(app.staticTexts["Saved - dark mode"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Dark"].isSelected, "Dark is the chosen appearance")
 
         app.terminate()
         launch(scenario: "frequent", tab: 4)
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
-        scrollToElement(app.staticTexts["Saved - dark mode"])
-        XCTAssertTrue(app.staticTexts["Saved - dark mode"].exists)
+        scrollToElement(app.buttons["Dark"])
+        XCTAssertTrue(app.buttons["Dark"].isSelected, "The choice survives a relaunch")
     }
 
     func testMainTabVisualSmokeMatrix() {
         let matrix: [(scenario: String, tab: Int, expectedText: String, attachment: String)] = [
-            ("emptyMainTabs", 0, "Add your first property", "empty-home"),
-            ("emptyMainTabs", 1, "Create the property record", "empty-properties"),
-            ("emptyMainTabs", 2, "Add a property first", "empty-track"),
+            ("emptyMainTabs", 0, "Hours you confirm count toward your 750", "empty-home"),
+            ("emptyMainTabs", 1, "Add your first rental", "empty-properties"),
+            ("emptyMainTabs", 2, "Log your first hour", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
-            ("emptyMainTabs", 4, "Upgrade to Pro", "empty-settings"),
-            ("occasional", 0, "Today's work", "occasional-home"),
-            ("occasional", 1, "Portfolio evidence", "occasional-properties"),
-            ("occasional", 2, "Log your time", "occasional-track"),
+            ("emptyMainTabs", 4, "Dormer\u{00A0}Pro", "empty-settings"),
+            ("occasional", 0, "of 100 hours", "occasional-home"),
+            ("occasional", 1, "214 Oak Street", "occasional-properties"),
+            ("occasional", 2, "Log time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
             ("occasional", 4, "Settings", "occasional-settings"),
-            ("frequent", 0, "750 hour target", "frequent-home"),
-            ("frequent", 1, "Portfolio evidence", "frequent-properties"),
-            ("frequent", 2, "Log your time", "frequent-track"),
+            ("frequent", 0, "of 750 hours", "frequent-home"),
+            ("frequent", 1, "3 rentals ·", "frequent-properties"),
+            ("frequent", 2, "Log time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
             ("frequent", 4, "Pro is active", "frequent-settings")
         ]
@@ -187,45 +197,40 @@ final class LandlordHoursUITests: XCTestCase {
                 app.terminate()
                 launch(scenario: item.scenario, tab: item.tab)
                 assertVisibleText(item.expectedText, timeout: 8)
+                if item.attachment == "frequent-home" {
+                    // 2.2: Today has no header line; the hero ring carries hours toward the goal.
+                    let hero = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "165, of 750 hours")).firstMatch
+                    XCTAssertTrue(hero.waitForExistence(timeout: 5), "Today hero: hours toward 750")
+                }
                 attachScreenshot(named: item.attachment)
-                XCTAssertFalse(app.staticTexts["Welcome to LandlordHours"].exists)
+                XCTAssertFalse(app.staticTexts["Welcome to Dormer"].exists)
             }
         }
     }
 
-    func testTrackEmptyStateAddPropertyCTAOpensPropertySheet() {
+    func testTrackEmptyStateAsksWhichRentalAndLogsTheFirstHour() {
         launch(scenario: "emptyMainTabs", tab: 2)
 
-        assertVisibleText("Add a property first", timeout: 8)
-        assertVisibleText("Why this comes first")
-
-        let addProperty = app.buttons["Add first property"]
-        XCTAssertTrue(addProperty.waitForExistence(timeout: 5))
-        addProperty.tap()
-
-        let propertyName = app.textFields["property.name"]
-        XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.textFields["property.address"].exists)
-        attachScreenshot(named: "track-empty-add-property-route")
+        let name = app.textFields["log.rentalName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), "no rentals: the sheet asks which one, it does not send you away")
+        XCTAssertEqual(app.buttons["log.save"].label, "Name your rental")
+        attachScreenshot(named: "track-empty-first-log")
     }
 
     func testTimerLaunchStatesRemainReviewable() {
-        launch(scenario: "frequent", tab: 2, extraArguments: ["-LHInitialTrackMode", "timer"])
-
-        assertVisibleText("Timer")
-        XCTAssertTrue(app.buttons["track.timer.start"].waitForExistence(timeout: 5))
+        launch(scenario: "frequent", tab: 0, extraArguments: ["-LHOpenLog", "timerIdle"])
+        XCTAssertTrue(app.buttons["timer.start"].waitForExistence(timeout: 8))
         attachScreenshot(named: "timer-idle-state")
 
         app.terminate()
-        launch(scenario: "frequent", tab: 2, extraArguments: ["-LHInitialTrackMode", "timer", "-LHStartTimer"])
-        XCTAssertTrue(app.buttons["track.timer.stop"].waitForExistence(timeout: 8))
-        assertVisibleText("Evidence in progress")
+        launch(scenario: "frequent", tab: 0, extraArguments: ["-LHOpenLog", "timerRunning"])
+        XCTAssertTrue(app.buttons["timer.stop"].waitForExistence(timeout: 8))
         attachScreenshot(named: "timer-running-state")
 
         app.terminate()
-        launch(scenario: "frequent", tab: 2, extraArguments: ["-LHInitialTrackMode", "timer", "-LHShowTimerReview"])
-        XCTAssertTrue(app.buttons["track.timer.save"].waitForExistence(timeout: 8))
-        assertVisibleText("Notes")
+        launch(scenario: "frequent", tab: 0, extraArguments: ["-LHOpenLog", "timerReview"])
+        XCTAssertTrue(app.buttons["log.save"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["log.timer.ran"].exists)
         attachScreenshot(named: "timer-review-state")
     }
 
@@ -251,13 +256,16 @@ final class LandlordHoursUITests: XCTestCase {
     func testFirstTimeActivationFlowAddsPropertyAndLogsFirstHour() {
         launch(scenario: "emptyMainTabs", tab: 0)
 
-        XCTAssertTrue(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 8))
-
-        let propertyTile = app.buttons["home.activation.property"]
-        XCTAssertTrue(propertyTile.waitForExistence(timeout: 5))
-        propertyTile.tap()
-
+        // 2.2: an owner with no property sees the empty lot; its "Add a rental" is the one action.
+        let addProperty = app.buttons["today.addRental"].firstMatch
+        XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.staticTexts["Finish setting up"].exists, "Setup card follows the first property")
         let propertyName = app.textFields["property.name"]
+        // The launch splash fades over ~1s and can swallow the first tap.
+        for _ in 0..<3 where !propertyName.exists {
+            tapWhenHittable(addProperty, scrollIfNeeded: true)
+            _ = propertyName.waitForExistence(timeout: 3)
+        }
         XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
         propertyName.tap()
         propertyName.typeText("Oak Street Duplex")
@@ -278,45 +286,74 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Oak Street Duplex"].waitForExistence(timeout: 5))
 
-        app.buttons["Home"].tap()
-        let firstHourTile = app.buttons["home.activation.firstHour"]
-        XCTAssertTrue(firstHourTile.waitForExistence(timeout: 5))
-        firstHourTile.tap()
+        // 2.2: the setup card is gone; "Log time" in the tab bar is the one way to the first hour.
+        app.buttons["tab.logTime"].tap()
 
-        XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 5))
-        let noteEditor = app.textViews["track.entryNotes"]
+        let noteEditor = app.descendants(matching: .any)["log.note"].firstMatch
         XCTAssertTrue(noteEditor.waitForExistence(timeout: 5))
         noteEditor.tap()
-        noteEditor.typeText("Reviewed tenant message for 1 hour")
+        noteEditor.typeText("Reviewed tenant message at Oak Street Duplex for 1 hour")
 
-        let logTime = app.buttons["track.logTime"]
-        if !logTime.waitForExistence(timeout: 6) {
-            let reviewButton = app.buttons["track.reviewEvidence"]
-            XCTAssertTrue(reviewButton.waitForExistence(timeout: 2))
-            reviewButton.tap()
-        }
+        let logTime = app.buttons["log.save"]
         XCTAssertTrue(logTime.waitForExistence(timeout: 5))
-        XCTAssertTrue(logTime.isEnabled)
+        Thread.sleep(forTimeInterval: 1.5)   // the 600 ms pause, then the read
+        resolveLogGaps()
         logTime.tap()
 
-        XCTAssertTrue(app.staticTexts["Time logged"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 5))
 
-        app.buttons["Home"].tap()
-        XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Finish setting up"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
+    }
+
+    func testAddRentalNextMovesFocusFromNameToAddress() {
+        launch(scenario: "emptyMainTabs", tab: 0)
+        let addProperty = app.buttons["today.addRental"].firstMatch
+        XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
+        let propertyName = app.textFields["property.name"]
+        for _ in 0..<3 where !propertyName.exists {
+            tapWhenHittable(addProperty, scrollIfNeeded: true)
+            _ = propertyName.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
+        propertyName.tap()
+        propertyName.typeText("Oak Street Duplex")
+
+        let address = app.textFields["property.address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        XCTAssertFalse(address.value(forKey: "hasKeyboardFocus") as? Bool ?? false, "Address starts unfocused")
+        let next = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "next")).firstMatch
+        // iOS 27 labels the return key in lower case ("next"); match without case.
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "Name field shows a Next return key")
+        next.tap()
+
+        let focused = NSPredicate(format: "hasKeyboardFocus == true")
+        expectation(for: focused, evaluatedWith: address)
+        waitForExpectations(timeout: 5)
+        XCTAssertFalse(propertyName.value(forKey: "hasKeyboardFocus") as? Bool ?? true, "Name gave up focus")
+
+        address.typeText("123 Main Street")
+        XCTAssertEqual(address.value as? String, "123 Main Street")
+        // The last field's Done/Return dismisses the keyboard focus.
+        let done = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "done")).firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 3), "Address field shows a Done return key")
+        done.tap()
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == false"), evaluatedWith: address)
+        waitForExpectations(timeout: 5)
     }
 
     func testAttachmentPhotoSurvivesForceQuitAndRelaunch() {
         // Launch 1: seed an entry that carries a real, file-backed attachment.
-        launch(scenario: "occasional", tab: 0, extraArguments: ["-LHSeedAttachment"])
+        // 2.0: Today no longer lists recent entries (Records owns them), so open Records.
+        launch(scenario: "occasional", tab: 6, extraArguments: ["-LHSeedAttachment"])
 
-        // Recent Activity sits below the fold on the redesigned Home, and the splash
-        // can still be fading: scroll until the row is hittable before tapping.
-        let entryRow = app.staticTexts["Property Management"]
+        // Scroll until the row is hittable before tapping.
+        let entryRow = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Called tenant")).firstMatch
         XCTAssertTrue(entryRow.waitForExistence(timeout: 20))
         tapWhenHittable(entryRow, scrollIfNeeded: true)
 
-        XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
+        // Package G: the record page shows "Attachments" with a count header and the photo grid.
+        XCTAssertTrue(app.descendants(matching: .any)["entry.attachments"].waitForExistence(timeout: 6),
                       "Seeded attachment should render before relaunch")
         attachScreenshot(named: "attachment-before-relaunch")
 
@@ -324,18 +361,18 @@ final class LandlordHoursUITests: XCTestCase {
         // load from disk (the user stays signed in via the persisted scope keys).
         app.terminate()
         app.launchArguments = [
-            "-LHInitialTab", "0",
+            "-LHInitialTab", "6",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
         ]
         app.launch()
 
-        let entryRowAgain = app.staticTexts["Property Management"]
+        let entryRowAgain = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Called tenant")).firstMatch
         XCTAssertTrue(entryRowAgain.waitForExistence(timeout: 20),
                       "Persisted entry should still be present after relaunch")
         tapWhenHittable(entryRowAgain, scrollIfNeeded: true)
 
-        XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
+        XCTAssertTrue(app.descendants(matching: .any)["entry.attachments"].waitForExistence(timeout: 6),
                       "Attachment must still render after a true process restart")
         attachScreenshot(named: "attachment-after-relaunch")
     }
@@ -358,11 +395,15 @@ final class LandlordHoursUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         var swipes = 0
         while Date() < deadline {
-            if element.exists && element.isHittable {
+            // The floating tab bar overlays scroll content; XCUI can report a row under it as
+            // hittable, and the tap then lands on a tab. Require the row to clear the bar.
+            let tabBar = app.buttons["tab.today"]
+            let clearsTabBar = !tabBar.exists || element.frame.maxY < tabBar.frame.minY - 8
+            if element.exists && element.isHittable && clearsTabBar {
                 element.tap()
                 return
             }
-            if scrollIfNeeded && element.exists && swipes < 6 && app.staticTexts["Home"].isHittable {
+            if scrollIfNeeded && element.exists && swipes < 6 && app.buttons["tab.today"].isHittable {
                 app.swipeUp()
                 swipes += 1
             } else {
@@ -389,14 +430,37 @@ final class LandlordHoursUITests: XCTestCase {
         add(attachment)
     }
 
-    private func scrollToElement(_ element: XCUIElement, maxSwipes: Int = 6) {
+    /// Since WP-L removed the launch splash, the first screen is still settling when a test
+    /// starts: wait for the element, let each swipe's scroll come to rest, then wait for it to
+    /// become hittable instead of reading `isHittable` once.
+    private func scrollToElement(_ element: XCUIElement, maxSwipes: Int = 10) {
+        _ = element.waitForExistence(timeout: 8)
         var swipes = 0
-        while (!element.exists || !element.isHittable) && swipes < maxSwipes {
-            app.swipeUp()
+        while !(waitUntilHittable(element, timeout: 1) && clearsTabBar(element)) && swipes < maxSwipes {
+            // Scroll toward the element: it can sit above the fold when a tab keeps its old
+            // scroll offset after the content above it shrank.
+            // Short, slow drags (about a third of the screen) so the target can't jump from under
+            // the floating tab bar to above the fold in one swipe.
+            let up = !(element.exists && element.frame.maxY < app.windows.firstMatch.frame.midY)
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.62 : 0.32))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.32 : 0.62))
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
             swipes += 1
+            Thread.sleep(forTimeInterval: 0.6)
         }
         XCTAssertTrue(element.waitForExistence(timeout: 2))
-        XCTAssertTrue(element.isHittable)
+        XCTAssertTrue(waitUntilHittable(element, timeout: 4), "Not hittable after scrolling: \(element)")
+    }
+
+    /// The floating tab bar overlays content: a row under it reports hittable but a tap hits a tab.
+    private func clearsTabBar(_ element: XCUIElement) -> Bool {
+        let tabBar = app.buttons["tab.today"]
+        return !tabBar.exists || element.frame.maxY < tabBar.frame.minY - 8
+    }
+
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND isHittable == true"), object: element)
+        return XCTWaiter().wait(for: [hittable], timeout: timeout) == .completed
     }
 
     private func scrollToText(_ text: String, timeout: TimeInterval = 5, maxSwipes: Int = 8) {
@@ -417,5 +481,17 @@ final class LandlordHoursUITests: XCTestCase {
         expectation(for: hittable, evaluatedWith: element)
         waitForExpectations(timeout: timeout)
         element.tap()
+    }
+
+    /// The Log button names what is missing and opens that editor; fill each gap with the first choice until it says "Log ...".
+    private func resolveLogGaps() {
+        let save = app.buttons["log.save"]
+        for _ in 0..<4 {
+            if save.label.hasPrefix("Log ") { return }
+            save.tap()
+            let rental = app.buttons["log.pick.property.0"]
+            let kind = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'log.pick.category.'")).firstMatch
+            if rental.waitForExistence(timeout: 2) { rental.tap() } else if kind.waitForExistence(timeout: 2) { kind.tap() } else { return }
+        }
     }
 }

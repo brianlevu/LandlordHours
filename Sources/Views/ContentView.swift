@@ -1,64 +1,104 @@
 import SwiftUI
 import StoreKit
 import Combine
-import LucideIcons
 
 extension Notification.Name {
     static let switchToTab = Notification.Name("switchToTab")
     static let openAddProperty = Notification.Name("openAddProperty")
     static let switchToPropertiesAndOpenAddProperty = Notification.Name("switchToPropertiesAndOpenAddProperty")
-    static let prefillFirstActivity = Notification.Name("prefillFirstActivity")
-    static let restartGuidedOnboarding = Notification.Name("restartGuidedOnboarding")
-    static let skipGuidedOnboarding = Notification.Name("skipGuidedOnboarding")
-    static let suspendGuidedOnboardingOverlay = Notification.Name("suspendGuidedOnboardingOverlay")
-    static let resumeGuidedOnboardingOverlay = Notification.Name("resumeGuidedOnboardingOverlay")
 }
 
+/// 1.x first-run coach-mark flags. The coach mark is gone (2.0 onboarding ends on Today with
+/// no overlay); the keys stay so profile reset and the legacy fixture keep clearing them.
 enum GuidedOnboardingStore {
     static let completedKey = "hasCompletedGuidedOnboarding"
     static let skippedKey = "hasSkippedGuidedOnboarding"
 
-    static var isCompleted: Bool {
-        UserDefaults.standard.bool(forKey: UserScope.key(completedKey))
-    }
-
-    static var isSkipped: Bool {
-        UserDefaults.standard.bool(forKey: UserScope.key(skippedKey))
-    }
-
-    static func markCompleted() {
-        UserDefaults.standard.set(true, forKey: UserScope.key(completedKey))
-        UserDefaults.standard.removeObject(forKey: UserScope.key(skippedKey))
-    }
-
     static func skip() {
         UserDefaults.standard.set(true, forKey: UserScope.key(skippedKey))
-    }
-
-    static func restart() {
-        UserDefaults.standard.removeObject(forKey: UserScope.key(completedKey))
-        UserDefaults.standard.removeObject(forKey: UserScope.key(skippedKey))
-    }
-}
-
-enum GuidedOnboardingStep: Hashable {
-    case propertyTab
-    case addProperty
-    case trackTab
-    case firstActivity
-}
-
-private struct AppTabBarHiddenPreferenceKey: PreferenceKey {
-    static var defaultValue = false
-
-    static func reduce(value: inout Bool, nextValue: () -> Bool) {
-        value = value || nextValue()
     }
 }
 
 extension View {
+    /// v2 (§1.25): pushed screens that want the whole height hide the native tab bar the system way.
+    /// (1.x drove a custom bar through a preference; the native tab bar needs nothing else.)
     func hidesAppTabBar(_ hidden: Bool = true) -> some View {
-        preference(key: AppTabBarHiddenPreferenceKey.self, value: hidden)
+        toolbarVisibility(hidden ? .hidden : .automatic, for: .tabBar)
+    }
+}
+
+// MARK: - The shell's tabs (standard §1.25, §H.7)
+
+/// The five items in the native tab bar. "Log time" is the fifth, with the search role; selecting it
+/// opens the Log time sheet and restores the previous tab, so it is never the selected tab.
+enum ShellItem: Hashable, CaseIterable {
+    case today, inbox, records, rentals, logTime
+
+    /// The 1.x integer routes (`.switchToTab` posts, `-LHInitialTab`, App Intents, UI tests) keep
+    /// resolving: 0 Today, 1 Rentals, 2 Log time, 3 Reports (on Today), 4 Settings (on Today),
+    /// 5 Inbox, 6 Records.
+    init(legacyIndex: Int) {
+        switch legacyIndex {
+        case ShellTab.propertiesIndex: self = .rentals
+        case ShellTab.logTimeIndex: self = .logTime
+        case ShellTab.inboxIndex: self = .inbox
+        case ShellTab.recordsIndex: self = .records
+        default: self = .today
+        }
+    }
+
+    var legacyIndex: Int {
+        switch self {
+        case .today: return ShellTab.todayIndex
+        case .inbox: return ShellTab.inboxIndex
+        case .records: return ShellTab.recordsIndex
+        case .rentals: return ShellTab.propertiesIndex
+        case .logTime: return ShellTab.logTimeIndex
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .today: return String(localized: "shell.tab.today", defaultValue: "Today", table: "Foundations")
+        case .inbox: return String(localized: "shell.tab.inbox", defaultValue: "Inbox", table: "Foundations")
+        case .records: return String(localized: "shell.tab.records", defaultValue: "Records", table: "Foundations")
+        case .rentals: return String(localized: "shell.tab.rentals", defaultValue: "Rentals", table: "Foundations")
+        case .logTime: return String(localized: "shell.tab.logTime", defaultValue: "Log time", table: "Foundations")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .today: return "sun.horizon"
+        case .inbox: return "tray"
+        case .records: return "book.closed"
+        case .rentals: return "house"
+        case .logTime: return "plus"
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .today: return "tab.today"
+        case .inbox: return "tab.inbox"
+        case .records: return "tab.records"
+        case .rentals: return "tab.properties"
+        case .logTime: return "tab.logTime"
+        }
+    }
+}
+
+/// What the Today tab shows: Reports and Settings open from Today's header, in the Today tab.
+enum TodayRoute: Equatable {
+    case dashboard, reports, settings
+
+    init?(legacyIndex: Int) {
+        switch legacyIndex {
+        case ShellTab.todayIndex: self = .dashboard
+        case ShellTab.reportsIndex: self = .reports
+        case ShellTab.settingsIndex: self = .settings
+        default: return nil
+        }
     }
 }
 
@@ -71,60 +111,83 @@ struct ContentView: View {
     @ObservedObject private var ratingPrompt = RatingPromptCoordinator.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var goalManager = GoalManager.shared
-    @State private var selectedTab = Self.initialTabFromLaunchArguments()
+    /// The selected tab (never `.logTime`: selecting it opens the sheet and restores this).
+    @State private var tab: ShellItem = {
+        let item = ShellItem(legacyIndex: ContentView.initialTabFromLaunchArguments())
+        return item == .logTime ? .today : item   // Log time opens as a sheet over Today
+    }()
+    /// Reports and Settings open in the Today tab from Today's header.
+    @State private var todayRoute: TodayRoute = TodayRoute(legacyIndex: Self.initialTabFromLaunchArguments()) ?? .dashboard
+    /// The window's layout band (§1.27), from the scene width with 8pt hysteresis.
+    @State private var band: LayoutBand = .a
+    /// The scene's height, safe areas included (§1.27 IP4: band B's hero).
+    @State private var windowHeight: CGFloat = 0
+    #if DEBUG
+    @State private var showOnboarding = WelcomeStateFixture.forceWelcome
+    @State private var showComponentSheet = LHComponentSheetLaunch.isRequested
+    #else
     @State private var showOnboarding = false
-    @State private var showSplashAfterSignOut = false
-    @State private var guidedOnboardingRefresh = false
-    @State private var isReplayingGuidedOnboarding = false
-    @State private var isGuidedOnboardingSuspended = false
-    @State private var isForcingGuidedOnboardingHome = false
-    @State private var hasAcknowledgedFirstActivityCoach = false
-    @State private var didApplyGuidedReplayLaunchArgument = false
-    @State private var isCustomTabBarHidden = false
-    @State private var isSplashAnimating = true
-    @State private var isShowingInitialLaunchBridge = true
-    @State private var didScheduleInitialLaunchBridgeDismiss = false
+    #endif
+    /// WP-L: background work the shell surfaces (look-back reveal, export ready banner).
+    @ObservedObject private var houseEvents = TodayHouseEvents.shared
+    @ObservedObject private var exportJob = ExportJob.shared
+    @State private var shellBackfillReveal: HouseBackfillReveal?
+    @State private var exportShare: ExportShareItem?
+    /// WP3: the suggestion inbox (tab content + badge).
+    @StateObject private var inboxModel = InboxViewModel.live(app: AppModelHost.shared.viewModel)
+    /// WP3: one-time "What's new" auto-capture opt-in for people updating from 1.x.
+    @State private var showCaptureWhatsNew = false
+    /// The Log time sheet (or the timer), opened by the fifth tab, ⌘N and every 1.x "+" route.
+    @State private var logRoute: LogSheetRoute?
+    /// The Log time sheet is on screen, from the moment it opens until it has finished dismissing
+    /// (`onDismiss`), so Today's reveal waits for the sheet to be gone (§B.3 `houseReveal`).
+    @State private var logSheetUp = false
+    /// 2.0 surfaces: the one toast queue (Log time and the timer post to it through
+    /// `AppToastCenter`), and Get help opened from the load-error toast.
+    @ObservedObject private var toastCenter = LHToastCenter.shared
+    @State private var showGetHelp = false
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private static func initialTabFromLaunchArguments() -> Int {
         let args = ProcessInfo.processInfo.arguments
-        if args.contains("-LHForceGuidedSetupHome") {
-            return 0
-        }
-        if args.contains("-LHReplayGuidedSetup") {
-            return 1
-        }
         guard let index = args.firstIndex(of: "-LHInitialTab"),
               args.indices.contains(index + 1),
               let tab = Int(args[index + 1]) else {
             return 0
         }
-        return min(max(tab, 0), 4)
-    }
-
-    private static var shouldReplayGuidedSetupFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-LHReplayGuidedSetup")
-    }
-
-    private static var shouldForceGuidedSetupHomeFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-LHForceGuidedSetupHome")
+        return min(max(tab, 0), ShellTab.maxIndex)
     }
 
     var body: some View {
         Group {
-            if viewModel.isInitializing || showSplashAfterSignOut || isShowingInitialLaunchBridge {
-                splashScreen
-            } else if !viewModel.isSignedIn {
-                LoginView()
-            } else if showOnboarding {
+            // WP-L: no launch splash or loading screen in any path. Today renders at once from
+            // local data; only the hours wait on the first iCloud pull (DashboardView).
+            // Package K: the root reads `rootState` (no sign-in); onboarding still holds itself open.
+            if viewModel.rootState != .app || showOnboarding {
+                // 2.0: Welcome replaces the sign-in wall; "Start building" makes a profile on
+                // this iPhone and the same flow carries on (one branch, one view identity).
                 OnboardingView(showOnboarding: $showOnboarding)
+                    .overlay(alignment: .bottom) {
+                        LHToastHost(center: toastCenter)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                    }
             } else {
                 mainContent
+                    .identitySheets(viewModel)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(colors.background)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+            band = LayoutBand.resolve(previous: band, width: width)
+        }
+        .environment(\.layoutBand, band)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom } action: { height in
+            windowHeight = height
+        }
+        .environment(\.lhWindowHeight, windowHeight)
         .overlay {
             if let celebration = viewModel.activeCelebration {
                 CelebrationOverlayView(type: celebration) {
@@ -134,24 +197,28 @@ struct ContentView: View {
                 .zIndex(999)
             }
         }
-        .overlay(alignment: .top) {
-            if let message = viewModel.persistenceError {
-                LHErrorBanner(message: message) {
-                    animate(AppAnimation.reveal) { viewModel.persistenceError = nil }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(1000)
-            }
+        .onChange(of: viewModel.persistenceError, initial: true) { _, message in
+            guard let message else { return }
+            showPersistenceToast(message)
         }
-        .lhMotion(AppAnimation.reveal, value: viewModel.persistenceError)
+        .sheet(isPresented: $showGetHelp) {
+            NavigationStack { ContactSupportView() }
+        }
+        // WP-P: the one paywall, opened by any screen through ProPaywallPresenter.shared.
+        .proPaywallHost()
+        #if DEBUG
+        .fullScreenCover(isPresented: .constant(PaywallPreviewLaunch.current != nil)) {
+            if let preview = PaywallPreviewLaunch.current { PaywallPreviewRoot(launch: preview) }
+        }
+        .fullScreenCover(isPresented: $showComponentSheet) {
+            LHComponentSheet(page: LHComponentSheetLaunch.page)
+        }
+        #endif
         .environmentObject(CategoryManager.shared)
         .environmentObject(goalManager)
         .onAppear {
             viewModel.checkSignInState()
             checkPostSignInFlow()
-            scheduleInitialLaunchBridgeDismissIfReady()
             applyPendingAppIntentNavigationIfNeeded()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -162,57 +229,19 @@ struct ContentView: View {
         .onOpenURL { url in
             applyDeepLink(url)
         }
-        .onChange(of: viewModel.isInitializing) { _, _ in
-            scheduleInitialLaunchBridgeDismissIfReady()
+        .onChange(of: showOnboarding) { _, isShowing in
+            if !isShowing, CaptureSetupHandoff.openInboxAfterOnboarding {
+                CaptureSetupHandoff.openInboxAfterOnboarding = false
+                route(toLegacy: ShellTab.inboxIndex)
+            }
         }
         .onChange(of: viewModel.isSignedIn) { _, newValue in
             if newValue {
                 checkPostSignInFlow()
             } else {
-                // User signed out — show splash briefly, then login
+                // Signed out: straight to sign-in (no splash).
                 showOnboarding = false
-                showSplashAfterSignOut = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    animate(AppAnimation.standard) {
-                        showSplashAfterSignOut = false
-                    }
-                }
             }
-        }
-        .onChange(of: viewModel.timeEntries.count) { _, newValue in
-            if newValue > 0, !GuidedOnboardingStore.isCompleted {
-                GuidedOnboardingStore.markCompleted()
-                guidedOnboardingRefresh.toggle()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .restartGuidedOnboarding)) { _ in
-            GuidedOnboardingStore.restart()
-            showOnboarding = false
-            animate(AppAnimation.smooth) {
-                isReplayingGuidedOnboarding = true
-                isGuidedOnboardingSuspended = false
-                hasAcknowledgedFirstActivityCoach = false
-                selectedTab = 1
-                guidedOnboardingRefresh.toggle()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .skipGuidedOnboarding)) { _ in
-            GuidedOnboardingStore.skip()
-            isReplayingGuidedOnboarding = false
-            isGuidedOnboardingSuspended = false
-            hasAcknowledgedFirstActivityCoach = false
-            guidedOnboardingRefresh.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .suspendGuidedOnboardingOverlay)) { _ in
-            isGuidedOnboardingSuspended = true
-            guidedOnboardingRefresh.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .resumeGuidedOnboardingOverlay)) { _ in
-            isGuidedOnboardingSuspended = false
-            guidedOnboardingRefresh.toggle()
-        }
-        .onAppear {
-            applyGuidedReplayLaunchArgumentIfNeeded()
         }
         .onChange(of: ratingPrompt.pendingRequest) { _, trigger in
             guard trigger != nil else { return }
@@ -221,213 +250,6 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 requestReview()
                 ratingPrompt.pendingRequest = nil
-            }
-        }
-    }
-
-    // MARK: - Splash / Loading Screen
-    private var splashScreen: some View {
-        ZStack {
-            splashBackground
-
-            VStack(spacing: 20) {
-                Spacer()
-
-                WaveHouseIcon(size: 84)
-                    .shadow(color: colors.primary.opacity(colorScheme == .dark ? 0.26 : 0.20), radius: 18, y: 10)
-                    .scaleEffect(isSplashAnimating ? 1 : 0.96)
-                    .opacity(isSplashAnimating ? 1 : 0)
-
-                launchWordmark
-                    .font(.system(size: 31, weight: .bold, design: .rounded))
-                    .opacity(isSplashAnimating ? 1 : 0)
-
-                HStack(spacing: 8) {
-                    LoadingDot(delay: 0.0, color: colors.primary)
-                    LoadingDot(delay: 0.12, color: colors.informational)
-                    LoadingDot(delay: 0.24, color: colors.positive)
-                }
-                .opacity(isSplashAnimating ? 1 : 0)
-
-                Spacer()
-            }
-            .padding(.horizontal, 24)
-        }
-        .onAppear {
-            guard !reduceMotion else {
-                isSplashAnimating = true
-                return
-            }
-
-            withAnimation(AppAnimation.flow.delay(0.08)) {
-                isSplashAnimating = true
-            }
-        }
-    }
-
-    private var launchWordmark: Text {
-        Text("Landlord")
-            .foregroundColor(colors.textPrimary)
-        +
-        Text("Hours")
-            .foregroundColor(colors.primary)
-    }
-
-    private var splashBackground: some View {
-        ZStack {
-            LinearGradient(
-                colors: colorScheme == .dark
-                    ? [AppColors.darkBackground, AppColors.darkPlum, AppColors.darkInk]
-                    : [AppColors.lavenderPale, AppColors.background, AppColors.reportsAccentWash.opacity(0.8), Color.white],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            LinearGradient(
-                colors: [
-                    colors.primary.opacity(colorScheme == .dark ? 0.22 : 0.12),
-                    Color.clear,
-                    colors.positive.opacity(colorScheme == .dark ? 0.12 : 0.08)
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(colors.primary.opacity(colorScheme == .dark ? 0.13 : 0.08))
-                    .frame(height: 1)
-                    .offset(y: isSplashAnimating && !reduceMotion ? 46 : 22)
-                Spacer()
-                Rectangle()
-                    .fill(colors.primary.opacity(colorScheme == .dark ? 0.10 : 0.06))
-                    .frame(height: 1)
-                    .offset(y: isSplashAnimating && !reduceMotion ? -58 : -28)
-            }
-            .rotationEffect(.degrees(-16))
-            .opacity(0.9)
-        }
-        .ignoresSafeArea()
-    }
-
-    private var launchHeader: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                WaveHouseIcon(size: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: colors.primary.opacity(0.16), radius: 12, y: 6)
-
-                launchWordmark
-                    .font(.system(size: 27, weight: .bold, design: .rounded))
-            }
-
-            Text("Preparing your tax-year command center")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .opacity(isSplashAnimating ? 1 : 0)
-        .offset(y: isSplashAnimating ? 0 : 10)
-    }
-
-    private var qualificationMap: some View {
-        VStack(spacing: 22) {
-            HStack(alignment: .center, spacing: 22) {
-                SplashProgressRings(isAnimating: isSplashAnimating)
-                    .frame(width: 134, height: 134)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("2026")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.primary)
-
-                        Text("Qualification map")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Text("Hours, properties, and reports are being organized into review-ready records.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            VStack(spacing: 10) {
-                SplashEvidenceRow(
-                    icon: "clock",
-                    title: "Hour ledger",
-                    detail: "Syncing recent entries",
-                    tint: colors.primary,
-                    isActive: isSplashAnimating
-                )
-
-                SplashEvidenceRow(
-                    icon: "building-2",
-                    title: "Property records",
-                    detail: "Checking portfolio status",
-                    tint: colors.informational,
-                    isActive: isSplashAnimating
-                )
-
-                SplashEvidenceRow(
-                    icon: "file-text",
-                    title: "Report package",
-                    detail: "Preparing export data",
-                    tint: colors.positive,
-                    isActive: isSplashAnimating
-                )
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
-                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.82 : 0.72))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
-                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.55 : 0.42), lineWidth: 1)
-        )
-        .shadow(color: colors.primary.opacity(colorScheme == .dark ? 0.12 : 0.10), radius: 18, x: 0, y: 12)
-        .scaleEffect(isSplashAnimating ? 1 : 0.98)
-        .opacity(isSplashAnimating ? 1 : 0)
-    }
-
-    private var splashStatusRail: some View {
-        HStack(spacing: 10) {
-            LoadingDot(delay: 0.0, color: colors.primary)
-            LoadingDot(delay: 0.12, color: colors.informational)
-            LoadingDot(delay: 0.24, color: colors.positive)
-
-            Text("Building audit trail")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
-        .background(
-            Capsule()
-                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.70 : 0.64))
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(colors.border.opacity(0.42), lineWidth: 1)
-        )
-        .opacity(isSplashAnimating ? 1 : 0)
-    }
-
-    private func scheduleInitialLaunchBridgeDismissIfReady() {
-        guard !viewModel.isInitializing,
-              isShowingInitialLaunchBridge,
-              !didScheduleInitialLaunchBridgeDismiss else { return }
-
-        didScheduleInitialLaunchBridgeDismiss = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-            animate(AppAnimation.standard) {
-                isShowingInitialLaunchBridge = false
             }
         }
     }
@@ -442,6 +264,30 @@ struct ContentView: View {
         }
     }
 
+    /// Shows the 2.0 What's new once to people who finished 1.x onboarding. Never on top of
+    /// onboarding.
+    private func presentCaptureWhatsNewIfNeeded() {
+        guard !showOnboarding else { return }
+        let completed = UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding"))
+        guard CaptureOptIn.shouldShowWhatsNew(hasCompletedOnboarding: completed) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            showCaptureWhatsNew = true
+        }
+    }
+
+    /// Save failed → "Retry"; load failed → "Help" (the records are still on this iPhone).
+    private func showPersistenceToast(_ message: String) {
+        if message == AppViewModel.loadFailureMessage {
+            toastCenter.show(.problem, message, actionTitle: String(localized: "shell.toast.help", defaultValue: "Help",
+                                                                  table: "Foundations")) { showGetHelp = true }
+        } else {
+            toastCenter.show(.problem, message, actionTitle: String(localized: "shell.toast.retry", defaultValue: "Retry",
+                                                                  table: "Foundations")) { [weak viewModel] in
+                viewModel?.retrySave()
+            }
+        }
+    }
+
     private func applyPendingAppIntentNavigationIfNeeded() {
         guard let rawDestination = UserDefaults.standard.string(forKey: AppIntentNavigationRequest.pendingDestinationKey),
               let destination = LandlordHoursIntentDestination(rawValue: rawDestination) else {
@@ -449,7 +295,7 @@ struct ContentView: View {
         }
 
         UserDefaults.standard.removeObject(forKey: AppIntentNavigationRequest.pendingDestinationKey)
-        selectedTab = destination.tabIndex
+        route(toLegacy: destination.tabIndex)
     }
 
     private func applyDeepLink(_ url: URL) {
@@ -467,502 +313,276 @@ struct ContentView: View {
 
         guard let destinationValue,
               let destination = LandlordHoursIntentDestination(rawValue: destinationValue) else {
-            selectedTab = 0
+            route(toLegacy: ShellTab.todayIndex)
             return
         }
 
-        selectedTab = destination.tabIndex
+        route(toLegacy: destination.tabIndex)
     }
 
-    // MARK: - Main Content with Tab Bar
+    /// Every 1.x integer route lands here: a tab, a Today page (Reports, Settings), or Log time.
+    private func route(toLegacy index: Int) {
+        let item = ShellItem(legacyIndex: min(max(index, 0), ShellTab.maxIndex))
+        if item == .logTime {
+            openLog(plusRoute)
+            return
+        }
+        if item == .today { todayRoute = TodayRoute(legacyIndex: index) ?? .dashboard }
+        tab = item
+    }
+
+    // MARK: - Main content: the native tab bar (§1.25, §H.7)
+
     var mainContent: some View {
-        ZStack(alignment: .bottom) {
-            selectedTabContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .safeAreaInset(edge: .bottom) {
-                    if !isCustomTabBarHidden {
-                        Color.clear
-                            .frame(height: AppSpacing.floatingTabBarReservedHeight)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .switchToTab)) { notification in
-                    if let tab = notification.object as? Int {
-                        selectedTab = tab
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .switchToPropertiesAndOpenAddProperty)) { _ in
-                    selectedTab = 1
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        NotificationCenter.default.post(name: .openAddProperty, object: nil)
-                    }
-                }
-
-            if !isCustomTabBarHidden {
-                tabBarUnderlay
-
-                customTabBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+        tabView
+            .tint(colors.action)
+            .modifier(TabBarMinimizeOnScroll())
+            .background {
+                // ⌘N logs time from anywhere (§1.27 keyboard).
+                Button(ShellItem.logTime.title) { openLog(.log) }
+                    .keyboardShortcut("n", modifiers: .command)
+                    .opacity(0)
+                    .accessibilityHidden(true)
             }
-
-            // Floating timer banner (visible on all tabs except Track)
-            if viewModel.isTimerRunning && selectedTab != 2 && !isCustomTabBarHidden {
-                FloatingTimerBanner(viewModel: viewModel) {
-                    selectedTab = 2
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .padding(.bottom, 52) // above tab bar
+            .onReceive(NotificationCenter.default.publisher(for: .switchToTab)) { notification in
+                if let index = notification.object as? Int { route(toLegacy: index) }
             }
-
-        }
-        .onPreferenceChange(AppTabBarHiddenPreferenceKey.self) { hidden in
-            animate(AppAnimation.quick) {
-                isCustomTabBarHidden = hidden
-            }
-        }
-        .overlayPreferenceValue(GuidedSpotlightTargetKey.self) { targets in
-            GeometryReader { proxy in
-                if let step = guidedOnboardingStep {
-                    let measuredTarget = targets[step].map { proxy[$0].insetBy(dx: -5, dy: -5) }
-
-                    GuidedOnboardingOverlay(
-                        step: step,
-                        spotlightOverride: measuredTarget,
-                        isReplay: isReplayingGuidedOnboarding,
-                        onPrimary: { handleGuidedOnboardingPrimary(step) },
-                        onSecondary: { handleGuidedOnboardingSecondary(step) },
-                        onSkip: {
-                            GuidedOnboardingStore.skip()
-                            isReplayingGuidedOnboarding = false
-                            guidedOnboardingRefresh.toggle()
-                        }
-                    )
-                    .accessibilityIdentifier("guidedSetup.overlay")
-                    .transition(.opacity)
-                    .zIndex(20)
+            .onReceive(NotificationCenter.default.publisher(for: .switchToPropertiesAndOpenAddProperty)) { _ in
+                route(toLegacy: ShellTab.propertiesIndex)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    NotificationCenter.default.post(name: .openAddProperty, object: nil)
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var selectedTabContent: some View {
-        switch selectedTab {
-        case 0:
-            DashboardView()
-        case 1:
-            PropertiesView()
-        case 2:
-            TimeLogView()
-        case 3:
-            ReportsView()
-        case 4:
-            SettingsView()
-        default:
-            DashboardView()
-        }
-    }
-
-    private var customTabBar: some View {
-        HStack(spacing: 0) {
-            tabBarButton(index: 0, title: "Home", icon: Lucide.house)
-            tabBarButton(index: 1, title: "Properties", icon: Lucide.building2)
-                .guidedSpotlightTarget(.propertyTab)
-            tabBarButton(index: 2, title: "Track", icon: Lucide.clock)
-                .guidedSpotlightTarget(.trackTab)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .frame(height: 78)
-        .floatingDockGlass(colors: colors, colorScheme: colorScheme)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
-    }
-
-    private var tabBarUnderlay: some View {
-        let dockOpacity = colorScheme == .dark ? 0.96 : 0.92
-
-        return LinearGradient(
-            stops: [
-                .init(color: colors.background.opacity(0.0), location: 0.0),
-                .init(color: colors.background.opacity(dockOpacity), location: 0.42),
-                .init(color: colors.background.opacity(1.0), location: 1.0),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: AppSpacing.floatingTabBarReservedHeight + 72)
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: .bottom)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private func tabBarButton(index: Int, title: String, icon: UIImage) -> some View {
-        let isSelected = selectedTab == index
-        // Full-strength secondary text: the 0.78 opacity version measured 3.46:1.
-        let inactiveColor = colors.textSecondary
-
-        return Button {
-            animate(AppAnimation.quick) {
-                selectedTab = index
-            }
-        } label: {
-            VStack(spacing: 5) {
-                LucideIcon(image: icon, size: 22)
-                    .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(
-                Capsule()
-                    .fill(isSelected ? colors.primarySurface.opacity(0.82) : Color.clear)
-            )
-            .contentShape(Capsule())
-            .lhMotion(AppAnimation.quick, value: isSelected)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-
-    private var guidedOnboardingStep: GuidedOnboardingStep? {
-        _ = guidedOnboardingRefresh
-        guard viewModel.isSignedIn,
-              !showOnboarding,
-              !isGuidedOnboardingSuspended else {
-            return nil
-        }
-
-        if isForcingGuidedOnboardingHome {
-            return currentGuidedOnboardingStep
-        }
-
-        if isReplayingGuidedOnboarding {
-            if selectedTab == 1 { return .addProperty }
-            if selectedTab == 2 { return .firstActivity }
-            return .propertyTab
-        }
-
-        guard !GuidedOnboardingStore.isCompleted,
-              !GuidedOnboardingStore.isSkipped else {
-            return nil
-        }
-
-        return currentGuidedOnboardingStep
-    }
-
-    private var currentGuidedOnboardingStep: GuidedOnboardingStep? {
-        if viewModel.properties.isEmpty {
-            return selectedTab == 1 ? .addProperty : .propertyTab
-        }
-        if viewModel.timeEntries.isEmpty {
-            if hasAcknowledgedFirstActivityCoach {
-                return nil
-            }
-            return selectedTab == 2 ? .firstActivity : .trackTab
-        }
-        return nil
-    }
-
-    private func handleGuidedOnboardingPrimary(_ step: GuidedOnboardingStep) {
-        switch step {
-        case .propertyTab:
-            animate(AppAnimation.smooth) { selectedTab = 1 }
-        case .addProperty:
-            isGuidedOnboardingSuspended = true
-            NotificationCenter.default.post(name: .openAddProperty, object: nil)
-            if isReplayingGuidedOnboarding, !viewModel.properties.isEmpty {
-                isReplayingGuidedOnboarding = false
-                guidedOnboardingRefresh.toggle()
-            }
-        case .trackTab:
-            animate(AppAnimation.smooth) { selectedTab = 2 }
-        case .firstActivity:
-            NotificationCenter.default.post(name: .prefillFirstActivity, object: nil)
-            isReplayingGuidedOnboarding = false
-            hasAcknowledgedFirstActivityCoach = true
-            guidedOnboardingRefresh.toggle()
-        }
-    }
-
-    private func handleGuidedOnboardingSecondary(_ step: GuidedOnboardingStep) {
-        switch step {
-        case .firstActivity:
-            isReplayingGuidedOnboarding = false
-            hasAcknowledgedFirstActivityCoach = true
-            guidedOnboardingRefresh.toggle()
-        default:
-            GuidedOnboardingStore.skip()
-            isReplayingGuidedOnboarding = false
-            guidedOnboardingRefresh.toggle()
-        }
-    }
-
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
-        if reduceMotion {
-            updates()
-        } else {
-            withAnimation(animation, updates)
-        }
-    }
-
-    private func applyGuidedReplayLaunchArgumentIfNeeded() {
-        guard Self.shouldReplayGuidedSetupFromLaunchArguments || Self.shouldForceGuidedSetupHomeFromLaunchArguments,
-              !didApplyGuidedReplayLaunchArgument else { return }
-        didApplyGuidedReplayLaunchArgument = true
-        GuidedOnboardingStore.restart()
-        showOnboarding = false
-        isForcingGuidedOnboardingHome = Self.shouldForceGuidedSetupHomeFromLaunchArguments
-        isReplayingGuidedOnboarding = Self.shouldReplayGuidedSetupFromLaunchArguments
-        isGuidedOnboardingSuspended = false
-        hasAcknowledgedFirstActivityCoach = false
-        selectedTab = Self.shouldForceGuidedSetupHomeFromLaunchArguments ? 0 : 1
-        guidedOnboardingRefresh.toggle()
-    }
-}
-
-// MARK: - Launch Loading Components
-
-private struct SplashProgressRings: View {
-    let isAnimating: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isRotating = false
-
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(
-                    colors.primarySurface.opacity(colorScheme == .dark ? 0.32 : 0.70),
-                    style: StrokeStyle(lineWidth: 13, lineCap: .round, dash: [3, 7])
-                )
-                .rotationEffect(.degrees(isRotating ? 360 : 0))
-
-            Circle()
-                .trim(from: 0, to: isAnimating ? 0.34 : 0.06)
-                .stroke(
-                    LinearGradient(
-                        colors: [colors.primary, AppColors.reportsAccentSoft],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: 13, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-92))
-                .animation(AppAnimation.flow.delay(0.14), value: isAnimating)
-
-            Circle()
-                .stroke(
-                    colors.positiveSurface.opacity(colorScheme == .dark ? 0.34 : 0.78),
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .padding(25)
-
-            Circle()
-                .trim(from: 0, to: isAnimating ? 0.22 : 0.04)
-                .stroke(
-                    LinearGradient(
-                        colors: [colors.positive, AppColors.successGreenSoft],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-92))
-                .padding(25)
-                .animation(AppAnimation.flow.delay(0.24), value: isAnimating)
-
-            VStack(spacing: 1) {
-                Text("21%")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text("pace")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textTertiary)
-            }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 7.5).repeatForever(autoreverses: false)) {
-                isRotating = true
-            }
-        }
-    }
-}
-
-private struct SplashEvidenceRow: View {
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-    let isActive: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            JellyBadge(systemName: icon, color: tint, size: 34)
-                .shadow(color: tint.opacity(0.14), radius: 8, y: 4)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text(detail)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-            }
-
-            Spacer(minLength: 10)
-
-            ZStack {
-                Circle()
-                    .fill(tint.opacity(colorScheme == .dark ? 0.22 : 0.16))
-                    .frame(width: 24, height: 24)
-
-                Circle()
-                    .trim(from: 0, to: isActive ? 0.76 : 0.18)
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .frame(width: 24, height: 24)
-                    .rotationEffect(.degrees(-90))
-                    .animation(AppAnimation.flow, value: isActive)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: AppCornerRadius.medium, style: .continuous)
-                .fill(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.58 : 0.62))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.medium, style: .continuous)
-                .strokeBorder(colors.border.opacity(0.28), lineWidth: 1)
-        )
-    }
-}
-
-private struct LoadingDot: View {
-    let delay: Double
-    let color: Color
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isActive = false
-
-    var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 7, height: 7)
-            .scaleEffect(isActive && !reduceMotion ? 1.0 : 0.62)
-            .opacity(isActive && !reduceMotion ? 1 : 0.45)
             .onAppear {
-                guard !reduceMotion else {
-                    isActive = true
+                #if DEBUG
+                InboxDebugSeed.applyIfNeeded(app: viewModel)
+                SurfaceDebugHooks.apply(toasts: toastCenter, app: viewModel)
+                #endif
+                inboxModel.reload()
+                presentCaptureWhatsNewIfNeeded()
+                if Self.initialTabFromLaunchArguments() == ShellTab.logTimeIndex {
+                    openLog(plusRoute)
+                }
+                #if DEBUG
+                LogShellDebug.applyIfNeeded(app: viewModel) { route in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { openLog(route) }
+                }
+                #endif
+            }
+            .onChange(of: tab) { oldTab, newTab in
+                // "Log time" is never the selected tab: open the sheet over the tab the user was on.
+                if newTab == .logTime {
+                    tab = oldTab == .logTime ? .today : oldTab
+                    openLog(plusRoute)
                     return
                 }
+                #if DEBUG
+                if oldTab != .logTime, newTab != .logTime { HouseRevealDebugLog.shared.record(newTab.accessibilityIdentifier) }
+                #endif
+                // Leaving Today closes Reports or Settings, as the 1.x bar did.
+                if oldTab == .today, newTab != .today { todayRoute = .dashboard }
+                inboxModel.dismissToast()
+                inboxModel.reload()
+                scheduleShellBackfillReveal()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openLogSheet)) { note in
+                openLog((note.object as? LogSheetRoute) ?? .log)
+            }
+            .sheet(item: $logRoute, onDismiss: {
+                logSheetUp = false
+                #if DEBUG
+                HouseRevealDebugLog.shared.record("logSheetDismissed")
+                #endif
+            }) { route in
+                LogTimeSheet(route: route) { logRoute = nil }
+                    .environmentObject(viewModel)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
+                    .presentationBackground(colors.background)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { inboxModel.reload() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
+                inboxModel.reload(animated: true)
+                // The widget's to-confirm count is the Inbox badge's count.
+                viewModel.refreshWidgetSurface()
+            }
+            // WP-L: the look-back finished in the background. Today plays the house reveal itself;
+            // on any other tab the shell plays it once, when no sheet is in the way.
+            .onChange(of: houseEvents.pendingBackfill) { _, _ in scheduleShellBackfillReveal() }
+            .onChange(of: inboxModel.sheetSuggestion) { _, _ in scheduleShellBackfillReveal() }
+            .fullScreenCover(item: $shellBackfillReveal) { reveal in
+                BackfillRevealView(
+                    foundHours: reveal.foundHours,
+                    suggestionCount: reveal.suggestionCount,
+                    confirmedHours: 0,
+                    artScheme: colorScheme,
+                    onReview: {
+                        shellBackfillReveal = nil
+                        route(toLegacy: ShellTab.inboxIndex)
+                    },
+                    onSkip: { shellBackfillReveal = nil }
+                )
+            }
+            .sheet(item: $exportShare) { item in
+                // The report is a PDF plus a spreadsheet: share both.
+                ActivityShareSheet(items: [ExportShareFile(url: item.pdfURL), ExportShareFile(url: item.csvURL)]) { completed in
+                    exportShare = nil
+                    if completed { viewModel.exportShared(format: .pdf) }
+                }
+                .presentationDetents([.medium, .large])
+                .ignoresSafeArea()
+            }
+            .sheet(isPresented: $showCaptureWhatsNew, onDismiss: {
+                // Swiping the intro away is an answer too: it never shows again, and nothing turns on.
+                CaptureOptIn.markWhatsNewSeen()
+                if OnbBackfill.flowActive { OnbBackfill.flowEnded(foundShown: false) }
+                inboxModel.reload()
+            }) {
+                OnbWhatsNewSheet { openInbox in
+                    showCaptureWhatsNew = false
+                    if openInbox { route(toLegacy: ShellTab.inboxIndex) }
+                }
+                .environmentObject(viewModel)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+    }
 
-                withAnimation(
-                    .easeInOut(duration: 0.72)
-                    .delay(delay)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    isActive = true
+    /// Five native tabs. The system draws the bar (Liquid Glass on iOS 26+, its own material on
+    /// 18–25) and its minimize behaviour; nothing here reserves a bottom height.
+    private var tabView: some View {
+        TabView(selection: $tab) {
+            Tab(ShellItem.today.title, systemImage: ShellItem.today.systemImage, value: ShellItem.today) {
+                shellRoot { todayContent }
+            }
+            .accessibilityIdentifier(ShellItem.today.accessibilityIdentifier)
+            Tab(ShellItem.inbox.title, systemImage: ShellItem.inbox.systemImage, value: ShellItem.inbox) {
+                shellRoot { InboxView(model: inboxModel) }
+            }
+            .badge(inboxModel.badgeCount)
+            .accessibilityIdentifier(ShellItem.inbox.accessibilityIdentifier)
+            Tab(ShellItem.records.title, systemImage: ShellItem.records.systemImage, value: ShellItem.records) {
+                shellRoot { HistoryView() }
+            }
+            .accessibilityIdentifier(ShellItem.records.accessibilityIdentifier)
+            Tab(ShellItem.rentals.title, systemImage: ShellItem.rentals.systemImage, value: ShellItem.rentals) {
+                shellRoot { PropertiesView() }
+            }
+            .accessibilityIdentifier(ShellItem.rentals.accessibilityIdentifier)
+            // The create action is the native fifth item (search role), inside the bar as in the
+            // locked iOS 27 frame. The explicit label stops VoiceOver reading the role as "Search".
+            Tab(ShellItem.logTime.title, systemImage: ShellItem.logTime.systemImage, value: ShellItem.logTime, role: .search) {
+                LHCanvas()
+            }
+            .accessibilityLabel(ShellItem.logTime.title)
+            .accessibilityIdentifier(ShellItem.logTime.accessibilityIdentifier)
+        }
+        .tabViewStyle(.tabBarOnly)
+        // iOS 26+ drops `Tab`'s `.accessibilityIdentifier` on the floor: the bar's buttons come out
+        // with an empty identifier. Set them on the bar's items; badge and tab changes set them again.
+        .background(ShellTabBarIdentifierTagger(token: "\(inboxModel.badgeCount)-\(tab)"))
+    }
+
+    @ViewBuilder
+    private var todayContent: some View {
+        switch todayRoute {
+        case .dashboard: DashboardView(inbox: inboxModel)
+            .environment(\.todayShellUncovered, todayUncovered)
+        case .reports: ReportsView()
+        case .settings: SettingsView()
+        }
+    }
+
+    /// Nothing of the shell's covers Today: its tab is selected on the dashboard, and no shell sheet
+    /// or cover is up (the Log time sheet counts until it has finished dismissing).
+    private var todayUncovered: Bool {
+        tab == .today && todayRoute == .dashboard && logRoute == nil && !logSheetUp
+            && exportShare == nil && !showCaptureWhatsNew && shellBackfillReveal == nil && !showGetHelp
+            && viewModel.activeCelebration == nil
+    }
+
+    /// Each tab root: the export
+    /// banner in its own row above the bar, and the bottom toasts above the bar.
+    private func shellRoot<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .tint(colors.action)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let banner = exportBanner {
+                    ExportReadyBanner(
+                        kind: banner,
+                        onOpen: { exportShare = exportJob.takeReadyForSharing() },
+                        onDismiss: { exportJob.dismissBanner() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
             }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func floatingDockGlass(colors: AdaptiveColors, colorScheme: ColorScheme) -> some View {
-        if #available(iOS 26.0, *) {
-            self
-                .background(
-                    Capsule()
-                        .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.42 : 0.28))
-                )
-                .glassEffect(
-                    .regular.tint(colors.actionSurface.opacity(colorScheme == .dark ? 0.20 : 0.34)).interactive(),
-                    in: .capsule
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.24), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 14, y: 8)
-        } else {
-            self
-                .background(colors.backgroundSecondary)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.58), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 10, y: 4)
-        }
-    }
-}
-
-// MARK: - Floating Timer Banner
-
-struct FloatingTimerBanner: View {
-    @ObservedObject var viewModel: AppViewModel
-    let onTap: () -> Void
-
-    @State private var elapsed: TimeInterval = 0
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    private var propertyName: String {
-        guard let id = viewModel.timerPropertyId else { return "" }
-        return viewModel.properties.first { $0.id == id }?.name ?? "Unknown"
-    }
-
-    private var formattedTime: String {
-        let h = Int(elapsed) / 3600
-        let m = (Int(elapsed) % 3600) / 60
-        let s = Int(elapsed) % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%d:%02d", m, s)
-    }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(AppColors.coral)
-                    .frame(width: 8, height: 8)
-                Text(formattedTime)
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundStyle(AppColors.onAction)
-                Text(propertyName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(AppColors.onAction.opacity(0.8))
-                    .lineLimit(1)
-                Spacer()
-                LucideIcon(image: Lucide.chevronRight, size: 14)
-                    .foregroundStyle(AppColors.onAction.opacity(0.6))
+            .lhMotion(AppAnimation.reveal, value: exportBanner)
+            .overlay(alignment: .bottom) {
+                // WP3: Undo for the last inbox action takes the slot first; the shared queue waits.
+                ZStack {
+                    if let toast = inboxModel.toast {
+                        InboxUndoToast(toast: toast) { inboxModel.undo() }
+                            // Slides only: an opacity fade would let row text show through mid-transition.
+                            .transition(reduceMotion ? .identity : .move(edge: .bottom))
+                    } else {
+                        LHToastHost(center: toastCenter)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(AppColors.primary)
-            .clipShape(Capsule())
-            .shadow(color: AppColors.primary.opacity(0.18), radius: 8, y: 3)
+    }
+
+    /// The export banner, hidden when the ready report no longer matches the records.
+    private var exportBanner: ExportJob.Banner? {
+        guard exportJob.banner != nil else { return nil }
+        let fingerprint = exportJob.resultYear.map { ExportFingerprint.current(app: viewModel, year: $0) }
+        return exportJob.banner(currentFingerprint: fingerprint)
+    }
+
+    /// Plays the look-back reveal from the shell when Today isn't on screen to play it.
+    private func scheduleShellBackfillReveal() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            guard !(tab == .today && todayRoute == .dashboard),
+                  shellBackfillReveal == nil,
+                  inboxModel.sheetSuggestion == nil,
+                  !showCaptureWhatsNew,
+                  !OnbBackfill.flowActive,
+                  exportShare == nil,
+                  let reveal = houseEvents.pendingBackfill else { return }
+            houseEvents.markBackfillShown()
+            shellBackfillReveal = reveal
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
-        .onReceive(timer) { _ in
-            elapsed = viewModel.timerElapsedTime
-        }
-        .onAppear {
-            elapsed = viewModel.timerElapsedTime
+    }
+
+    /// Log time from the fifth tab, widgets, intents and notifications (`LogSheetRoute.forPlusRoute`).
+    private var plusRoute: LogSheetRoute {
+        LogSheetRoute.forPlusRoute(isTimerRunning: viewModel.isTimerRunning, stoppedDraft: StoppedTimerDraftStore.load())
+    }
+
+    private func openLog(_ route: LogSheetRoute) {
+        AppToastCenter.shared.dismiss()
+        guard logRoute == nil else { return }
+        logSheetUp = true
+        logRoute = route
+    }
+}
+
+// MARK: - Shell modifiers
+
+/// §1.25: the bar shrinks to the active tab as the user scrolls down (iOS 26+; the system's own
+/// behaviour before that).
+private struct TabBarMinimizeOnScroll: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
         }
     }
 }
@@ -970,4 +590,55 @@ struct FloatingTimerBanner: View {
 #Preview {
     ContentView()
         .environmentObject(AppViewModel())
+}
+
+// MARK: - Tab bar identifiers (iOS 26+)
+
+/// SwiftUI's `Tab(...).accessibilityIdentifier(_:)` does not reach the native tab bar's buttons on
+/// iOS 26 and 27 (they report an empty identifier), so UI tests, automation and the house-reveal
+/// log could not find `tab.today` / `tab.inbox`. This finds the shell's `UITabBarController` and
+/// sets each bar item's identifier, matched by the item's title, which the bar button reports.
+struct ShellTabBarIdentifierTagger: UIViewRepresentable {
+    /// Changes whenever the bar may rebuild its items (badge, selection), so the identifiers are set again.
+    let token: String
+
+    func makeUIView(context: Context) -> TaggerView { TaggerView() }
+    func updateUIView(_ view: TaggerView, context: Context) { view.applyIdentifiers() }
+
+    final class TaggerView: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            applyIdentifiers()
+        }
+
+        func applyIdentifiers() {
+            isUserInteractionEnabled = false
+            isAccessibilityElement = false
+            DispatchQueue.main.async { [weak self] in
+                guard let window = self?.window else { return }
+                ShellTabBarIdentifiers.apply(in: window)
+            }
+        }
+    }
+}
+
+enum ShellTabBarIdentifiers {
+    static func apply(in window: UIWindow) {
+        guard let bar = tabBarController(from: window.rootViewController) else { return }
+        let byTitle = Dictionary(ShellItem.allCases.map { ($0.title, $0.accessibilityIdentifier) },
+                                 uniquingKeysWith: { first, _ in first })
+        for item in bar.tabBar.items ?? [] {
+            guard let title = item.title, let id = byTitle[title] else { continue }
+            if item.accessibilityIdentifier != id { item.accessibilityIdentifier = id }
+        }
+    }
+
+    private static func tabBarController(from root: UIViewController?) -> UITabBarController? {
+        guard let root else { return nil }
+        if let bar = root as? UITabBarController { return bar }
+        for child in root.children {
+            if let bar = tabBarController(from: child) { return bar }
+        }
+        return nil
+    }
 }

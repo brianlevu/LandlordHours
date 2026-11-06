@@ -1,1288 +1,707 @@
 import SwiftUI
-import PDFKit
-import LucideIcons
+import Charts
 
-// MARK: - Goal Mode Enum
+// MARK: - Reports
+//
+// The ring's screen (standard §1.12, §H.5): where each person honestly stands first (the same
+// engine values as Today), the two pace tiles that left Today, then where the hours went (rental,
+// kind of work, month, who, source), then the PDF. Plain canvas: the house sits on Today and the
+// rental page, so two heroes never compete here. The one thing on a screen set in the drafting
+// mono is the ring card's eyebrow (§C, mono labels).
+
+/// The goal Reports measures against. Labels double as the segmented control's titles.
 enum GoalMode: String, CaseIterable, Identifiable {
-    case reps750 = "REPS · 750h"
+    case reps750 = "750h"
     case mp500 = "500h"
     case mp100 = "100h"
 
     var id: String { rawValue }
-
     var pillLabel: String { rawValue }
 
-    var targetHours: Double {
+    var houseGoal: HouseGoal {
         switch self {
-        case .reps750: return 750
-        case .mp500: return 500
-        case .mp100: return 100
+        case .reps750: return .reps750
+        case .mp500: return .mp500
+        case .mp100: return .mp100
         }
     }
 
-    var showInnerRing: Bool {
-        self == .reps750
-    }
+    var targetHours: Double { houseGoal.targetHours }
 
-    var outerGradientColors: [Color] {
-        switch self {
-        case .reps750: return [AppColors.reportsAccent, AppColors.reportsAccentSoft]
-        case .mp500: return [AppColors.reportsAccent, AppColors.mpAccentSoft]
-        case .mp100: return [AppColors.successGreenLight, AppColors.successGreenSoft]
+    init(_ goal: HouseGoal) {
+        switch goal {
+        case .reps750: self = .reps750
+        case .mp500: self = .mp500
+        case .mp100: self = .mp100
         }
     }
-
-    var innerGradientColors: [Color] {
-        [AppColors.successGreenLight, AppColors.successGreenSoft]
-    }
-
-    var trackOuterColor: Color {
-        switch self {
-        case .reps750: return AppColors.reportsAccentWash
-        case .mp500: return AppColors.reportsAccentWash
-        case .mp100: return AppColors.successGreenWash
-        }
-    }
-
-    var trackInnerColor: Color {
-        switch self {
-        case .reps750: return AppColors.successGreenWash
-        case .mp500: return AppColors.snow
-        case .mp100: return AppColors.successGreenWash
-        }
-    }
-
-    var accentColor: Color {
-        switch self {
-        case .reps750: return AppColors.reportsAccent
-        case .mp500: return AppColors.mpAccent
-        case .mp100: return AppColors.successGreen
-        }
-    }
-
-    var accentWashColor: Color {
-        switch self {
-        case .reps750: return AppColors.reportsAccentWash
-        case .mp500: return AppColors.mpAccentWash
-        case .mp100: return AppColors.successGreenWash
-        }
-    }
-
-    var glowColor: Color {
-        switch self {
-        case .reps750: return AppColors.reportsAccent.opacity(0.10)
-        case .mp500: return AppColors.mpAccent.opacity(0.10)
-        case .mp100: return AppColors.successGreenLight.opacity(0.12)
-        }
-    }
-
-    var stat3Label: String {
-        switch self {
-        case .reps750: return "50% Rule"
-        case .mp500: return "Complete"
-        case .mp100: return ">100h tests"
-        }
-    }
-
 }
 
-// MARK: - Reports View
 struct ReportsView: View {
+    /// Loading hook (owner direction: loading never blocks). Reports' numbers are computed on the
+    /// main actor today, so this stays false; when totals or charts move off-thread, set it and the
+    /// numbers and the month chart show as placeholders.
+    var isLoading: Bool = false
+
     @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    @StateObject private var goalManager = GoalManager.shared
+    @ObservedObject private var goalManager = GoalManager.shared
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var taxProfile = TaxProfileManager.shared
+
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
-    @State private var showingExportSheet = false
-    @State private var showingPaywall = false
-    @State private var showingParticipationSheet = false
     @State private var selectedGoal: GoalMode = .reps750
-    @State private var ringAppeared = false
+    @State private var showingExportSheet = false
+    @State private var paywall: ProPaywallRequest?
+    @State private var showingParticipationSheet = false
 
-    private var reportsBottomContentInset: CGFloat {
-        AppSpacing.tabContentBottomInset + AppSpacing.xxl
+    private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
+
+    // MARK: Data
+
+    private var yearEntries: [TimeEntry] { viewModel.entriesForYear(selectedYear) }
+    private var standings: [ReportStanding] { viewModel.reportStandings(goal: selectedGoal.houseGoal, year: selectedYear) }
+
+    private var materialParticipation: TaxQualificationEngine.MaterialParticipationResult {
+        viewModel.materialParticipationOverview(year: selectedYear, includeSpouse: viewModel.tracksSpouseJointly)
     }
 
-    // MARK: - Computed Properties
-
-    private var selfHours: Double {
-        viewModel.totalHoursForParticipant(.selfParticipant, year: selectedYear)
+    private var showsParticipationRow: Bool {
+        selectedGoal == .mp100
+            && materialParticipation.ownerAndSpouseHours > 100
+            && !materialParticipation.meets500HourTest
     }
 
-    private var spouseHours: Double {
-        viewModel.totalHoursForParticipant(.spouse, year: selectedYear)
-    }
-
-    private var totalHours: Double {
-        switch selectedGoal {
-        case .reps750:
-            return repsStatus.realEstateHours
-        case .mp500, .mp100:
-            return materialParticipationStatus.ownerAndSpouseHours
-        }
-    }
-
-    private var repsStatus: TaxQualificationEngine.REPSResult {
-        viewModel.repsStatus(participant: .selfParticipant, year: selectedYear)
-    }
-
-    private var materialParticipationStatus: TaxQualificationEngine.MaterialParticipationResult {
-        viewModel.materialParticipationOverview(year: selectedYear)
-    }
-
-    private var outerProgress: Double {
-        let target = selectedGoal.targetHours
-        guard target > 0 else { return 0 }
-        return min(totalHours / target, 1.0)
-    }
-
-    private var innerProgress: Double {
-        guard selectedGoal.showInnerRing, repsStatus.moreThanHalfStatus != .notEntered else { return 0 }
-        return min(repsStatus.realEstateWorkPercentage, 1.0)
-    }
-
-    private var meets50Percent: Bool {
-        viewModel.meets50PercentRule(year: selectedYear)
-    }
-
-    private var isGoalMet: Bool {
-        switch selectedGoal {
-        case .reps750:
-            return repsStatus.isQualified
-        case .mp500:
-            return materialParticipationStatus.meets500HourTest
-        case .mp100:
-            return materialParticipationStatus.meets100HourTest
-        }
-    }
-
-    private var remainingHours: Double {
-        max(selectedGoal.targetHours - totalHours, 0)
-    }
-
-    private var daysLeftInYear: Int {
+    private var rentalRows: [ReportsRentalRow] {
         let calendar = Calendar.current
-        guard let endOfYear = calendar.date(from: DateComponents(year: selectedYear, month: 12, day: 31)) else { return 0 }
-        let today = Date()
-        let currentYear = calendar.component(.year, from: today)
-        if selectedYear < currentYear { return 0 }
-        if selectedYear > currentYear { return 365 }
-        return max(calendar.dateComponents([.day], from: today, to: endOfYear).day ?? 0, 0)
+        let today = viewModel.timeEntries.filter { calendar.isDateInToday($0.date) }
+        let loggedToday = Set(today.map(\.propertyId))
+        return ReportsLogic.rentalRows(
+            rentals: viewModel.properties.map { ($0.id, $0.name, viewModel.hoursForProperty($0, year: selectedYear), loggedToday.contains($0.id)) },
+            goalHours: selectedGoal.targetHours
+        )
     }
 
-    private var stat3Value: String {
-        switch selectedGoal {
-        case .reps750:
-            if repsStatus.moreThanHalfStatus == .notEntered { return TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue }
-            return String(format: "%.0f%%", repsStatus.realEstateWorkPercentage * 100)
-        case .mp500:
-            let pct = (totalHours / 500.0) * 100
-            return String(format: "%.0f%%", min(pct, 100))
-        case .mp100:
-            let count = viewModel.properties.filter { property in
-                viewModel.materialParticipationStatus(year: selectedYear, propertyId: property.id).meets100HourTest
-            }.count
-            return "\(count)"
-        }
+    private var categoryBars: [(label: String, hours: Double)] {
+        let byCategory = Dictionary(grouping: yearEntries.filter(\.countsForREPS), by: \.category)
+            .map { ($0.key.inboxLabel, $0.value.reduce(0) { $0 + $1.hours }) }
+        return ReportsLogic.ranked(byCategory)
     }
 
-    private var weeklyPaceNeeded: Double {
-        guard daysLeftInYear > 0 else { return 0 }
-        let weeksLeft = Double(daysLeftInYear) / 7.0
-        guard weeksLeft > 0 else { return 0 }
-        return remainingHours / weeksLeft
+    private var whoBars: [(label: String, hours: Double)] {
+        let me = yearEntries.filter { $0.participant == .selfParticipant }.reduce(0) { $0 + $1.hours }
+        let spouse = yearEntries.filter { $0.participant == .spouse }.reduce(0) { $0 + $1.hours }
+        guard spouse > 0 || taxProfile.spouseTracking else { return [] }
+        return [(RR.t("reports.who.me", "Me"), me), (RR.t("reports.who.spouse", "Spouse"), spouse)]
     }
 
-    private var paceStatus: (label: String, detail: String, isOnTrack: Bool) {
-        if selectedGoal == .reps750, let open = TaxQualificationEngine.hoursMetRuleOpenStatus(repsStatus) {
-            return (open.label, open.detail, false)
-        }
-        if isGoalMet {
-            let over = totalHours - selectedGoal.targetHours
-            return (selectedGoal == .reps750 ? "Qualified" : "Goal met", "\(String(format: "%.0f", over))h over target", true)
-        }
-        let pace = weeklyPaceNeeded
-        if pace <= 20 {
-            return ("On track", "~\(String(format: "%.1f", pace))h/week needed", true)
-        } else {
-            return ("Behind pace", "~\(String(format: "%.1f", pace))h/week needed", false)
-        }
+    private var sourceBars: [(label: String, hours: Double)] {
+        let bySource = Dictionary(grouping: yearEntries, by: { RecordSourceBadge(entry: $0) })
+            .map { ($0.key.title, $0.value.reduce(0) { $0 + $1.hours }) }
+        return ReportsLogic.ranked(bySource)
     }
 
-    private var propertyAccentColors: [Color] {
-        [
-            AppColors.reportsAccent,
-            AppColors.error,
-            AppColors.successGreenLight,
-            AppColors.warning,
-            AppColors.dataBlue,
-            AppColors.repairOrange,
-        ]
+    private var monthly: [Double] { ReportsLogic.monthlyHours(yearEntries, year: selectedYear) }
+
+    /// "Through Oct 19 · 73 days left in the year", or what a closed or future year is.
+    private var throughLine: String {
+        let calendar = Calendar.current
+        let now = Date()
+        let currentYear = calendar.component(.year, from: now)
+        if selectedYear < currentYear { return RR.t("reports.through.closed", "The \(String(selectedYear)) tax year is closed.") }
+        if selectedYear > currentYear { return RR.t("reports.through.future", "\(String(selectedYear)) hasn\u{2019}t started yet.") }
+        let day = now.formatted(.dateTime.month(.abbreviated).day())
+        let days = ReportsLogic.daysLeft(now: now, calendar: calendar)
+        return RR.t("reports.through.open", "Through \(day) \u{00B7} \(days) days left in the year")
     }
+
+    /// Days since the first record of the year, so a pace waits for enough hours (Today's rule).
+    private var daysOfData: Int {
+        let calendar = Calendar.current
+        guard let first = yearEntries.map(\.date).min() else { return 0 }
+        return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: first), to: calendar.startOfDay(for: Date())).day ?? 0)
+    }
+
+    private var paceTiles: [ReportsTile] {
+        guard let lead = standings.first else { return [] }
+        let rep = selectedGoal == .reps750 ? viewModel.repsStatus(participant: .selfParticipant, year: selectedYear) : nil
+        return ReportsLogic.paceTiles(
+            standing: lead, rep: rep, year: selectedYear,
+            paceReady: TodayHeroCopy.paceIsReady(hours: lead.hours, daysOfData: daysOfData)
+        )
+    }
+
+    // MARK: Body
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    headerRow
-
-                    goalPillRow
-
-                    ringHeroSection
-
-                    if showMP100ParticipationRow {
-                        mp100ParticipationRow
+            ScrollView {
+                VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                    controls
+                    standingSection
+                    if yearEntries.isEmpty {
+                        LHEmptyState(
+                            systemImage: "chart.bar",
+                            tone: .action,
+                            headline: RR.t("reports.empty.title", "No hours in \(String(selectedYear)) yet"),
+                            message: RR.t("reports.empty.message", "Log or confirm work and the breakdown fills in here.")
+                        )
+                        .accessibilityIdentifier("reports.empty")
+                    } else {
+                        rentalSection
+                        barSection(title: RR.t("reports.section.kind", "By kind of work"), bars: categoryBars)
+                        monthSection
+                        if !whoBars.isEmpty {
+                            barSection(title: RR.t("reports.section.who", "Who did it"), bars: whoBars)
+                        }
+                        barSection(title: RR.t("reports.section.source", "Where the hours came from"), bars: sourceBars)
                     }
-
-                    legendRow
-
-                    paceIndicator
-
-                    statChipRow
-
-                    PropertyBreakdownSection(
-                        properties: viewModel.properties,
-                        viewModel: viewModel,
-                        selectedYear: selectedYear,
-                        selectedGoal: selectedGoal,
-                        accentColors: propertyAccentColors
-                    )
-                    .padding(.top, AppSpacing.xl)
-
-                    CategoryBreakdownSection(
-                        viewModel: viewModel,
-                        selectedYear: selectedYear,
-                        selectedGoal: selectedGoal
-                    )
+                    exportCard
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, reportsBottomContentInset)
+                .padding(.horizontal, LHMetrics.gutter)
+                .padding(.bottom, LHMetrics.sectionGap)
             }
-            .background {
-                goalBackground
-            }
-            .navigationBarHidden(true)
+            .scrollIndicators(.hidden)
+            .background { LHCanvas() }
+            // Screen anatomy: the scaffold owns the title, the back icon, the one trailing action and the gaps.
+            .lhTabScreen(RR.t("reports.title", "Reports"), subtitle: throughLine,
+                         back: LHBackAction(label: RR.t("reports.back", "Back to Today"), identifier: "shell.backToToday") {
+                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+            }, trailing: {
+                LHHeaderAction(symbol: "square.and.arrow.up", label: RR.t("reports.export.label", "Export report"),
+                               identifier: "reports.export", action: exportAction)
+            })
             .sheet(isPresented: $showingExportSheet) {
                 ExportPDFView(year: selectedYear)
             }
-            .sheet(isPresented: $showingPaywall) {
-                // After a purchase, carry on to the export the user asked for.
-                PaywallView(
-                    context: .export,
-                    year: selectedYear,
-                    onUnlocked: { showingExportSheet = true },
-                    onClose: { showingPaywall = false }
-                )
-            }
+            .proPaywall($paywall)
             .sheet(isPresented: $showingParticipationSheet) {
                 ParticipationConfirmationSheet(
                     year: selectedYear,
-                    currentAnswer: materialParticipationStatus.noOneParticipatedMore
+                    currentAnswer: materialParticipation.noOneParticipatedMore
                 ) { answer in
                     taxProfile.setNoOneParticipatedMore(answer, forYear: selectedYear)
                 }
             }
             .onAppear {
-                // Sync selected goal from GoalManager settings
-                switch goalManager.globalGoalType {
-                case .reps, .both:
-                    selectedGoal = .reps750
-                case .str:
-                    selectedGoal = .mp100
-                }
-                animate(AppAnimation.ringProgress.delay(0.3)) {
-                    ringAppeared = true
-                }
+                selectedGoal = GoalMode(goalManager.houseGoal)
                 Analytics.reportViewed()
             }
         }
+        .accessibilityIdentifier("reports.screen")
     }
 
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
-        if reduceMotion {
-            updates()
-        } else {
-            withAnimation(animation, updates)
-        }
-    }
+    // MARK: Header and controls
 
-    // MARK: - Goal-Specific Background
-    private var goalBackground: some View {
-        ZStack {
-            LHMobileCanvas()
-
-            Circle()
-                .fill(selectedGoal.glowColor)
-                .frame(width: 240, height: 240)
-                .blur(radius: 58)
-                .offset(x: selectedGoal == .mp500 ? -150 : 150, y: -230)
-                .allowsHitTesting(false)
-
-            Circle()
-                .fill(selectedGoal.accentWashColor.opacity(colorScheme == .dark ? 0.08 : 0.42))
-                .frame(width: 180, height: 180)
-                .blur(radius: 52)
-                .offset(x: selectedGoal == .mp100 ? -130 : 130, y: 260)
-                .allowsHitTesting(false)
-        }
-        .lhMotion(AppAnimation.standard, value: selectedGoal)
-    }
-
-    // MARK: - Header Row
-    private var headerRow: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                Text("Reports")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .minimumScaleFactor(0.82)
-
-                Spacer()
-
-                Button {
-                    exportAction()
-                } label: {
-                    LucideIcon(image: subscriptionManager.isPro ? Lucide.share2 : Lucide.lock, size: 20)
-                        .foregroundStyle(colors.textPrimary)
-                        .frame(width: 44, height: 44)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(subscriptionManager.isPro ? "Export report" : "Unlock export")
-                .accessibilityIdentifier("reports.export")
+    /// The year chip and the goal switcher share a row while they fit; otherwise the switcher takes
+    /// its own row.
+    private var controls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                yearMenu
+                goalPicker
             }
-
-            Text("Check pace, gaps, and export-ready evidence.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(2)
-
-            YearSelector(
-                selectedYear: $selectedYear,
-                accentColor: colors.textPrimary,
-                accentWash: colors.backgroundTertiary
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                yearMenu
+                goalPicker
+            }
         }
+        // The chips draw 34pt inside a 44pt tap frame: lift the row by the inset so the visible
+        // edge, not the tap frame, sits on the scaffold's content line (S3 is measured in pixels).
+        .padding(.top, -(LHMetrics.minTap - LHChip.height) / 2)
     }
 
-    private func exportAction() {
-        if viewModel.canExportPDF() {
-            showingExportSheet = true
-        } else {
-            showingPaywall = true
+    private var yearMenu: some View {
+        Menu {
+            Picker(RR.t("reports.year", "Year"), selection: $selectedYear) {
+                ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
+                    Text(String(year)).tag(year)
+                }
+            }
+        } label: {
+            LHChip(String(selectedYear), systemImage: "calendar", isSelected: false) {}
+                .allowsHitTesting(false)
         }
+        .fixedSize()
+        .accessibilityLabel(RR.t("reports.year.spoken", "Tax year, \(String(selectedYear))"))
+        .accessibilityIdentifier("reports.year")
     }
 
-    // MARK: - Goal Pill Row
-    private var goalPillRow: some View {
-        HStack(spacing: 8) {
-            ForEach(GoalMode.allCases) { goal in
-                GoalPillButton(
-                    goal: goal,
-                    isSelected: selectedGoal == goal,
-                    accentColor: goal.accentColor,
-                    accentWash: goal.accentWashColor,
-                    action: {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        animate(AppAnimation.pillPop) {
-                            selectedGoal = goal
+    private var goalPicker: some View {
+        LHSegmented(
+            GoalMode.allCases.map { LHSegmented<GoalMode>.Option($0, $0.pillLabel) },
+            selection: $selectedGoal,
+            accessibilityLabel: RR.t("reports.goal", "Goal")
+        )
+        .accessibilityIdentifier("reports.goal")
+    }
+
+    // MARK: Standing
+
+    private var standingSection: some View {
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(RR.t("reports.section.stand", "Where you stand"))
+            VStack(spacing: 12) {
+                ForEach(Array(standings.enumerated()), id: \.element.id) { index, standing in
+                    VStack(alignment: .leading, spacing: 8) {
+                        if index == 0 {
+                            RingStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                        } else {
+                            CompactStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                        }
+                        if (index == 0 ? ax : dynamicTypeSize >= .xxLarge), let detail = standing.detail {
+                            Text(detail)
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 4)
+                                .accessibilityHidden(true)
                         }
                     }
-                )
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Ring Hero Section
-    private var ringHeroSection: some View {
-        ZStack {
-            // Ambient glow
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [selectedGoal.glowColor, .clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 120
-                    )
-                )
-                .frame(width: 240, height: 240)
-                .lhMotion(AppAnimation.standard, value: selectedGoal)
-
-            ZStack {
-                // Outer track (segmented dashes)
-                Circle()
-                    .stroke(
-                        selectedGoal.trackOuterColor,
-                        style: StrokeStyle(lineWidth: 18, lineCap: .round, dash: [3, 5])
-                    )
-                    .frame(width: 216, height: 216)
-                    .lhMotion(AppAnimation.standard, value: selectedGoal)
-
-                // Outer progress
-                Circle()
-                    .trim(from: 0, to: ringAppeared ? outerProgress : 0)
-                    .stroke(
-                        LinearGradient(
-                            colors: selectedGoal.outerGradientColors,
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 18, lineCap: .round)
-                    )
-                    .frame(width: 216, height: 216)
-                    .rotationEffect(.degrees(-90))
-                    .lhMotion(AppAnimation.ringProgress, value: outerProgress)
-                    .lhMotion(AppAnimation.standard, value: selectedGoal)
-
-                // Inner track (REPS only)
-                if selectedGoal.showInnerRing {
-                    Circle()
-                        .stroke(
-                            selectedGoal.trackInnerColor,
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round, dash: [3, 5])
-                        )
-                        .frame(width: 164, height: 164)
-                        .transition(.opacity)
-
-                    Circle()
-                        .trim(from: 0, to: ringAppeared ? innerProgress : 0)
-                        .stroke(
-                            LinearGradient(
-                                colors: selectedGoal.innerGradientColors,
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                        )
-                        .frame(width: 164, height: 164)
-                        .rotationEffect(.degrees(-90))
-                        .lhMotion(AppAnimation.ringProgress, value: innerProgress)
-                        .transition(.opacity)
                 }
-
-                ringCenterContent
+                if showsParticipationRow { participationRow }
+                if !paceTiles.isEmpty {
+                    LHTile.StatGrid {
+                        ForEach(paceTiles, id: \.label) { tile in
+                            LHTile.Stat(value: tile.value, label: tile.label)
+                        }
+                    }
+                    .accessibilityIdentifier("reports.paceTiles")
+                }
             }
-            .frame(width: 260, height: 260)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(selectedGoal.pillLabel) progress. \(AppFormat.hours(totalHours)) logged out of \(Int(selectedGoal.targetHours)) hours.")
+        .lhMotion(AppAnimation.standard, value: selectedGoal)
     }
 
-    @ViewBuilder
-    private var ringCenterContent: some View {
-        if isGoalMet && selectedGoal == .mp100 {
-            VStack(spacing: 4) {
-                LucideIcon(image: Lucide.circleCheck, size: 32)
-                    .foregroundStyle(AppColors.successGreen)
-                Text("Goal met!")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppColors.successGreen)
-                Text("\(Int(totalHours)) of \(Int(selectedGoal.targetHours)) hours")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(AppColors.mist)
-            }
-            .transition(.opacity)
-        } else {
-            VStack(spacing: 4) {
-                Text(String(format: "%.0f", totalHours))
-                    .font(AppTypography.heroNumber)
-                    .foregroundStyle(isGoalMet ? AppColors.successGreen : colors.textPrimary)
-
-                Text("of \(Int(selectedGoal.targetHours)) hours")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppColors.mist)
-            }
-            .transition(.opacity)
-        }
-    }
-
-    // MARK: - 100-Hour Test Confirmation Row
-    //
-    // Surfaces the 100-hour material participation state only once hours clear the
-    // threshold and the 500-hour test hasn't already established participation.
-    private var showMP100ParticipationRow: Bool {
-        selectedGoal == .mp100
-            && materialParticipationStatus.ownerAndSpouseHours > 100
-            && !materialParticipationStatus.meets500HourTest
-    }
-
-    @ViewBuilder
-    private var mp100ParticipationRow: some View {
-        switch materialParticipationStatus.noOneParticipatedMore {
+    private var participationRow: some View {
+        let answer = materialParticipation.noOneParticipatedMore
+        let title: String
+        let symbol: String
+        let tint: LHRowGlyph.Tint
+        switch answer {
         case .none:
-            participationRow(
-                icon: Lucide.circleAlert,
-                iconTint: AppColors.cautionText,
-                iconWash: colors.cautionSurface,
-                borderTint: AppColors.caution,
-                title: "100-hour threshold reached",
-                detail: "Confirm no one participated more to pass this test.",
-                actionLabel: "Confirm"
-            )
+            title = RR.t("reports.participation.ask", "Did anyone else do more?")
+            symbol = "questionmark.circle.fill"
+            tint = .caution
         case .some(true):
-            participationRow(
-                icon: Lucide.badgeCheck,
-                iconTint: AppColors.successGreen,
-                iconWash: AppColors.successGreenWash,
-                borderTint: AppColors.successGreenLight,
-                title: "No one participated more",
-                detail: "You confirmed the 100-hour test for \(String(selectedYear)).",
-                actionLabel: "Change"
-            )
+            title = RR.t("reports.participation.nobody", "No one did more")
+            symbol = "checkmark.circle.fill"
+            tint = .positive
         case .some(false):
-            participationRow(
-                icon: Lucide.circleSlash,
-                iconTint: AppColors.cautionText,
-                iconWash: colors.cautionSurface,
-                borderTint: AppColors.caution,
-                title: "Someone participated more",
-                detail: "The 100-hour test isn't met. Your 500-hour path still counts.",
-                actionLabel: "Change"
+            title = RR.t("reports.participation.someone", "Someone did more")
+            symbol = "exclamationmark.circle.fill"
+            tint = .caution
+        }
+        let meta = answer == nil
+            ? RR.t("reports.participation.meta.ask", "Answer for \(String(selectedYear)) to settle the 100-hour test.")
+            : RR.t("reports.participation.meta.change", "Tap to change your answer for \(String(selectedYear)).")
+        return LHRowGroup {
+            LHRow.Browse(
+                title: title,
+                meta: meta,
+                value: answer == nil ? RR.t("reports.participation.answer", "Answer") : RR.t("reports.participation.change", "Change"),
+                systemImage: symbol,
+                tint: tint,
+                wrapsMeta: true,
+                action: { showingParticipationSheet = true }
             )
         }
-    }
-
-    private func participationRow(
-        icon: UIImage,
-        iconTint: Color,
-        iconWash: Color,
-        borderTint: Color,
-        title: String,
-        detail: String,
-        actionLabel: String
-    ) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showingParticipationSheet = true
-        } label: {
-            HStack(spacing: 12) {
-                LucideIcon(image: icon, size: 20)
-                    .foregroundStyle(iconTint)
-                    .frame(width: 40, height: 40)
-                    .background(iconWash)
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .multilineTextAlignment(.leading)
-                    Text(detail)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 8)
-
-                Text(actionLabel)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppColors.onAction)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(colors.action)
-                    .clipShape(Capsule())
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(borderTint.opacity(0.4), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.lhPressable)
         .accessibilityIdentifier("reports.mp100.confirmRow")
-        .accessibilityHint("Opens the 100-hour test confirmation")
+        .accessibilityHint(RR.t("reports.participation.hint", "Opens the 100-hour test question"))
     }
 
-    // MARK: - Legend Row
-    private var legendRow: some View {
-        HStack(spacing: 20) {
-            legendDot(
-                color: selectedGoal.outerGradientColors.first ?? AppColors.primary,
-                text: selectedGoal == .mp100 ? "All hours logged" :
-                      selectedGoal == .mp500 ? "Your hours + Spouse" : "RE Hours"
-            )
+    // MARK: Breakdowns
 
-            if selectedGoal.showInnerRing {
-                legendDot(
-                    color: AppColors.successGreenLight,
-                    text: "50% Rule"
-                )
+    private func sectionTitle(_ title: String, total: Double) -> String {
+        RR.t("reports.header.total", "\(title)\u{00A0}\u{00B7} \(LHFormat.hours(total))")
+    }
+
+    private var rentalSection: some View {
+        let rows = rentalRows
+        let total = rows.reduce(0) { $0 + $1.hours }
+        let title = RR.t("reports.section.rental", "By rental")
+        return VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(sectionTitle(title, total: total))
+            LHRowGroup {
+                if rows.isEmpty {
+                    emptyBar
+                } else {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        if index > 0 { LHDivider(leadingInset: LHRow.insets.leading + 44 + 12) }
+                        LHRow.Browse(
+                            title: row.name,
+                            meta: ReportsLogic.shareLine(row.share),
+                            value: LHFormat.hours(row.hours),
+                            showsChevron: false
+                        ) {
+                            LHThumb.row(row.stage, lit: row.loggedToday)
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(row.name)
+                        .accessibilityValue(RR.t("reports.rental.spoken", "\(LHFormat.spokenHours(row.hours)), \(Int((row.share * 100).rounded())) percent"))
+                    }
+                }
             }
-        }
-        .lhMotion(AppAnimation.standard, value: selectedGoal)
-    }
-
-    private func legendDot(color: Color, text: String) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-            Text(text)
-                .font(AppTypography.caption)
-                .foregroundStyle(AppColors.slate)
-        }
-    }
-
-    // MARK: - Pace Indicator
-    private var paceIndicator: some View {
-        let pace = paceStatus
-        return HStack(spacing: 8) {
-            // Pace badge
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(pace.isOnTrack ? AppColors.successGreenLight : colors.caution)
-                    .frame(width: 6, height: 6)
-                Text(pace.label)
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            .foregroundStyle(pace.isOnTrack ? AppColors.successGreen : AppColors.cautionText)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(pace.isOnTrack ? AppColors.successGreenWash : colors.cautionSurface)
-            .clipShape(Capsule())
-
-            // Detail text
-            Text(pace.detail)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.mist)
-        }
-        .lhMotion(AppAnimation.standard, value: selectedGoal)
-    }
-
-    // MARK: - Stat Chip Row
-    private var statChipRow: some View {
-        HStack(spacing: 8) {
-            StatChip(
-                value: isGoalMet ? AppFormat.hours(totalHours) : AppFormat.hours(remainingHours),
-                label: isGoalMet ? "Total logged" : "Remaining",
-                valueColor: isGoalMet ? AppColors.successGreen : colors.textPrimary,
-                colorScheme: colorScheme
-            )
-
-            StatChip(
-                value: "\(daysLeftInYear)",
-                label: "Days left",
-                valueColor: colors.textPrimary,
-                colorScheme: colorScheme
-            )
-
-            StatChip(
-                value: stat3Value,
-                label: selectedGoal.stat3Label,
-                valueColor: selectedGoal == .reps750 && meets50Percent ? AppColors.successGreen :
-                            selectedGoal == .mp100 ? AppColors.successGreen : colors.textPrimary,
-                colorScheme: colorScheme
-            )
-        }
-    }
-}
-
-// MARK: - Year Selector (Pill Style)
-struct YearSelector: View {
-    @Binding var selectedYear: Int
-    var accentColor: Color = AppColors.primary
-    var accentWash: Color = AppColors.primarySurface
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Button {
-                if selectedYear > 2020 { selectedYear -= 1 }
-            } label: {
-                LucideIcon(image: Lucide.chevronLeft, size: 11)
-                    .foregroundStyle(accentColor)
-            }
-            .accessibilityLabel("Previous year")
-
-            Text(String(selectedYear))
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(accentColor)
-
-            Button {
-                if selectedYear < 2030 { selectedYear += 1 }
-            } label: {
-                LucideIcon(image: Lucide.chevronRight, size: 11)
-                    .foregroundStyle(accentColor)
-            }
-            .accessibilityLabel("Next year")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(accentWash)
-        .clipShape(Capsule())
-        .lhMotion(AppAnimation.standard, value: accentColor)
-    }
-}
-
-// MARK: - Goal Pill Button
-struct GoalPillButton: View {
-    let goal: GoalMode
-    let isSelected: Bool
-    var accentColor: Color = AppColors.action
-    var accentWash: Color = AppColors.actionSurface
-    let action: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        Button(action: action) {
-            Text(goal.pillLabel)
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(isSelected ? AppColors.onAction : colors.textSecondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? accentColor : inactiveFill)
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(
-                            isSelected ? accentWash.opacity(colorScheme == .dark ? 0.72 : 0.9) : colors.border.opacity(colorScheme == .dark ? 0.85 : 0.28),
-                            lineWidth: 1
-                        )
-                )
-        }
-        .buttonStyle(.plain)
-        .lhMotion(AppAnimation.pillPop, value: isSelected)
-    }
-
-    private var inactiveFill: Color {
-        colors.backgroundTertiary
-    }
-}
-
-// MARK: - Stat Chip
-struct StatChip: View {
-    let value: String
-    let label: String
-    var valueColor: Color = AppColors.charcoal
-    var colorScheme: ColorScheme = .light
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundStyle(valueColor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+            Text(RR.t("reports.rental.footnote", "Every hour that counts as rental work, yours and your spouse\u{2019}s."))
+                .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
+                .padding(.horizontal, 4)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .padding(.horizontal, 10)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("reports.section.rental")
     }
-}
 
-// MARK: - Property Breakdown Section
-struct PropertyBreakdownSection: View {
-    let properties: [RentalProperty]
-    let viewModel: AppViewModel
-    let selectedYear: Int
-    var selectedGoal: GoalMode = .reps750
-    var accentColors: [Color] = []
+    private var emptyBar: some View {
+        Text(RR.t("reports.nothingYet", "Nothing logged here yet."))
+            .font(.subheadline)
+            .foregroundStyle(colors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(LHRow.insets)
+    }
 
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Properties")
-                    .font(.system(size: 19, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-
-                Spacer()
-            }
-
-            if properties.isEmpty {
-                EmptySectionCard(
-                    systemIcon: "building-2",
-                    message: "No properties added",
-                    actionLabel: "Add Property",
-                    action: {
-                        // Switch to Properties tab (index 1)
-                        NotificationCenter.default.post(name: .switchToTab, object: 1)
-                    }
-                )
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(Array(properties.enumerated()), id: \.element.id) { index, property in
-                        let hours = viewModel.hoursForProperty(property, year: selectedYear)
-                        let barColor = accentColors[index % max(accentColors.count, 1)]
-                        PropertyBreakdownRow(
-                            property: property,
-                            hours: hours,
-                            barColor: barColor,
-                            selectedGoal: selectedGoal
-                        )
+    private func barSection(title: String, bars: [(label: String, hours: Double)]) -> some View {
+        let total = bars.reduce(0) { $0 + $1.hours }
+        let maxValue = bars.map(\.hours).max() ?? 0
+        return VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(sectionTitle(title, total: total))
+            VStack(spacing: 14) {
+                if bars.isEmpty {
+                    emptyBar.padding(-16)
+                } else {
+                    ForEach(Array(bars.enumerated()), id: \.offset) { _, bar in
+                        LHBarRow(label: bar.label, value: LHFormat.hours(bar.hours), fraction: maxValue > 0 ? bar.hours / maxValue : 0)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(bar.label)
+                            .accessibilityValue(RR.t("reports.bar.spoken", "\(LHFormat.spokenHours(bar.hours)), \(total > 0 ? Int((bar.hours / total * 100).rounded()) : 0) percent"))
                     }
                 }
             }
+            .padding(LHMetrics.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+            .overlay { cardEdge }
         }
-    }
-}
-
-// MARK: - Property Breakdown Row
-struct PropertyBreakdownRow: View {
-    let property: RentalProperty
-    let hours: Double
-    var barColor: Color = AppColors.primary
-    var selectedGoal: GoalMode = .reps750
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var progress: Double {
-        guard selectedGoal.targetHours > 0 else { return 0 }
-        return min(hours / selectedGoal.targetHours, 1.0)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("reports.section.\(title)")
     }
 
-    var barGradient: LinearGradient {
-        LinearGradient(
-            colors: [barColor, barColor.opacity(0.6)],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-
-    private var metaText: String {
-        switch selectedGoal {
-        case .reps750:
-            return "\(property.propertyType.rawValue) \u{00B7} \(property.address)"
-        case .mp500:
-            return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)) of \(Int(selectedGoal.targetHours))h"
-        case .mp100:
-            if hours > selectedGoal.targetHours {
-                return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)), met"
-            } else if hours == selectedGoal.targetHours {
-                return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)), add any more time"
-            } else {
-                let left = selectedGoal.targetHours - hours
-                return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)), \(AppFormat.hours(left)) left"
-            }
+    @ViewBuilder private var cardEdge: some View {
+        if colorScheme == .dark {
+            RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
         }
     }
 
-    private var hoursDisplayText: String {
-        switch selectedGoal {
-        case .reps750:
-            return AppFormat.hours(hours)
-        case .mp500:
-            let pct = (hours / selectedGoal.targetHours) * 100
-            return String(format: "%.0f%%", pct)
-        case .mp100:
-            return AppFormat.hours(hours)
-        }
-    }
-
-    private var hoursColor: Color {
-        switch selectedGoal {
-        case .reps750:
-            return colors.textPrimary
-        case .mp500:
-            return barColor
-        case .mp100:
-            return hours > selectedGoal.targetHours ? AppColors.successGreen : colors.textPrimary
-        }
-    }
-
-    private var subText: String {
-        switch selectedGoal {
-        case .reps750:
-            return String(format: "%.0f%%", progress * 100)
-        case .mp500:
-            return "complete"
-        case .mp100:
-            return "logged"
-        }
-    }
-
-    private var effectiveBarColor: Color {
-        if selectedGoal == .mp100 && hours > selectedGoal.targetHours {
-            return AppColors.successGreenLight
-        }
-        return barColor
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Circle()
-                .fill(effectiveBarColor.opacity(colorScheme == .dark ? 0.28 : 0.18))
-                .frame(width: 44, height: 44)
-                .overlay {
-                    LucideIcon(image: property.propertyType == .str ? Lucide.bedDouble : Lucide.house, size: 20)
-                        .foregroundStyle(effectiveBarColor)
-                }
-
-            // Property info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(property.name)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineLimit(1)
-
-                Text(metaText)
-                    .font(AppTypography.caption)
-                    .foregroundStyle(colors.textSecondary)
-                    .lineLimit(1)
-
-                // Progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(colors.border.opacity(colorScheme == .dark ? 0.35 : 0.35))
-                            .frame(height: 4)
-
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(
-                                LinearGradient(
-                                    colors: [effectiveBarColor, effectiveBarColor.opacity(0.6)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: max(geometry.size.width * progress, 0), height: 4)
-                            .lhMotion(AppAnimation.ringProgress, value: progress)
-                    }
-                }
-                .frame(height: 4)
-                .padding(.top, 6)
-            }
-
-            Spacer(minLength: 4)
-
-            // Hours
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(hoursDisplayText)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(hoursColor)
-
-                Text(subText)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-    }
-}
-
-// MARK: - Category Breakdown Section
-struct CategoryBreakdownSection: View {
-    let viewModel: AppViewModel
-    let selectedYear: Int
-    var selectedGoal: GoalMode = .reps750
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var categoryBreakdown: [(ActivityCategory, Double)] {
-        let entries = viewModel.entriesForYear(selectedYear)
-        var breakdown: [ActivityCategory: Double] = [:]
-
-        for entry in entries where entry.countsForREPS {
-            breakdown[entry.category, default: 0] += entry.hours
-        }
-
-        return breakdown.sorted { $0.value > $1.value }.map { ($0.key, $0.value) }
-    }
-
-    private let categoryColors: [Color] = [
-        AppColors.reportsAccent,
-        AppColors.error,
-        AppColors.successGreenLight,
-        AppColors.warning,
-        AppColors.dataBlue,
-        AppColors.repairOrange,
-        AppColors.reportsAccentSoft,
-        AppColors.dataBlueDeep,
-        AppColors.dataRed,
-        AppColors.dataEmerald,
-        AppColors.dataPink,
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Categories")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(colors.textPrimary)
-
-                Spacer()
-            }
-            .padding(.horizontal, AppSpacing.xl)
-
-            if categoryBreakdown.isEmpty {
-                EmptySectionCard(
-                    systemIcon: "tag",
-                    message: "No time entries yet"
-                )
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(Array(categoryBreakdown.enumerated()), id: \.element.0) { index, item in
-                        let (category, hours) = item
-                        let catColor = categoryColors[index % max(categoryColors.count, 1)]
-                        CategoryBreakdownRow(
-                            category: category,
-                            hours: hours,
-                            totalHours: viewModel.totalHoursAllParticipants(year: selectedYear),
-                            barColor: catColor
-                        )
-                    }
-                }
-                .padding(.horizontal, AppSpacing.xl)
-            }
-        }
-    }
-}
-
-// MARK: - Category Breakdown Row
-struct CategoryBreakdownRow: View {
-    let category: ActivityCategory
-    let hours: Double
-    let totalHours: Double
-    var barColor: Color = AppColors.primary
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var progress: Double {
-        guard totalHours > 0 else { return 0 }
-        return hours / totalHours
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(
-                    LinearGradient(
-                        colors: [barColor, barColor.opacity(0.7)],
-                        startPoint: .top,
-                        endPoint: .bottom
+    private var monthSection: some View {
+        let values = monthly
+        let total = values.reduce(0, +)
+        let symbols = Calendar.current.shortMonthSymbols
+        let currentMonth = Calendar.current.component(.month, from: Date())
+        let isCurrentYear = Calendar.current.component(.year, from: Date()) == selectedYear
+        return VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(sectionTitle(RR.t("reports.section.month", "By month"), total: total))
+            Chart {
+                ForEach(0..<12, id: \.self) { index in
+                    BarMark(
+                        x: .value("Month", symbols[index]),
+                        y: .value("Hours", values[index])
                     )
-                )
-                .frame(width: 4, height: 40)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    LucideIcon(image: category.lucideIcon, size: 12)
-                        .foregroundStyle(barColor)
-
-                    Text(category.rawValue)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(1)
+                    .foregroundStyle(isCurrentYear && index + 1 > currentMonth ? colors.border : colors.action)
+                    .cornerRadius(4)
+                    .accessibilityLabel(Calendar.current.monthSymbols[index])
+                    .accessibilityValue(LHFormat.spokenHours(values[index]))
                 }
-
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(colors.border.opacity(colorScheme == .dark ? 0.35 : 0.35))
-                            .frame(height: 4)
-
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(
-                                LinearGradient(
-                                    colors: [barColor, barColor.opacity(0.6)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: max(geometry.size.width * progress, 0), height: 4)
-                            .lhMotion(AppAnimation.ringProgress, value: progress)
+            }
+            .chartXAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let label = value.as(String.self) {
+                            Text(String(label.prefix(1)))
+                                .font(.caption2)
+                                .foregroundStyle(colors.textSecondary)
+                        }
                     }
                 }
-                .frame(height: 4)
-                .padding(.top, 4)
             }
-
-            Spacer(minLength: 4)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(AppFormat.hours(hours))
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-
-                Text(String(format: "%.0f%%", progress * 100))
-                    .font(AppTypography.label)
-                    .foregroundStyle(AppColors.mist)
+            .chartYAxis {
+                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine().foregroundStyle(colors.border.opacity(0.7))
+                    AxisValueLabel {
+                        if let hours = value.as(Double.self) {
+                            Text(LHFormat.hours(hours))
+                                .font(.caption2)
+                                .monospacedDigit()
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                    }
+                }
             }
+            .frame(height: ax ? 160 : 120)
+            .opacity(isLoading ? 0 : 1)
+            .overlay {
+                if isLoading {
+                    RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous)
+                        .fill(colors.backgroundTertiary)
+                }
+            }
+            .padding(LHMetrics.cardPadding)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+            .overlay { cardEdge }
+            .accessibilityLabel(RR.t("reports.month.spoken", "Hours by month, \(String(selectedYear))"))
+            .accessibilityIdentifier("reports.monthChart")
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                .fill(
-                    colorScheme == .dark
-                    ? colors.backgroundSecondary.opacity(0.9)
-                    : Color.white.opacity(0.65)
-                )
+    }
+
+    // MARK: Export
+
+    private var pdfTitle: String {
+        String(format: String(localized: "pdf.title", defaultValue: "Rental hours record %lld"), selectedYear)
+    }
+
+    private var exportRow: some View {
+        LHRow.Browse(
+            title: pdfTitle,
+            meta: RR.t("reports.export.meta", "The PDF and the spreadsheet, with where each hour came from."),
+            systemImage: "doc.richtext",
+            wrapsMeta: true,
+            action: ProGate.isExportLocked(isPro: subscriptionManager.isPro) ? nil : exportAction
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.75 : 0.22), lineWidth: 1)
-        )
+    }
+
+    /// Free: the card is a `.row` locked preview (the Reports free preview); every report above
+    /// stays free. Pro: a plain link to the PDF.
+    @ViewBuilder
+    private var exportCard: some View {
+        if ProGate.isExportLocked(isPro: subscriptionManager.isPro) {
+            LHRowGroup {
+                LockedPreview(
+                    size: .row,
+                    entry: .reportsExport,
+                    line: ProGate.lockLine(.reportsExport),
+                    keeps: ProGate.keepsLine(.reportsExport),
+                    onUnlock: openExportPaywall
+                ) {
+                    exportRow
+                }
+            }
+        } else {
+            LHRowGroup { exportRow }
+                .accessibilityIdentifier("reports.exportCard")
+        }
+    }
+
+    /// Export always opens the PDF page; a free user sees it as a locked preview there.
+    private func exportAction() {
+        showingExportSheet = true
+    }
+
+    private func openExportPaywall() {
+        paywall = ProPaywallRequest(context: .export, entry: .reportsExport, year: selectedYear,
+                                    onUnlocked: { showingExportSheet = true })
     }
 }
 
-// MARK: - Empty Section Card
-struct EmptySectionCard: View {
-    let systemIcon: String
-    let message: String
-    var actionLabel: String? = nil
-    var action: (() -> Void)? = nil
+// MARK: - Standing cards
 
-    @Environment(\.colorScheme) var colorScheme
+private extension ReportStanding {
+    var spokenValue: String {
+        RR.t("reports.standing.spoken", "\(LHFormat.spokenHours(hours)) of \(Int(target)) hours. \(status). \(detail ?? "")")
+    }
+}
+
+/// The lead standing. D6 caps a non-hero card at 20% of the window, so the ring sits beside the
+/// words (112 at default, 96 at XXL) instead of above them at the 260 that standard section 1.12
+/// names; both cannot hold, and the cap is the measured rule. At accessibility sizes the card is
+/// words only (the ring would stack above them) and the long detail line sits under it on the
+/// page, so no card passes 20%.
+private struct RingStandingCard: View {
+    let standing: ReportStanding
+    let year: Int
+    var isLoading = false
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
+    private var toneColor: Color {
+        switch standing.tone {
+        case .positive: return colors.positive
+        case .caution: return colors.caution
+        case .neutral: return colors.textSecondary
+        }
+    }
+
+    private var toneSymbol: String {
+        switch standing.tone {
+        case .positive: return "checkmark.circle.fill"
+        case .caution: return "exclamationmark.circle.fill"
+        case .neutral: return "circle.dashed"
+        }
+    }
+
+    private var eyebrow: String {
+        RR.t("reports.standing.eyebrow", "\(String(year)) \u{00B7} \(standing.name)")
+    }
+
+    private var ringDiameter: CGFloat { typeSize >= .xxLarge ? 96 : 112 }
+
+    private var statusLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: toneSymbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(toneColor)
+                .accessibilityHidden(true)
+            Text(standing.status)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(standing.tone == .neutral ? colors.textPrimary : toneColor)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var eyebrowText: some View {
+        Text(eyebrow)
+            .font(AppTypography.drafting)
+            .textCase(.uppercase)
+            .tracking(1.3)
+            .foregroundStyle(colors.draftingInk)
+    }
+
     var body: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 8) {
-                JellyBadge(
-                    systemName: systemIcon,
-                    color: AppColors.mist,
-                    wash: AppColors.snow,
-                    size: 40
-                )
-
-                Text(message)
-                    .font(AppTypography.body)
-                    .foregroundStyle(colors.textSecondary)
-
-                if let actionLabel, let action {
-                    Button(action: action) {
-                        Text(actionLabel)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(AppColors.primary)
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    eyebrowText
+                    Text(RR.t("reports.standing.ofHours", "\(LHFormat.hours(standing.hours)) of \(Int(standing.target))h"))
+                        .font(.title3.weight(.semibold))
+                        .fontDesign(.rounded)
+                        .monospacedDigit()
+                        .foregroundStyle(colors.textPrimary)
+                        .redacted(reason: isLoading ? .placeholder : [])
+                    statusLine
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .center, spacing: 16) {
+                    LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: ringDiameter, lineWidth: 12, accessibilityValue: standing.spokenValue) {
+                        VStack(spacing: 0) {
+                            Text(String(Int(standing.hours.rounded(.down))))
+                                .font(.title.weight(.bold))
+                                .fontDesign(.rounded)
+                                .monospacedDigit()
+                                .foregroundStyle(colors.textPrimary)
+                                .contentTransition(.numericText())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .redacted(reason: isLoading ? .placeholder : [])
+                            Text(RR.t("reports.standing.ofShort", "of \(Int(standing.target))h"))
+                                .font(.caption)
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
                     }
+                    VStack(alignment: .leading, spacing: 4) {
+                        eyebrowText
+                        statusLine
+                        if let detail = standing.detail {
+                            Text(detail)
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.vertical, AppSpacing.xl)
-            Spacer()
         }
-        .background(
-            RoundedRectangle(cornerRadius: AppCornerRadius.medium)
-                .fill(
-                    colorScheme == .dark
-                    ? Color.white.opacity(0.06)
-                    : Color.white.opacity(0.5)
-                )
-        )
-        .padding(.horizontal, AppSpacing.xl)
+        .padding(LHMetrics.cardPadding)
+        .frame(maxWidth: .infinity)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(RR.t("reports.standing.label", "\(standing.name), \(standing.goal.spokenName)"))
+        .accessibilityValue(standing.spokenValue)
+        .accessibilityIdentifier("reports.standing.\(standing.person.rawValue)")
     }
 }
 
-// MARK: - ActivityCategory Lucide Mapping
-extension ActivityCategory {
-    var lucideIcon: UIImage {
-        switch self {
-        case .repairs: return Lucide.wrench
-        case .management: return Lucide.folder
-        case .leasing: return Lucide.key
-        case .bookkeeping: return Lucide.fileText
-        case .legal: return Lucide.landmark
-        case .insurance: return Lucide.shield
-        case .travel: return Lucide.car
-        case .renovations: return Lucide.hammer
-        case .investing: return Lucide.trendingUp
-        case .financing: return Lucide.dollarSign
-        case .contractNegotiation: return Lucide.fileCog
-        }
+/// Any further standing (a spouse's own count): a small ring beside the words.
+private struct CompactStandingCard: View {
+    let standing: ReportStanding
+    let year: Int
+    var isLoading = false
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var eyebrow: String {
+        RR.t("reports.standing.eyebrow", "\(String(year)) \u{00B7} \(standing.name)")
     }
 
-    var lucideIconName: String {
-        switch self {
-        case .repairs: return "wrench"
-        case .management: return "folder"
-        case .leasing: return "key"
-        case .bookkeeping: return "file-text"
-        case .legal: return "landmark"
-        case .insurance: return "shield"
-        case .travel: return "car"
-        case .renovations: return "hammer"
-        case .investing: return "trending-up"
-        case .financing: return "dollar-sign"
-        case .contractNegotiation: return "file-cog"
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
+        layout {
+            // At accessibility sizes the words carry the count ("21h of 750h"); the ring would
+            // only add a stacked 72pt band above six lines of text.
+            if !typeSize.isAccessibilitySize {
+                LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: 72, lineWidth: 9,
+                       accessibilityValue: standing.spokenValue) {
+                    EmptyView()
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(eyebrow)
+                    .font(AppTypography.drafting)
+                    .textCase(.uppercase)
+                    .tracking(1.3)
+                    .foregroundStyle(colors.draftingInk)
+                Text(RR.t("reports.standing.ofHours", "\(LHFormat.hours(standing.hours)) of \(Int(standing.target))h"))
+                    .font(.title3.weight(.semibold))
+                    .fontDesign(.rounded)
+                    .monospacedDigit()
+                    .foregroundStyle(colors.textPrimary)
+                    .redacted(reason: isLoading ? .placeholder : [])
+                Text(standing.status)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                if let detail = standing.detail, typeSize < .xxLarge {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    var color: Color {
-        switch self {
-        case .repairs: return AppColors.coral
-        case .management: return AppColors.sage
-        case .leasing: return AppColors.sky
-        case .bookkeeping: return AppColors.honey
-        case .legal: return AppColors.rose
-        case .insurance: return AppColors.primaryLight
-        case .travel: return AppColors.sky
-        case .renovations: return AppColors.coral
-        case .investing: return AppColors.sage
-        case .financing: return AppColors.honey
-        case .contractNegotiation: return AppColors.primary
+        .padding(LHMetrics.cardPadding)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+            }
         }
-    }
-
-    var chipLabel: String {
-        switch self {
-        case .repairs: return "Repairs"
-        case .management: return "Management"
-        case .leasing: return "Leasing"
-        case .bookkeeping: return "Bookkeeping"
-        case .legal: return "Legal"
-        case .insurance: return "Insurance"
-        case .travel: return "Travel"
-        case .renovations: return "Renovations"
-        case .investing: return "Investing"
-        case .financing: return "Financing"
-        case .contractNegotiation: return "Contracts"
-        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(RR.t("reports.standing.label", "\(standing.name), \(standing.goal.spokenName)"))
+        .accessibilityValue(standing.spokenValue)
+        .accessibilityIdentifier("reports.standing.\(standing.person.rawValue)")
     }
 }
 
-// MARK: - 100-Hour Test Confirmation Sheet
+// MARK: - 100-hour test question sheet
 //
-// Shared by Reports and the Settings tax profile. Records the per-tax-year answer to
-// IRS Test 3's "did anyone else participate more?" prong. Answers are icon + text so
-// the choice never depends on color alone.
+// Shared by Reports, Today and Settings. Records the per-tax-year answer to the "did anyone else
+// do more?" part of the 100-hour test. Answers are glyph + text so the choice never depends on
+// colour alone.
 struct ParticipationConfirmationSheet: View {
     let year: Int
     let currentAnswer: Bool?
@@ -1293,45 +712,35 @@ struct ParticipationConfirmationSheet: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Text("100-HOUR TEST")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(0.8)
-                        .foregroundStyle(AppColors.slate)
+        LHSheet(
+            RR.t("reports.sheet.title", "100-hour test"),
+            subtitle: String(year),
+            onClose: { dismiss() }
+        ) {
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                Text(RR.t("reports.sheet.question", "Did a manager or contractor put in more hours than you and your spouse this year, at any rental?"))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Did anyone else — like a property manager or contractor — spend more time on this property than you (and your spouse) this year?")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text("\u{201C}Someone else\u{201D} means a property manager, contractor, or co-owner who isn\u{2019}t your spouse. Answering for \(String(year)).")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                VStack(spacing: AppSpacing.sm) {
-                    answerButton(
-                        title: "No one did more",
-                        subtitle: "You (and your spouse) put in the most time",
-                        icon: Lucide.badgeCheck,
-                        tint: AppColors.successGreen,
-                        tintWash: AppColors.successGreenWash,
+                LHRowGroup {
+                    answerRow(
+                        title: RR.t("reports.sheet.no", "No one did more"),
+                        subtitle: RR.t("reports.sheet.no.detail", "You and your spouse put in the most time."),
+                        symbol: "checkmark.circle.fill",
+                        tint: .positive,
                         isSelected: currentAnswer == true,
                         identifier: "participation.answer.yes"
                     ) {
                         onAnswer(true)
                         dismiss()
                     }
-
-                    answerButton(
-                        title: "Someone did more",
-                        subtitle: "A manager, contractor, or co-owner outpaced you",
-                        icon: Lucide.circleSlash,
-                        tint: AppColors.cautionText,
-                        tintWash: colors.cautionSurface,
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
+                    answerRow(
+                        title: RR.t("reports.sheet.yes", "Someone did more"),
+                        subtitle: RR.t("reports.sheet.yes.detail", "A manager, contractor or co-owner put in more."),
+                        symbol: "exclamationmark.circle.fill",
+                        tint: .caution,
                         isSelected: currentAnswer == false,
                         identifier: "participation.answer.no"
                     ) {
@@ -1339,80 +748,37 @@ struct ParticipationConfirmationSheet: View {
                         dismiss()
                     }
                 }
-
-                Spacer()
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                LHMobileCanvas()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                }
-            }
+            .padding(.top, 8)
         }
-        .presentationDetents([.medium, .large])
+        .lhSheetPresentation(.standard)
+        .accessibilityIdentifier("participation.sheet")
     }
 
-    private func answerButton(
+    private func answerRow(
         title: String,
         subtitle: String,
-        icon: UIImage,
-        tint: Color,
-        tintWash: Color,
+        symbol: String,
+        tint: LHRowGlyph.Tint,
         isSelected: Bool,
         identifier: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                LucideIcon(image: icon, size: 22)
-                    .foregroundStyle(tint)
-                    .frame(width: 44, height: 44)
-                    .background(tintWash)
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(subtitle)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 8)
-
-                if isSelected {
-                    LucideIcon(image: Lucide.check, size: 18)
-                        .foregroundStyle(tint)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous)
-                    .stroke(isSelected ? tint.opacity(0.6) : colors.border.opacity(0.28),
-                            lineWidth: isSelected ? 1.5 : 1)
-            }
+        LHRow.Browse(
+            title: title,
+            meta: subtitle,
+            value: isSelected ? RR.t("reports.sheet.selected", "Chosen") : nil,
+            showsChevron: false,
+            wrapsMeta: true,
+            action: action
+        ) {
+            LHRowGlyph(systemImage: symbol, tint: tint)
         }
-        .buttonStyle(.lhPressable)
         .accessibilityIdentifier(identifier)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
-// MARK: - Preview
 #Preview {
     ReportsView()
         .environmentObject(AppViewModel())

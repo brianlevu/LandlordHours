@@ -1,0 +1,2234 @@
+{
+ "_note": "Hand-labelled calibration set for the 2.0 classifier (WP2, 2026-10-19). 'landlord' is the label, 'category' uses ActivityCategory case names (routine upkeep = repairs; compliance inspections = legal; management = rent, tenant communication, scheduling), 'property' uses the keys below. 'tuning' items shaped the keyword table (incl. the first held-out set, folded in after the review relabel); 'holdout' items were written after the table was frozen. Re-run CalibrationTests and recommit ClassifierThresholds after any change. Split 'realworld' (2026-10-19, classifier v2): synthetic items, one or more per failure pattern found on a real owner's calendar and inbox (no real data). Email items are 'sender: subject'. Property 'birchwood' is a short-term-rental room in a home the owner lives in, with aliases; 'cedar' sits on a two-word street that starts with a place-name prefix.",
+ "properties": [
+  {
+   "key": "oak",
+   "name": "Oak Street Duplex",
+   "address": "412 Oak St, Austin, TX 78704"
+  },
+  {
+   "key": "maple",
+   "name": "Maple Cottage",
+   "address": "88 Maple Ave, Austin, TX 78702"
+  },
+  {
+   "key": "lakeview",
+   "name": "Lakeview Condo",
+   "address": "1500 Lakeshore Blvd Unit 4B, Austin, TX 78741"
+  },
+  {
+   "key": "birchwood",
+   "name": "Birchwood Suite",
+   "address": "77 Birchwood Ln, Austin, TX 78745",
+   "type": "str",
+   "ownerOccupied": true,
+   "aliases": [
+    "Sunny Garden Room in Cozy Family Home",
+    "Ridgeline Plumbing"
+   ]
+  },
+  {
+   "key": "cedar",
+   "name": "Cedar Flats",
+   "address": "240 San Marco Ave, Austin, TX 78746",
+   "type": "ltr"
+  }
+ ],
+ "items": [
+  {
+   "title": "Plumber at Oak St - kitchen leak",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Tenant call - Maple Cottage heater",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Showing: Lakeview Condo unit 4B",
+   "landlord": true,
+   "category": "leasing",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Lease signing w/ new tenant",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "HVAC tune-up 412 Oak",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Collect rent / deposit checks",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Bookkeeping - rental expenses Q3",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Call CPA re Schedule E",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Move-out inspection Maple",
+   "landlord": true,
+   "category": "management",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Move-in walkthrough with new tenants",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Electrician - Lakeview panel upgrade",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Handyman: patch drywall unit 2",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Order appliances for Oak St duplex",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Insurance adjuster visit - water damage",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "File insurance claim for roof",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Eviction hearing - county court",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Meet attorney re lease dispute",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Rental permit renewal - city",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Code enforcement inspection 88 Maple",
+   "landlord": true,
+   "category": "legal",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Drive to Maple Cottage",
+   "landlord": true,
+   "category": "travel",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Home Depot run - Oak St supplies",
+   "landlord": true,
+   "category": "travel",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Kitchen remodel walkthrough w/ contractor",
+   "landlord": true,
+   "category": "renovations",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Flooring install Lakeview",
+   "landlord": true,
+   "category": "renovations",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Get bids for roof replacement",
+   "landlord": true,
+   "category": "renovations",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Landscaper at Maple - spring cleanup",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Pest control - Oak St",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Screen rental applicants",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Post listing on Zillow",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Respond to tenant maintenance requests",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Turnover clean unit 4B",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Rekey locks after move-out",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Smoke detector check - all units",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Water heater replacement Maple",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Garbage disposal fix 412 Oak St",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Gutter cleaning - Maple Cottage",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Annual fire inspection Lakeview building",
+   "landlord": true,
+   "category": "legal",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Lakeview HOA board meeting",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "HOA dues + special assessment review",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Property tax payment - Oak",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Reconcile rent ledger in QuickBooks",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Send 1099s to contractors",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Meet property manager - Lakeview",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Airbnb guest checkout + turnover",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Restock STR supplies",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Respond to VRBO inquiries",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Lease renewal - Maple tenants",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Rent increase notice - Oak St",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Security deposit return - unit 2",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Open house - Lakeview condo",
+   "landlord": true,
+   "category": "leasing",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Roofer estimate 88 Maple Ave",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Toilet repair Lakeview 4B",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Paint vacant unit",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Carpet cleaning between tenants",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Inspect furnace before winter - Oak",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Appraisal at Oak Street Duplex",
+   "landlord": true,
+   "category": "financing",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Refinance call with lender - duplex",
+   "landlord": true,
+   "category": "financing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Tour potential rental property",
+   "landlord": true,
+   "category": "investing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Analyze new duplex deal",
+   "landlord": true,
+   "category": "investing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Negotiate purchase contract - Elm St fourplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Closing on Elm fourplex",
+   "landlord": true,
+   "category": "financing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Mailbox key for new tenant",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Fix broken window at Maple",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Snow removal - Oak St walks",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Tenant complaint follow-up",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Vacancy - update rental listing photos",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Background check for applicant",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Permit pickup for deck repair",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Drive to Lakeview for plumber",
+   "landlord": true,
+   "category": "travel",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Meet contractor at Oak",
+   "landlord": true,
+   "category": "renovations",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Review lease addendum",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Apartments.com listing refresh",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Buildium - enter expenses",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Section 8 inspection - Maple",
+   "landlord": true,
+   "category": "legal",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Mow lawn at rental",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Utility transfer for new tenant",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Leak under sink at 1500 Lakeshore",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Evict notice - unit 2 nonpayment",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Landlord insurance renewal",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Exterminator at Maple Cottage",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Lakeshore unit showing 5pm",
+   "landlord": true,
+   "category": "leasing",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Dentist - cleaning",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Dr. Patel annual physical",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Kids soccer practice",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Emma's piano recital",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Team standup",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "1:1 with Sarah",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Sprint planning",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Q4 OKR review",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "All hands",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Flight to Denver",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Gym - leg day",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Haircut",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Date night",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Parent-teacher conference",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "PTA meeting",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Vet appointment - Max",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Oil change",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Car inspection",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "DMV appointment",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Mom's birthday dinner",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Book club",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Yoga class",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Lunch with Alex",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Interview - senior engineer candidate",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Code review session",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Deploy window",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Church",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Pick up kids from school",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Grocery run",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Costco",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Netflix watch party",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Dinner reservation",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Doctor follow-up",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Therapy",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Basketball court reservation",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Rent tux for wedding",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Fix bike",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Clean garage",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Paint kids room",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "House cleaner",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Mortgage payment (our house)",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Insurance renewal - car",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Weekly sync with product team",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Conference call - vendor demo",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Company offsite",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Wedding - Josh & Kim",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Baby shower",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Flu shot",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Coffee with Mike",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Performance review",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Zoom: quarterly business review",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Swim lessons",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Fantasy draft",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Board meeting (work)",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Lunch at Maple Street Bistro",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Dishwasher not draining - Oak unit B",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Call tenant about late payment",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Garage door opener broken at Maple",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Meet inspector for rental registration",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Swap air filters at all rentals",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Get quotes for new fence at Maple",
+   "landlord": true,
+   "category": "renovations",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Schedule cleaners for unit 4B turnover",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Prep 1031 exchange docs",
+   "landlord": true,
+   "category": "investing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Walk the Oak property with the handyman",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Lakeview board meeting - assessments",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "Answer rental inquiries on Facebook Marketplace",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Pay property insurance premium",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Mold remediation at Lakeview",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "tuning"
+  },
+  {
+   "title": "New tenant orientation",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Sign PM agreement for Maple",
+   "landlord": true,
+   "category": "management",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Upload receipts to Stessa",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Drop off keys for cleaner - 412 Oak",
+   "landlord": true,
+   "category": "management",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Smoke alarm battery swap Maple",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "tuning"
+  },
+  {
+   "title": "Water bill dispute with city for Oak St",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "oak",
+   "split": "tuning"
+  },
+  {
+   "title": "Year-end statements for rentals",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Allergist appointment",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Team retro",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Haircut for Liam",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Soccer tournament",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Quarterly planning offsite",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Pick up dry cleaning",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Brunch with in-laws",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Flight home",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Car wash",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Physical therapy",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Fix leaky faucet at our house",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Kids dentist",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Product roadmap review",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Happy hour with team",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Concert",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Pay credit card bill",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Dog groomer",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Volunteer at school fair",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Hair appointment",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Rent a car for vacation",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "tuning"
+  },
+  {
+   "title": "Replace cracked tile in Oak St bathroom",
+   "landlord": true,
+   "category": "repairs",
+   "property": "oak",
+   "split": "holdout"
+  },
+  {
+   "title": "Text tenants about water shutoff Thursday",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Garbage pickup schedule for Maple tenants",
+   "landlord": true,
+   "category": "management",
+   "property": "maple",
+   "split": "holdout"
+  },
+  {
+   "title": "Lakeview unit 4B AC not cooling",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "holdout"
+  },
+  {
+   "title": "City rental inspection 412 Oak",
+   "landlord": true,
+   "category": "legal",
+   "property": "oak",
+   "split": "holdout"
+  },
+  {
+   "title": "Return call - prospective tenant for Maple",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "holdout"
+  },
+  {
+   "title": "Sign renewal with Oak St tenant",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "holdout"
+  },
+  {
+   "title": "Pick up rent checks from lockbox",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Schedule chimney sweep for Maple Cottage",
+   "landlord": true,
+   "category": "repairs",
+   "property": "maple",
+   "split": "holdout"
+  },
+  {
+   "title": "Lakeview: replace bathroom fan",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "holdout"
+  },
+  {
+   "title": "Run credit check on new applicant",
+   "landlord": true,
+   "category": "leasing",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Late fee notice to unit 2",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Quarterly estimated taxes - rental income",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Categorize rental expenses for September",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Small claims court - unpaid rent",
+   "landlord": true,
+   "category": "legal",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Renew landlord liability policy",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Drive to Oak St to let in plumber",
+   "landlord": true,
+   "category": "travel",
+   "property": "oak",
+   "split": "holdout"
+  },
+  {
+   "title": "Get 3 quotes for Maple kitchen remodel",
+   "landlord": true,
+   "category": "renovations",
+   "property": "maple",
+   "split": "holdout"
+  },
+  {
+   "title": "Walk lender through duplex financials",
+   "landlord": true,
+   "category": "financing",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Look at fourplex listing on Elm",
+   "landlord": true,
+   "category": "investing",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Counteroffer on Elm fourplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Clean gutters at the duplex",
+   "landlord": true,
+   "category": "repairs",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Change furnace filter Lakeview",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "holdout"
+  },
+  {
+   "title": "Post vacancy sign at Maple",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "holdout"
+  },
+  {
+   "title": "Answer tenant email about parking",
+   "landlord": true,
+   "category": "management",
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Orthodontist - Mia",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Team offsite planning",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Pick up prescription",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Ski trip",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Board game night",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Quarterly planning with my manager",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Car registration renewal",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Dinner with the Nguyens",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Kids dentist checkup",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Run 5k",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Laundry",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Fix laptop",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Vacation rental for Tahoe trip",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Haircut - Liam",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Pay electric bill (home)",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "holdout"
+  },
+  {
+   "title": "Airbnb: Set up discounts for the fall season",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Increase bookings with powerful promotions",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Lisbon stays you should see",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Your password was updated",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Your security code is 482910",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Webinar - pricing tips for hosts",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Host Updates: March",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Your reservation in Denver is confirmed",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Home Depot: 20% off patio furniture this weekend",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Lowe's: Deals of the week on grills",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Tax Helper Co: Newsletter - five tips before you file",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Sam via Neighbors: [maple-neighbors] Anyone know a good plumber?",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Parent group: [oakhill-parents] Contractor recommendations for a deck",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "City Planning: Permit center newsletter - new fees",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Neighborhood Digest: roof repair question and 4 more posts",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "HomeFinder: New listings near you and 12 more updates",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Property Alerts: Alert: a building permit was requested near you",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "BBQ with the neighbors",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Game night",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Housewarming party",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Birthday celebration at Birchwood",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Parking at San Antonio airport",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "San Antonio International Airport"
+  },
+  {
+   "title": "Spa day",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "San Marcos Springs Resort"
+  },
+  {
+   "title": "Win a car rental for the weekend",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Expert call - rent industry trends",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Airbnb: RE: Reservation for Sunny Garden Room in Cozy Family Home, Mar 3 - 5",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Pending: Reservation request at Sunny Garden Room in Cozy Family Home",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Reminder: 5 hours left to reply to Dana's reservation request",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Inquiry for Sunny Garden Room in Cozy Family Home for Apr 2 - 9",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Write a review for Sam",
+   "landlord": true,
+   "category": "management",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Payout sent for your stay",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Tax form required for payments",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Ridgeline Plumbing: Quote for parts and labor",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Ridgeline Plumbing: Invoice for services rendered",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Fix leaking faucet in guest room",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Guest turnover cleaning",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Cost segregation study kickoff call",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Update depreciation schedule for the rentals",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Send 1099s to contractors",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "CPA: Schedule E draft for the duplex",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Agent Co: Landlord insurance renewal quote",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Jordan Lee and Pat",
+   "landlord": true,
+   "category": "leasing",
+   "property": "cedar",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "240 San Marco Ave, Austin, TX 78746"
+  },
+  {
+   "title": "Riley M.",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "412 Oak St, Austin, TX 78704"
+  },
+  {
+   "title": "Smoke detector check at San Marco",
+   "landlord": true,
+   "category": "repairs",
+   "property": "cedar",
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Counter-offer on the Birch Rd triplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Submit offer on 22 Pine St duplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Review purchase agreement with seller's agent",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Negotiate sale price for Cedar Flats",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "cedar",
+   "split": "deals"
+  },
+  {
+   "title": "Refi call with Chase - Maple Cottage",
+   "landlord": true,
+   "category": "financing",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "HELOC application for Oak Street Duplex",
+   "landlord": true,
+   "category": "financing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Rate lock deadline - Lakeview refinance",
+   "landlord": true,
+   "category": "financing",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Send bank statements to lender for DSCR loan",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Closing docs signing - Pine St duplex",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Run cap rate on Birch Rd triplex",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Tour potential rental on Walnut Ave",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Pull comps for 22 Pine St",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "1031 exchange - identify replacement property",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Look at duplex listing in Eastside",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Negotiation call with the seller's agent",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "List the Pine Street house for sale with the broker",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Sign listing agreement for Cedar Flats",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "cedar",
+   "split": "deals"
+  },
+  {
+   "title": "Negotiate price with the buyer's agent - Maple Cottage",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Closing at the title company at 9am",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Escrow closing call for the Pine St duplex",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Pay the mortgage payment for Oak Street Duplex",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Record the mortgage payment - Lakeview",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Set up autopay for the loan payment on Maple Cottage",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Escrow walkthrough for the Birch duplex purchase",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Draft LOI for the 6-unit on 3rd St",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Inspection contingency call with buyer's agent",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Earnest money wire due Friday - Pine St duplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Review inspection period extension with the seller",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Due diligence checklist for the Eastside fourplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Final walk-through for the Walnut Ave purchase",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Put the Maple Cottage on the market",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Meet broker to sell the Lakeview house",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Counter on PSA for the Elm Ave fourplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Sign broker agreement for the sale of Pine St",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Loan application documents for the 8-unit",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Call mortgage broker about pre-approval",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Appraisal ordered by lender for Oak Street Duplex",
+   "landlord": true,
+   "category": "financing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Cash-out refi quote for Lakeview",
+   "landlord": true,
+   "category": "financing",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Build pro forma for the 12-unit acquisition",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Underwriting the Hamilton St deal with partners",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Intro call with buyer's agent about Eastside duplexes",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Tenant lease renewal negotiation for Oak Street Duplex",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Offer lease renewal to tenant at Maple Cottage",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Collect rent from tenants - Lakeview",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Return deposit from tenant - Oak Street Duplex",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Pay property tax bill for Cedar Flats",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "cedar",
+   "split": "deals"
+  },
+  {
+   "title": "Closing up the pool for winter - Maple Cottage",
+   "landlord": true,
+   "category": "management",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Closing the gate and checking locks at Lakeview",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Autopay for the mortgage on Oak Street Duplex",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Review contingency fund for repairs at Lakeview",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Move-out walkthrough with tenant at Maple Cottage",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "deals"
+  }
+ ]
+}
