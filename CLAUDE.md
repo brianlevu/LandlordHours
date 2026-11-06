@@ -112,3 +112,7 @@ Run `get_design_context` then `get_screenshot` for the exact node before impleme
 - **DerivedData**: ALWAYS pass `-derivedDataPath /Volumes/Home/DerivedData` when running `xcodebuild`. The boot disk is only 228GB. Never use the default ~/Library/Developer/Xcode/DerivedData/.
 - **Simulators**: Local simulators OK — device files symlinked to external SSD. Use Device Hub to manage. Max 1-2 at a time (16GB RAM). Always use `-derivedDataPath /Volumes/Home/DerivedData`.
 - **Temp files**: Build artifacts in /tmp fill the boot disk. Prefer `/Volumes/Home/tmp` for large intermediate files.
+
+## Release metadata
+
+- **Copyright is "2026 Altai Ventures LLC"** (`fastlane/metadata/copyright.txt`). Never "OpenClaw". When creating a new App Store version, pass `--copyright "2026 Altai Ventures LLC"` to `asc versions create` (ASC copies the old "2026 OpenClaw" otherwise) and confirm with `asc versions list` before submit. Bundle IDs stay `com.openclaw.*` (permanent; users never see them).
