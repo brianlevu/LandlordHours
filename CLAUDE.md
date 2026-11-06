@@ -120,6 +120,6 @@ Run `get_design_context` then `get_screenshot` for the exact node before impleme
 
 ### Source of truth
 
-- The App Store listing name is **Dormer** (app id 6759508794). The internal code name LandlordHours stays valid for targets and source.
+- The App Store name is **Dormer: REPS Hour Tracker** (brand: Dormer; app id 6759508794). The internal code name LandlordHours stays valid for targets and source.
 - `metadata/` is a snapshot pulled from App Store Connect on 2026-11-06 (live version 2.3). Before any ASO or listing advice, re-pull (`asc metadata pull`) or check live with `asc`; never trust the snapshot alone.
 - `fastlane/metadata/` mirrors it for the `release` lane. The marketing site (https://altaiventures.co/products/dormer/) lives in the altaiventures repo, not here.

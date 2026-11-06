@@ -101,8 +101,8 @@ enum Analytics {
 
     /// The current PostHog distinct id, for cross-SDK attribution joins ONLY (today: the RevenueCat
     /// `$posthogUserId` subscriber attribute set in `LandlordPurchases.configure`). This is the
-    /// single seam that lets PostHog's id leave this file, so `Analytics.swift` stays the only file
-    /// that touches PostHog. Returns `nil` when analytics never configured (QA/DEBUG/XCTest) or the
+    /// single seam that lets PostHog's id leave this file: `Analytics.swift` is the only place
+    /// PostHog's distinct id is read. Returns `nil` when analytics never configured (QA/DEBUG/XCTest) or the
     /// user opted out of usage sharing. A plain attribute value, never an identity call: nothing
     /// here calls (or should ever call) `PostHogSDK.shared.identify()`, which would link the two
     /// SDKs' users and break the privacy manifest's "not linked to you" claim.
