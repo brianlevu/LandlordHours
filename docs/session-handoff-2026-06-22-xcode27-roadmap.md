@@ -1,7 +1,7 @@
 # Session Handoff - Xcode 27 Readiness and LandlordHours Roadmap
 
 Date: 2026-06-22
-Project: `/Users/brian/Projects/LandlordHours`
+Project: `/Users/brian/Projects/Dormer`
 
 ## Current Toolchain State
 
@@ -95,10 +95,10 @@ Before this handoff:
 Useful evidence:
 
 - Track milestone screenshots:
-  - `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
-  - `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
+  - `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
+  - `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
 - Backlog:
-  - `/Users/brian/Projects/LandlordHours/docs/design-improvement-backlog.md`
+  - `/Users/brian/Projects/Dormer/docs/design-improvement-backlog.md`
 
 ## Roadmap After Xcode 27 Setup
 
@@ -130,13 +130,13 @@ Useful evidence:
 Use this when returning to LandlordHours after the Xcode 27 setup:
 
 ```text
-We are continuing `/Users/brian/Projects/LandlordHours`.
+We are continuing `/Users/brian/Projects/Dormer`.
 
 First read:
-- `/Users/brian/Projects/LandlordHours/AGENTS.md`
-- `/Users/brian/Projects/LandlordHours/docs/design-audit-playbook.md`
-- `/Users/brian/Projects/LandlordHours/docs/design-improvement-backlog.md`
-- `/Users/brian/Projects/LandlordHours/docs/session-handoff-2026-06-22-xcode27-roadmap.md`
+- `/Users/brian/Projects/Dormer/AGENTS.md`
+- `/Users/brian/Projects/Dormer/docs/design-audit-playbook.md`
+- `/Users/brian/Projects/Dormer/docs/design-improvement-backlog.md`
+- `/Users/brian/Projects/Dormer/docs/session-handoff-2026-06-22-xcode27-roadmap.md`
 
 Context:
 - Xcode 27 beta setup should now be complete on `/Volumes/Home`.

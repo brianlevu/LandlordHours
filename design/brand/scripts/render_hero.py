@@ -3,7 +3,7 @@ the soft shadow read as a black halo on blueprint blue.
 usage: .venv/bin/python render_hero.py --state stage2_frame75 --out ../renders [--res 1400] [--samples 96]
 """
 import argparse, os, sys, json
-PROJ = '/Users/brian/Projects/LandlordHours/design/blueprint-house/scripts'
+PROJ = '/Users/brian/Projects/Dormer/design/blueprint-house/scripts'
 sys.path.insert(0, PROJ)
 import bpy
 import house as H

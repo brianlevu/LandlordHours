@@ -7,7 +7,7 @@ Use this lane for LandlordHours Xcode 27 beta development. Do not use shared/gen
 ## Project Identity
 
 - App name: LandlordHours
-- Project: `/Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj`
+- Project: `/Users/brian/Projects/Dormer/LandlordHours.xcodeproj`
 - Scheme: `LandlordHours`
 - Widget scheme: `LandlordHoursWidgetExtension`
 - App bundle ID: `com.openclaw.landlordhours`
@@ -61,13 +61,13 @@ xcrun simctl create "LandlordHours iPhone 17 Pro Max iOS 27" "iPhone 17 Pro Max"
 - Result bundles: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results`
 - Archives: `/Volumes/Home/XcodeStorage/Archives`
 - Fastlane output: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/fastlane`
-- Lane logs/screenshots/tmp: `/Users/brian/Projects/LandlordHours/tmp/xcode27`
-- Lane logs: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs`
-- Lane screenshots: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots`
+- Lane logs/screenshots/tmp: `/Users/brian/Projects/Dormer/tmp/xcode27`
+- Lane logs: `/Users/brian/Projects/Dormer/tmp/xcode27/logs`
+- Lane screenshots: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots`
 
 Storage note:
 
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27` is a symlink to `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/tmp/xcode27`.
+- `/Users/brian/Projects/Dormer/tmp/xcode27` is a symlink to `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/tmp/xcode27`.
 - Keep this symlink. The internal drive hit `No space left on device` when logs/screenshots were stored directly under the project checkout.
 - Do not move keychain, signing, provisioning, or CoreSimulator device storage.
 
@@ -96,8 +96,8 @@ The runner pins:
 - Simulator: `LandlordHours iPhone 17 Pro Max iOS 27` (`B119FCEA-3C7B-4022-A57E-28357879F07D`)
 - DerivedData: `/Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27`
 - Results: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results`
-- Logs: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs`
-- Screenshots: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots`
+- Logs: `/Users/brian/Projects/Dormer/tmp/xcode27/logs`
+- Screenshots: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots`
 - Backing tmp path: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/tmp/xcode27`
 
 Build for testing:
@@ -106,13 +106,13 @@ Build for testing:
 RUN=lane-build-for-testing-$(date +%Y%m%d%H%M%S)
 DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer \
 xcodebuild \
-  -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj \
+  -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj \
   -scheme LandlordHours \
   -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' \
   -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 \
   -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/${RUN}.xcresult \
   build-for-testing \
-  2>&1 | tee /Users/brian/Projects/LandlordHours/tmp/xcode27/logs/${RUN}.log
+  2>&1 | tee /Users/brian/Projects/Dormer/tmp/xcode27/logs/${RUN}.log
 ```
 
 Unit tests only:
@@ -121,14 +121,14 @@ Unit tests only:
 RUN=lane-unit-test-$(date +%Y%m%d%H%M%S)
 DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer \
 xcodebuild \
-  -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj \
+  -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj \
   -scheme LandlordHours \
   -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' \
   -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 \
   -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/${RUN}.xcresult \
   -only-testing:LandlordHoursTests \
   test-without-building \
-  2>&1 | tee /Users/brian/Projects/LandlordHours/tmp/xcode27/logs/${RUN}.log
+  2>&1 | tee /Users/brian/Projects/Dormer/tmp/xcode27/logs/${RUN}.log
 ```
 
 Full test suite:
@@ -137,13 +137,13 @@ Full test suite:
 RUN=lane-full-test-$(date +%Y%m%d%H%M%S)
 DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer \
 xcodebuild \
-  -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj \
+  -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj \
   -scheme LandlordHours \
   -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' \
   -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 \
   -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/${RUN}.xcresult \
   test \
-  2>&1 | tee /Users/brian/Projects/LandlordHours/tmp/xcode27/logs/${RUN}.log
+  2>&1 | tee /Users/brian/Projects/Dormer/tmp/xcode27/logs/${RUN}.log
 ```
 
 Release archive:
@@ -152,7 +152,7 @@ Release archive:
 RUN=LandlordHours-$(date +%Y%m%d%H%M%S)
 DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer \
 xcodebuild \
-  -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj \
+  -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj \
   -scheme LandlordHours \
   -configuration Release \
   -destination 'generic/platform=iOS' \
@@ -168,7 +168,7 @@ DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer \
 xcodebuild -exportArchive \
   -archivePath /Volumes/Home/XcodeStorage/Archives/LandlordHours-20260622215945.xcarchive \
   -exportPath /Volumes/Home/XcodeStorage/Archives/LandlordHours-20260622215945-export \
-  -exportOptionsPlist /Users/brian/Projects/LandlordHours/tmp/xcode27/ExportOptions-app-store-connect.plist \
+  -exportOptionsPlist /Users/brian/Projects/Dormer/tmp/xcode27/ExportOptions-app-store-connect.plist \
   -allowProvisioningUpdates
 ```
 
@@ -215,8 +215,8 @@ Latest lane verification:
 - App Store Connect version `1.0.3` upload completed on 2026-06-23 without App Review submission.
 - Corrected IPA: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/fastlane/LandlordHours.ipa`
 - Corrected IPA version/build: `1.0.3` / `202606230116`
-- Metadata/screenshots upload log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/appstore-release-20260623011007.log`
-- Corrected binary-only upload log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/appstore-binary-only-20260623013127-v103.log`
+- Metadata/screenshots upload log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/appstore-release-20260623011007.log`
+- Corrected binary-only upload log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/appstore-binary-only-20260623013127-v103.log`
 - App Store upload failure root cause found on 2026-06-23: alternate icon metadata validation (`90032 Invalid Image Path`), fixed in the stable Xcode 26 release lane with build `202606230805`.
 - `LANE_TIMEOUT_SECONDS=900 ./ci_scripts/test_xcode27_lane.sh build` passed with Xcode 27 beta after Lock Screen widget, Dynamic Island action, notification action, and Engagement Lab QA hardening.
 - Build result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622224343.xcresult`
@@ -251,9 +251,9 @@ Earlier lane verification:
 - `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit` passed, confirmed from xcresult as 66 passed / 0 failed.
 - Unit result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-unit-test-20260622045117.xcresult`
 - Direct UI test run emitted a clean pass summary: 5 passed / 0 failed.
-- UI log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/direct-ui-test-202606220455.log`
+- UI log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/direct-ui-test-202606220455.log`
 - Dark + accessibility-large visual matrix completed with 17 screenshots.
-- Visual evidence: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2`
+- Visual evidence: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2`
 
 Post-restart lane hardening:
 
@@ -309,7 +309,7 @@ Real-device signing probe:
 ```bash
 DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer \
 xcodebuild \
-  -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj \
+  -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj \
   -scheme LandlordHours \
   -destination 'platform=iOS,id=00008140-001C682C0E7B001C' \
   -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 \
@@ -347,7 +347,7 @@ Managed provisioning attempt:
 - The earlier successful `lane-device-build-altai-managed-20260622180549.xcresult` verified Apple account access and managed provisioning, but it used the temporary Altai bundle IDs before the continuity decision.
 - After restoring the existing App Store Connect namespace, real-device managed provisioning succeeded.
 - Continuity result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-openclaw-managed-20260622182805.xcresult`
-- Continuity command: `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj -scheme LandlordHours -destination 'platform=iOS,id=00008140-001C682C0E7B001C' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-openclaw-managed-20260622182805.xcresult -allowProvisioningUpdates build`
+- Continuity command: `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj -scheme LandlordHours -destination 'platform=iOS,id=00008140-001C682C0E7B001C' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-openclaw-managed-20260622182805.xcresult -allowProvisioningUpdates build`
 - Continuity result: `BUILD SUCCEEDED`.
 - Signing used Team ID `G68NLC3DA3`, app profile `iOS Team Provisioning Profile: com.openclaw.landlordhours`, and widget profile `iOS Team Provisioning Profile: com.openclaw.landlordhours.widget`.
 

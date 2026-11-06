@@ -1,7 +1,7 @@
 # LandlordHours Xcode 27 Readiness Handoff
 
 Date: 2026-06-22
-Project: `/Users/brian/Projects/LandlordHours`
+Project: `/Users/brian/Projects/Dormer`
 
 ## Executive Summary
 
@@ -86,7 +86,7 @@ Before a real upload, verify the App Store Connect key still exists locally and 
 Command path:
 
 - XcodeBuildMCP defaults:
-  - Project: `/Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj`
+  - Project: `/Users/brian/Projects/Dormer/LandlordHours.xcodeproj`
   - Scheme: `LandlordHours`
   - Simulator: `iPhone 17`
   - Bundle ID: `com.openclaw.landlordhours`
@@ -108,7 +108,7 @@ Artifacts:
 
 Within `/Users/brian/Projects`, the landlord-related scan found only the active Swift project:
 
-- `/Users/brian/Projects/LandlordHours`
+- `/Users/brian/Projects/Dormer`
 
 No separate old non-Swift LandlordHouse folder was found in that scope during this audit.
 
@@ -121,13 +121,13 @@ If an older non-Swift LandlordHouse or LandlordHours implementation is found els
 - whether it contains unique assets, copy, data, screenshots, or release metadata worth preserving
 - recommended action: archive or delete
 
-Then ask Brian for explicit confirmation before deleting anything. Never delete `/Users/brian/Projects/LandlordHours`.
+Then ask Brian for explicit confirmation before deleting anything. Never delete `/Users/brian/Projects/Dormer`.
 
 ## What Changed In This Audit
 
 Added this handoff document:
 
-- `/Users/brian/Projects/LandlordHours/docs/session-handoff-2026-06-22-xcode27-readiness.md`
+- `/Users/brian/Projects/Dormer/docs/session-handoff-2026-06-22-xcode27-readiness.md`
 
 No project code, signing settings, deployment target, package versions, storage paths, or generated project files were changed by this audit.
 
@@ -211,7 +211,7 @@ Updated: 2026-06-22 02:22 America/Los_Angeles
 
 Use the project-specific Xcode 27 lane documented at:
 
-- `/Users/brian/Projects/LandlordHours/docs/xcode27-lane.md`
+- `/Users/brian/Projects/Dormer/docs/xcode27-lane.md`
 
 Current lane:
 
@@ -219,12 +219,12 @@ Current lane:
 - Simulator UUID: `B119FCEA-3C7B-4022-A57E-28357879F07D`
 - DerivedData: `/Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27`
 - Results: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results`
-- Logs/screenshots/tmp: `/Users/brian/Projects/LandlordHours/tmp/xcode27`
+- Logs/screenshots/tmp: `/Users/brian/Projects/Dormer/tmp/xcode27`
 
 Latest lane verification:
 
 - `build-for-testing` succeeded with Xcode 27 beta.
-- Build log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/lane-build-for-testing-20260622022215.log`
+- Build log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/lane-build-for-testing-20260622022215.log`
 - Result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622022215.xcresult`
 
 Do not use the shared/generic `Codex iPhone 17 Pro iOS 27.0` simulator for active LandlordHours work.
@@ -244,7 +244,7 @@ Verification after forced restart:
 
 - `./ci_scripts/test_xcode27_lane.sh doctor` passed.
 - `LANE_TIMEOUT_SECONDS=120 ./ci_scripts/test_xcode27_lane.sh build` passed.
-- Latest build log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/lane-build-for-testing-20260622025107.log`
+- Latest build log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/lane-build-for-testing-20260622025107.log`
 - Latest result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622025107.xcresult`
 
 Use these commands for future sessions:
@@ -318,7 +318,7 @@ xcodegen generate
 Then use XcodeBuildMCP:
 
 1. `session_show_defaults`
-2. If defaults still point to `/Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj`, scheme `LandlordHours`, and an iOS 27 simulator, run `test_sim(progress: false)`.
+2. If defaults still point to `/Users/brian/Projects/Dormer/LandlordHours.xcodeproj`, scheme `LandlordHours`, and an iOS 27 simulator, run `test_sim(progress: false)`.
 3. If the default simulator is still iOS 26.5, switch the simulator default before treating the app as iOS 27-validated.
 
 For distribution validation:
@@ -349,12 +349,12 @@ Only run a real TestFlight upload when Brian explicitly wants it. App Store revi
 We are continuing LandlordHours after the Xcode 27 beta environment setup.
 
 Project:
-`/Users/brian/Projects/LandlordHours`
+`/Users/brian/Projects/Dormer`
 
 Read first:
-- `/Users/brian/Projects/LandlordHours/AGENTS.md`
-- `/Users/brian/Projects/LandlordHours/docs/session-handoff-2026-06-22-xcode27-readiness.md`
-- `/Users/brian/Projects/LandlordHours/docs/design-improvement-backlog.md`
+- `/Users/brian/Projects/Dormer/AGENTS.md`
+- `/Users/brian/Projects/Dormer/docs/session-handoff-2026-06-22-xcode27-readiness.md`
+- `/Users/brian/Projects/Dormer/docs/design-improvement-backlog.md`
 
 First verify:
 - `xcode-select -p`

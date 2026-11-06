@@ -6,7 +6,7 @@ Outputs transparent PNGs per state: built pass (dark-variant lighting, made for 
 and a cyan linework pass; icon_compose.py puts them on blueprint blue.
 """
 import argparse, math, os, sys, time, json
-PROJ = '/Users/brian/Projects/LandlordHours/design/blueprint-house/scripts'
+PROJ = '/Users/brian/Projects/Dormer/design/blueprint-house/scripts'
 sys.path.insert(0, PROJ)
 import bpy
 from mathutils import Vector, Matrix

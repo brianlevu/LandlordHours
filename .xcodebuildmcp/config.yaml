@@ -1,6 +1,6 @@
 schemaVersion: 1
 sessionDefaults:
-  projectPath: /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj
+  projectPath: /Users/brian/Projects/Dormer/LandlordHours.xcodeproj
   scheme: LandlordHours
   simulatorName: LandlordHours iPhone 17 Pro Max iOS 27
   simulatorId: B119FCEA-3C7B-4022-A57E-28357879F07D

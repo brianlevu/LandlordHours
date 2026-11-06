@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-23 00:41 America/Los_Angeles
 Design skill: `impeccable` 3.7.1
-Latest scan: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/full-matrix-light-current-20260622193508/contact-sheet.jpg`
+Latest scan: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/full-matrix-light-current-20260622193508/contact-sheet.jpg`
 
 ## Goal
 
@@ -46,7 +46,7 @@ Evidence:
 - Device build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-20260622215713.xcresult`
 - Release archive: `/Volumes/Home/XcodeStorage/Archives/LandlordHours-20260622215945.xcarchive`
 - App Store Connect export: `/Volumes/Home/XcodeStorage/Archives/LandlordHours-20260622215945-export/LandlordHours.ipa`
-- Export log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/lane-export-app-store-connect-20260622220323.log`
+- Export log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/lane-export-app-store-connect-20260622220323.log`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=900 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -77,11 +77,11 @@ Completed in milestone 1:
 - Ran static design scans from `docs/design-audit-playbook.md`; remaining hits are expected category customization colors, token definitions, and normal acronyms such as PDF/REPS/STR.
 
 Evidence:
-- Current light contact sheet: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/full-matrix-light-current-20260622193508/contact-sheet.jpg`
-- Current light screenshots: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/full-matrix-light-current-20260622193508`
-- Dark contact sheet: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/full-matrix-dark-20260622192604/contact-sheet.jpg`
-- Dark screenshots: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/full-matrix-dark-20260622192604`
-- Track fixed screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/full-matrix-fixes-20260622192534/08-empty-track-fixed.png`
+- Current light contact sheet: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/full-matrix-light-current-20260622193508/contact-sheet.jpg`
+- Current light screenshots: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/full-matrix-light-current-20260622193508`
+- Dark contact sheet: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/full-matrix-dark-20260622192604/contact-sheet.jpg`
+- Dark screenshots: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/full-matrix-dark-20260622192604`
+- Track fixed screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/full-matrix-fixes-20260622192534/08-empty-track-fixed.png`
 
 Verification:
 - `git diff --check`: passed.
@@ -268,8 +268,8 @@ Verification:
 - Milestone 2 build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622165619.xcresult`
 - Milestone 2 unit result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-unit-test-20260622165639.xcresult`
 - Milestone 2 screenshots:
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/engagement-lab-202606221657/01-engagement-lab-dark.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/engagement-lab-202606221657/02-engagement-lab-light.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/engagement-lab-202606221657/01-engagement-lab-dark.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/engagement-lab-202606221657/02-engagement-lab-light.png`
 - Milestone 3 build: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh build`: passed.
 - Milestone 3 unit: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit`: passed, 78 / 78.
 - Milestone 3 build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622170244.xcresult`
@@ -311,12 +311,12 @@ Verification:
 - Milestone 10 targeted UI: rebuilt `testEngagementLabSurfacesStayReviewable`: passed, 1 / 1.
 - Milestone 10 build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622232853.xcresult`
 - Milestone 10 UI result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-ui-engagement-glass-final-20260622234129.xcresult`
-- Milestone 10 UI screenshots: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/engagement-glass-final-20260622234129/`
+- Milestone 10 UI screenshots: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/engagement-glass-final-20260622234129/`
 - Milestone 11 build: `LANE_TIMEOUT_SECONDS=600 ./ci_scripts/test_xcode27_lane.sh build`: passed.
 - Milestone 11 build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260623000948.xcresult`
-- Milestone 11 final Home Screen screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/home-system-surfaces-after-widget-final.png`
+- Milestone 11 final Home Screen screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/home-system-surfaces-after-widget-final.png`
 - Milestone 11 unit runner note: single-test and full-unit commands compiled the targets but stalled during Xcode 27 simulator test handoff; the hung `xcodebuild` processes were terminated. Re-run unit tests after simulator/Xcode runner state is clean.
-- Real-device signing probe: `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj -scheme LandlordHours -destination 'platform=iOS,id=00008140-001C682C0E7B001C' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-altai-20260622174951.xcresult build`: failed at provisioning, not Swift/build logic.
+- Real-device signing probe: `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj -scheme LandlordHours -destination 'platform=iOS,id=00008140-001C682C0E7B001C' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-altai-20260622174951.xcresult build`: failed at provisioning, not Swift/build logic.
 - Real-device continuity signing: restored the existing App Store Connect namespace and verified managed provisioning succeeds for `com.openclaw.landlordhours` and `com.openclaw.landlordhours.widget`.
 
 Next:
@@ -345,11 +345,11 @@ Files: `Sources/Views/TimeLogView.swift`, `Sources/Services/VoiceEntryService.sw
 Evidence:
 - `08-occasional-track.png`
 - `13-frequent-track-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-idle.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-running.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-review.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-idle.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-running.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-review.png`
 
 Problems:
 - Core daily flow still reads like the older app compared with Home, Reports, Settings, and Paywall.
@@ -396,18 +396,18 @@ Completed in milestone 4:
 Verification:
 - Build/run: passed with no warnings via XcodeBuildMCP.
 - Visual evidence:
-  - `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
-  - `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
+  - `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
+  - `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
 - Voice visual evidence:
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
 - Timer visual evidence:
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-idle.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-running.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-review.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-dark-20260622072714/timer-running-dark.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/01-track-expanded-details-top-dark-a11y.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/02-track-expanded-details-lower-dark-a11y.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-idle.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-running.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-review.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-dark-20260622072714/timer-running-dark.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/01-track-expanded-details-top-dark-a11y.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/02-track-expanded-details-lower-dark-a11y.png`
 - Static design scans: no new Track-specific critical hits.
 - Tests: 69 passed, 0 failed, 0 skipped.
 
@@ -421,10 +421,10 @@ Files: `Sources/Views/PropertiesView.swift`
 Evidence:
 - `07-occasional-properties.png`
 - `12-frequent-properties-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/add-property.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/property-detail.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/add-property-empty-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/property-detail-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/add-property.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/property-detail.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/add-property-empty-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/property-detail-dark-a11y.png`
 
 Problems:
 - Property cards feel utilitarian and list-like rather than like a premium rental portfolio.
@@ -463,15 +463,15 @@ Completed in milestone 3:
 Verification:
 - Build: passed through the dedicated Xcode 27 lane.
 - Visual evidence:
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-check-20260622030528/occasional-properties.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-check-20260622030528/frequent-properties.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/add-property.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/property-detail.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/07-empty-properties.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/12-occasional-properties.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/17-frequent-properties-pro.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/add-property-empty-dark-a11y.png`
-  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/property-detail-dark-a11y.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-check-20260622030528/occasional-properties.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-check-20260622030528/frequent-properties.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/add-property.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/property-detail.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/07-empty-properties.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/12-occasional-properties.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/17-frequent-properties-pro.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/add-property-empty-dark-a11y.png`
+  - `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/property-detail-dark-a11y.png`
 - Static design scans: no new Properties-specific critical hits.
 
 Remaining Properties follow-up:
@@ -482,28 +482,28 @@ Remaining Properties follow-up:
 Status: Milestone 5 complete; first-time activation flow verified
 Files: `Sources/Views/OnboardingView.swift`, `Sources/ViewModels/AppViewModel.swift`, `Sources/Views/SettingsView.swift`, `Sources/Views/DashboardView.swift`, `Sources/Views/ContentView.swift`, `Sources/Views/PropertiesView.swift`, `Sources/Views/TimeLogView.swift`, `UITests/LandlordHoursUITests.swift`, visual capture scripts
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/01-onboarding-goal.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/02-empty-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/03-empty-properties.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/04-empty-track.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/05-empty-reports.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/06-empty-settings.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/01-onboarding-goal.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/02-onboarding-property.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/03-onboarding-paywall.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/04-onboarding-notifications.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/05-onboarding-calendar.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/onboarding-contact-sheet.jpg`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-depth-fix-202606220910/02-onboarding-property-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-polish-202606220930/04-onboarding-notifications-polished.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-polish-202606220930/05-onboarding-calendar-polished.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-polish-202606220933/03-onboarding-paywall-polished-final.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/review.md`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/01-onboarding-goal-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/02-onboarding-property-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/03-onboarding-paywall-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/04-onboarding-notifications-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/05-onboarding-calendar-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/01-onboarding-goal.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/02-empty-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/03-empty-properties.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/04-empty-track.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/05-empty-reports.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/06-empty-settings.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/01-onboarding-goal.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/02-onboarding-property.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/03-onboarding-paywall.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/04-onboarding-notifications.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/05-onboarding-calendar.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/onboarding-contact-sheet.jpg`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-depth-fix-202606220910/02-onboarding-property-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-polish-202606220930/04-onboarding-notifications-polished.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-polish-202606220930/05-onboarding-calendar-polished.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-polish-202606220933/03-onboarding-paywall-polished-final.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/01-onboarding-goal-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/02-onboarding-property-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/03-onboarding-paywall-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/04-onboarding-notifications-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/05-onboarding-calendar-dark-a11y-fixed.png`
 
 Problems:
 - Current first-time visual matrix is blocked by the same onboarding goal screen across tab labels.
@@ -546,7 +546,7 @@ Verification:
 - Visual capture: `SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh` passed with 17 screenshots and `review.md`.
 - Screenshot inspection: confirmed `01-onboarding-goal.png` is true onboarding, while `02-empty-home.png` through `06-empty-settings.png` are signed-in main app tabs with no properties or entries.
 - Milestone 2 build: `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build` passed.
-- Milestone 2 visual capture: `OUT_DIR=/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh` passed with 21 screenshots and `review.md`.
+- Milestone 2 visual capture: `OUT_DIR=/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh` passed with 21 screenshots and `review.md`.
 - Milestone 2 unit tests: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit` passed, 69 / 69.
 - Static design scans: reviewed; no new onboarding/root critical hits.
 - Whitespace scan: `git diff --check` passed.
@@ -555,7 +555,7 @@ Verification:
 - Milestone 3 unit tests: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit` passed, 69 / 69.
 - Milestone 3 static scans: reviewed; no new onboarding hits.
 - Milestone 3 whitespace scan: `git diff --check` passed.
-- Milestone 4 full matrix: `OUT_DIR=/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y APPEARANCE=dark CONTENT_SIZE=accessibility-large SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh` passed with 21 screenshots.
+- Milestone 4 full matrix: `OUT_DIR=/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y APPEARANCE=dark CONTENT_SIZE=accessibility-large SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh` passed with 21 screenshots.
 - Milestone 4 targeted re-capture: five onboarding steps passed in dark/accessibility-large after the CTA and selector fixes.
 - Milestone 4 unit tests: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit` passed, 69 / 69.
 - Milestone 4 static scans: reviewed; no new onboarding hits.
@@ -570,7 +570,7 @@ Completed in milestone 5:
 Verification:
 - Targeted first-time activation UI test reported pass on the dedicated iOS 27 Pro Max lane: `LandlordHoursUITests/testFirstTimeActivationFlowAddsPropertyAndLogsFirstHour`.
 - Result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/first-time-activation-202606221642.xcresult`
-- Log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/first-time-activation-202606221642.log`
+- Log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/first-time-activation-202606221642.log`
 - Final build: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh build` passed.
 - Final unit tests: `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit` passed, 69 / 69.
 - Final whitespace scan: `git diff --check` passed.
@@ -585,8 +585,8 @@ Remaining First-Time follow-up:
 Status: Completed
 Files: `Sources/Views/ReportsView.swift`
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/10-occasional-reports.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/15-frequent-reports-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/10-occasional-reports.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/15-frequent-reports-pro.png`
 
 Problems:
 - Reports is visually strong, but lower content can compete with the floating tab bar.
@@ -611,9 +611,9 @@ Verification:
 Status: Completed
 Files: `Sources/Views/DashboardView.swift`
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/02-empty-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/07-occasional-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/12-frequent-home-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/02-empty-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/07-occasional-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/12-frequent-home-pro.png`
 
 Problems:
 - Learning was reachable but felt like a quiet card below the primary Home work.
@@ -648,20 +648,20 @@ Remaining Home follow-up:
 Status: Completed; remaining imagery licensing decision is pre-submission polish
 Files: `Sources/Views/LearningCenterView.swift`, `Sources/Views/DashboardView.swift`, `Assets.xcassets/LearningHero.imageset`, `Assets.xcassets/LearningArticle*.imageset`
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-polish-202606220758/04-learn-hub-light-replaced.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-polish-202606220758/05-learn-hub-dark-replaced.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-ia-202606220856/01-learn-hub-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/01-learn-hub-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/02-article-reps-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/03-article-str-ltr-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/04-article-spouse-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/05-article-records-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/01-guide-reps-roadmap-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/02-guide-audit-proof-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/03-quick-read-hour-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/04-quick-read-receipts-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/01-learn-guides-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/02-learn-quick-reads-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-polish-202606220758/04-learn-hub-light-replaced.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-polish-202606220758/05-learn-hub-dark-replaced.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-ia-202606220856/01-learn-hub-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/01-learn-hub-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/02-article-reps-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/03-article-str-ltr-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/04-article-spouse-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/05-article-records-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/01-guide-reps-roadmap-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/02-guide-audit-proof-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/03-quick-read-hour-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/04-quick-read-receipts-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/01-learn-guides-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/02-learn-quick-reads-dark-a11y.png`
 
 Problems:
 - Learn used repeated generic article artwork, so different topics felt interchangeable.
@@ -741,8 +741,8 @@ Notes:
 Status: Completed
 Files: `Sources/Services/AppleSignIn.swift`
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/signed-out-welcome-ios27-20260622-final/01-welcome-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/signed-out-welcome-ios27-20260622-final/02-welcome-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/signed-out-welcome-ios27-20260622-final/01-welcome-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/signed-out-welcome-ios27-20260622-final/02-welcome-dark.png`
 
 Problems:
 - The signed-out screen used a rotating carousel with generic clay-style artwork and oversized marketing copy.
@@ -773,7 +773,7 @@ Outcome:
 - Confirmed Reports/Home/Settings/Paywall are currently lower-risk.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_22-48-07-impeccable-screen-scan/contact-sheet.jpg`
+- `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_22-48-07-impeccable-screen-scan/contact-sheet.jpg`
 
 Next:
 - Execute P0 Track Time redesign, then run the visual/test loop.
@@ -786,8 +786,8 @@ Outcome:
 - Verified both occasional and frequent seeded states.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
-- `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
+- `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
+- `/Users/brian/Projects/Dormer/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
 
 Verification:
 - `build_run_sim`: passed, no warnings.
@@ -807,8 +807,8 @@ Outcome:
 - Used native iOS 26+/27 Liquid Glass treatment for the summary card while preserving fallback behavior for iOS 17+.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-check-20260622030528/occasional-properties.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-check-20260622030528/frequent-properties.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-check-20260622030528/occasional-properties.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-check-20260622030528/frequent-properties.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -827,8 +827,8 @@ Outcome:
 - Fixed the XcodeBuildMCP active defaults profile so automation uses the dedicated `LandlordHours iPhone 17 Pro Max iOS 27` simulator instead of a shared simulator.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/add-property.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/property-detail.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/add-property.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-milestone-2-20260622032558/property-detail.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -852,11 +852,11 @@ Outcome:
 - Confirmed Property Detail's evidence overview, identity fields, and location section remain usable in dark/accessibility-large.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/07-empty-properties.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/12-occasional-properties.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/17-frequent-properties-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/add-property-empty-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/property-detail-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/07-empty-properties.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/12-occasional-properties.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/17-frequent-properties-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/add-property-empty-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/properties-dark-a11y-202606220942/property-detail-dark-a11y.png`
 
 Verification:
 - Visual screenshot inspection: passed for first viewport and primary flows.
@@ -873,13 +873,13 @@ Outcome:
 - Fixed the generated non-admin debug-control checklist reference.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/01-onboarding-goal.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/02-empty-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/03-empty-properties.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/04-empty-track.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/05-empty-reports.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/06-empty-settings.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/01-onboarding-goal.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/02-empty-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/03-empty-properties.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/04-empty-track.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/05-empty-reports.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/06-empty-settings.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-37-24/review.md`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -897,9 +897,9 @@ Outcome:
 - Preserved the existing Reports hero, goal switcher, progress ring, pace indicator, stat chips, and export affordance.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/10-occasional-reports.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/15-frequent-reports-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/10-occasional-reports.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/15-frequent-reports-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_03-48-03/review.md`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -919,17 +919,17 @@ Outcome:
 - Iterated after screenshot review: the first checklist version was too tall, so it became a 2x2 action grid and moved above the annual target card for the empty state.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/02-empty-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/07-occasional-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/12-frequent-home-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/02-empty-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/07-occasional-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/12-frequent-home-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_04-18-40/review.md`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh build`: passed.
 - `SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh`: passed, 17 screenshots captured.
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh unit`: passed, 65 / 65.
 - Static design scans: reviewed, no new Home-specific critical hits.
-- Dark/accessibility-large screenshot inspection: activation grid passed in `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/06-empty-home.png`.
+- Dark/accessibility-large screenshot inspection: activation grid passed in `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/06-empty-home.png`.
 
 Next:
 - Continue monitoring lower Home content around the floating tab bar during full-matrix visual runs.
@@ -950,17 +950,17 @@ Mobbin reference check:
 - Time-entry form structure: [Toggl Track time entry](https://mobbin.com/screens/0ddd6c94-6458-4b1a-807c-a36adf93eab1) and [Jobber work-entry pattern](https://mobbin.com/screens/c705b35b-93d8-4aa1-a37f-2aa174ff6003).
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/02-empty-home.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/14-frequent-track-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/15-frequent-reports-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/16-frequent-settings-pro.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/02-empty-home.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/14-frequent-track-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/15-frequent-reports-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/16-frequent-settings-pro.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2/review.md`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh build`: passed.
 - `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit`: passed, confirmed from xcresult as 66 / 66.
-- Direct UI run with Xcode 27 beta: emitted pass summary, 5 / 5 UI tests passed. Xcode 27 beta kept the shell process attached after the pass summary, so the process was stopped manually after the success output was written to `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/direct-ui-test-202606220455.log`.
-- `APPEARANCE=dark CONTENT_SIZE=accessibility-large SETTLE_SECONDS=5 OUT_DIR=/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2 ./ci_scripts/capture_iphone_e2e_visuals.sh`: passed, 17 screenshots captured.
+- Direct UI run with Xcode 27 beta: emitted pass summary, 5 / 5 UI tests passed. Xcode 27 beta kept the shell process attached after the pass summary, so the process was stopped manually after the success output was written to `/Users/brian/Projects/Dormer/tmp/xcode27/logs/direct-ui-test-202606220455.log`.
+- `APPEARANCE=dark CONTENT_SIZE=accessibility-large SETTLE_SECONDS=5 OUT_DIR=/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_roadmap-dark-a11y-final2 ./ci_scripts/capture_iphone_e2e_visuals.sh`: passed, 17 screenshots captured.
 
 Notes:
 - Xcode 27 beta still logs an Apple simulator accessibility warning about duplicate WebCore/WebKit accessibility classes during UI tests. It did not fail the tests.
@@ -981,8 +981,8 @@ Outcome:
 - Improved parser coverage for dictation-like duration phrases.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1007,10 +1007,10 @@ Outcome:
 - Added accessibility identifiers for timer start, stop, save, and discard controls.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-idle.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-running.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-review.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/timer-polish-dark-20260622072714/timer-running-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-idle.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-running.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-20260622072543/timer-review.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/timer-polish-dark-20260622072714/timer-running-dark.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1033,8 +1033,8 @@ Outcome:
 - Added `-LHOpenLearningCenter` for deterministic Learn screenshot capture from the real Home navigation stack.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-polish-202606220758/04-learn-hub-light-replaced.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-polish-202606220758/05-learn-hub-dark-replaced.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-polish-202606220758/04-learn-hub-light-replaced.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-polish-202606220758/05-learn-hub-dark-replaced.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1055,11 +1055,11 @@ Outcome:
 - Confirmed `-LHOpenLearningCenter` still opens the Learn area before routing into a detail article.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/01-learn-hub-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/02-article-reps-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/03-article-str-ltr-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/04-article-spouse-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/05-article-records-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/01-learn-hub-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/02-article-reps-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/03-article-str-ltr-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/04-article-spouse-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-dark-a11y-202606220948/05-article-records-dark-a11y.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1079,10 +1079,10 @@ Outcome:
 - Confirmed the secondary Learn surfaces now keep readable body text, visible guide CTAs, and unclipped lesson/source rows.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/01-guide-reps-roadmap-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/02-guide-audit-proof-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/03-quick-read-hour-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/04-quick-read-receipts-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/01-guide-reps-roadmap-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/02-guide-audit-proof-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/03-quick-read-hour-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-secondary-dark-a11y-202606221002/04-quick-read-receipts-dark-a11y.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1102,8 +1102,8 @@ Outcome:
 - Confirmed the Date, Person, attachment, and property controls remain readable and usable in forced dark appearance with accessibility-large Dynamic Type.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/01-track-expanded-details-top-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/02-track-expanded-details-lower-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/01-track-expanded-details-top-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/track-expanded-dark-a11y-202606221017/02-track-expanded-details-lower-dark-a11y.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1124,8 +1124,8 @@ Outcome:
 - Confirmed Guides and Quick Answers now share the simplified row vocabulary and remain readable in the lower hub.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/01-learn-guides-dark-a11y.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/02-learn-quick-reads-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/01-learn-guides-dark-a11y.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/learn-lower-dark-a11y-202606221022/02-learn-quick-reads-dark-a11y.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1147,17 +1147,17 @@ Outcome:
 - Fixed the property onboarding screen after inspection showed the CTA sitting too close to the bottom safe area.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/01-onboarding-goal.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/02-onboarding-property.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/03-onboarding-paywall.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/04-onboarding-notifications.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/05-onboarding-calendar.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/onboarding-contact-sheet.jpg`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-depth-fix-202606220910/02-onboarding-property-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/01-onboarding-goal.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/02-onboarding-property.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/03-onboarding-paywall.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/04-onboarding-notifications.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/05-onboarding-calendar.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth/onboarding-contact-sheet.jpg`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-depth-fix-202606220910/02-onboarding-property-fixed.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
-- `OUT_DIR=/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh`: passed, 21 screenshots captured.
+- `OUT_DIR=/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-depth SETTLE_SECONDS=5 ./ci_scripts/capture_iphone_e2e_visuals.sh`: passed, 21 screenshots captured.
 - `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit`: passed, 69 / 69.
 - `git diff --check`: passed.
 - Static design scans: reviewed; no new onboarding/root critical hits.
@@ -1179,9 +1179,9 @@ Outcome:
 - Iterated after screenshot review to fix Calendar title compression, flow-caption truncation, and Pro benefit truncation.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-polish-202606220930/04-onboarding-notifications-polished.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-polish-202606220930/05-onboarding-calendar-polished.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-polish-202606220933/03-onboarding-paywall-polished-final.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-polish-202606220930/04-onboarding-notifications-polished.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-polish-202606220930/05-onboarding-calendar-polished.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-polish-202606220933/03-onboarding-paywall-polished-final.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1204,12 +1204,12 @@ Outcome:
 - Re-captured all five onboarding steps after the fixes and confirmed no clipped CTAs or broken primary content.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/review.md`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/01-onboarding-goal-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/02-onboarding-property-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/03-onboarding-paywall-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/04-onboarding-notifications-dark-a11y-fixed.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/05-onboarding-calendar-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_onboarding-dark-a11y/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/01-onboarding-goal-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/02-onboarding-property-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/03-onboarding-paywall-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/04-onboarding-notifications-dark-a11y-fixed.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-dark-a11y-fix-202606220937/05-onboarding-calendar-dark-a11y-fixed.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1233,9 +1233,9 @@ Outcome:
 - Added a shared `tabBarUnderlay` in `ContentView` so the floating tab reads as an intentional dock and long scroll content fades cleanly behind it.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_promax-ios27-audit-r2/review.md`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_promax-ios27-audit-r3-targeted/settings-occasional.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_promax-ios27-audit-r3-targeted/reports-frequent.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_promax-ios27-audit-r2/review.md`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_promax-ios27-audit-r3-targeted/settings-occasional.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/e2e-visual-runs/2026-06-22_promax-ios27-audit-r3-targeted/reports-frequent.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit`: passed, 69 / 69.
@@ -1262,14 +1262,14 @@ Outcome:
 - Mobbin was requested for reference, but no Mobbin connector was available in this Codex session; the implemented pattern follows the common high-quality iOS approach of making the native launch screen a stable, static brand/product promise and keeping animation in SwiftUI.
 
 Evidence:
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-storyboard-final/launch-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-storyboard-final/launch-dark.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-storyboard-r2/02-transition-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-vector-final/launch-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-vector-final/launch-dark.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-minimal-r2/01-first-frame-light.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-minimal-r2/03-first-frame-dark.png`
-- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/loading-screen-20260622-minimal-r2/05-after-5s-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-storyboard-final/launch-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-storyboard-final/launch-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-storyboard-r2/02-transition-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-vector-final/launch-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-vector-final/launch-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-minimal-r2/01-first-frame-light.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-minimal-r2/03-first-frame-dark.png`
+- `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/loading-screen-20260622-minimal-r2/05-after-5s-dark.png`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1297,7 +1297,7 @@ Verification:
 - Unit result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-unit-test-20260622202155.xcresult`
 - UI: direct Xcode 27 run passed, 10 / 10.
 - UI result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-ui-direct-20260622203333.xcresult`
-- UI log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/lane-ui-direct-20260622203333.log`
+- UI log: `/Users/brian/Projects/Dormer/tmp/xcode27/logs/lane-ui-direct-20260622203333.log`
 - `xcresulttool` verified both result bundles as readable.
 - `git diff --check`: passed.
 
@@ -1317,11 +1317,11 @@ Outcome:
 - Added UI test assertions for the new decision labels so future redesigns do not silently fall back to generic cards.
 
 Evidence:
-- Light screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-goal-polish-20260622/goal-light.png`
-- Dark screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-goal-polish-20260622/goal-dark.png`
-- Second-pass light screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-goal-polish-20260622-r2/goal-light.png`
-- Second-pass dark screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-goal-polish-20260622-r2/goal-dark.png`
-- Second-pass light/dark comparison: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/onboarding-goal-polish-20260622-r2/goal-light-dark-comparison.jpg`
+- Light screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-goal-polish-20260622/goal-light.png`
+- Dark screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-goal-polish-20260622/goal-dark.png`
+- Second-pass light screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-goal-polish-20260622-r2/goal-light.png`
+- Second-pass dark screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-goal-polish-20260622-r2/goal-dark.png`
+- Second-pass light/dark comparison: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/onboarding-goal-polish-20260622-r2/goal-light-dark-comparison.jpg`
 
 Verification:
 - `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh build`: passed.
@@ -1360,7 +1360,7 @@ Outcome:
 - Added unit assertions so quiet notification behavior is validated instead of only documented.
 
 Evidence:
-- Screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/ios27-polish-home-glass-dock-202606230024.jpg`
+- Screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/ios27-polish-home-glass-dock-202606230024.jpg`
 - Build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260623002243.xcresult`
 - Unit result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-unit-test-20260623002439.xcresult`
 
@@ -1388,8 +1388,8 @@ Outcome:
 - Verified both light and dark appearances on the dedicated iPhone 17 Pro Max iOS 27 simulator.
 
 Evidence:
-- Light screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/login-polish-20260623/login-light-r3-landing.jpg`
-- Dark screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/login-polish-20260623/login-dark-r3-landing.jpg`
+- Light screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/login-polish-20260623/login-light-r3-landing.jpg`
+- Dark screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/login-polish-20260623/login-dark-r3-landing.jpg`
 - Build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260623003728.xcresult`
 
 Verification:
@@ -1412,13 +1412,13 @@ Outcome:
 - Removed the obsolete boxed `welcomeGlass` helper from the previous direction.
 
 Evidence:
-- Light screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/login-polish-20260623/login-light-r4-after.png`
-- Dark screenshot: `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/login-polish-20260623/login-dark-r4-after.png`
+- Light screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/login-polish-20260623/login-light-r4-after.png`
+- Dark screenshot: `/Users/brian/Projects/Dormer/tmp/xcode27/screenshots/login-polish-20260623/login-dark-r4-after.png`
 - Build result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/login-polish-r4-build.xcresult`
 - Full test result bundle: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/login-polish-r4-unit.xcresult`
 
 Verification:
-- `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj -scheme LandlordHours -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/login-polish-r4-build.xcresult build-for-testing`: passed.
-- `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj -scheme LandlordHours -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/login-polish-r4-unit.xcresult test`: passed, 87 unit tests and 11 UI tests.
+- `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj -scheme LandlordHours -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/login-polish-r4-build.xcresult build-for-testing`: passed.
+- `DEVELOPER_DIR=/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer xcodebuild -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj -scheme LandlordHours -destination 'id=B119FCEA-3C7B-4022-A57E-28357879F07D' -derivedDataPath /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27 -resultBundlePath /Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/login-polish-r4-unit.xcresult test`: passed, 87 unit tests and 11 UI tests.
 - `git diff --check`: passed.
 - Fresh logged-out light and dark simulator screenshots captured after reinstalling the app on `LandlordHours iPhone 17 Pro Max iOS 27`.

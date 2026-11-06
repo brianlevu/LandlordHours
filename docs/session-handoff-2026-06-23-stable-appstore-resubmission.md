@@ -10,7 +10,7 @@
 > The body below is left as-written for historical record of the investigation; do not treat its "Remaining Submission Blocker" / "Next Resume Prompt" sections as current TODOs.
 
 Date: 2026-06-23
-Project: `/Users/brian/Projects/LandlordHours`
+Project: `/Users/brian/Projects/Dormer`
 Branch before merge: `codex/landlordhours-voice-logging-ios27`
 
 ## Current Decision
@@ -151,7 +151,7 @@ Use a separate stable lane so artifacts do not collide with Xcode 27 development
 RUN=LandlordHours-Xcode26-$(date +%Y%m%d%H%M%S)
 DEVELOPER_DIR=/Volumes/Home/Applications/Xcode.app/Contents/Developer \
 xcodebuild \
-  -project /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj \
+  -project /Users/brian/Projects/Dormer/LandlordHours.xcodeproj \
   -scheme LandlordHours \
   -configuration Release \
   -destination 'generic/platform=iOS' \
@@ -181,7 +181,7 @@ After uploading the corrected Xcode 26.5 build, verify:
 
 ## Next Resume Prompt
 
-Resume from `/Users/brian/Projects/LandlordHours`.
+Resume from `/Users/brian/Projects/Dormer`.
 
 Use stable Xcode 26.5 for App Store release:
 
